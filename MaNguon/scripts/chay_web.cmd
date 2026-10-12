@@ -131,6 +131,14 @@ function Start-PhotocopyService {
     Start-Process cmd.exe -WorkingDirectory $Solution -ArgumentList $taskCommand -WindowStyle Normal
 }
 
+function Get-PhotocopyAppDrive {
+    param([string[]]$OccupiedLetters)
+    foreach ($taskLetter in [char[]]'PQRSTUVWXYZ') {
+        if ([string]$taskLetter -notin $OccupiedLetters) { return ([string]$taskLetter + ':') }
+    }
+    throw 'Khong con o dia trong P-Z de tao duong dan Android tam.'
+}
+
 function Start-PhotocopyApp {
     param([string]$Solution)
     $taskAdb = Join-Path $env:LOCALAPPDATA 'Android\Sdk\platform-tools\adb.exe'
@@ -149,15 +157,32 @@ function Start-PhotocopyApp {
             Start-Sleep -Seconds 3
         }
     }
+    $taskMobilePath = [IO.Path]::GetFullPath((Join-Path $Solution '..\photocopy_mobile'))
+    $taskMappedDrive = $null
+    $taskPushed = $false
     try {
-        Push-Location (Join-Path $Solution '..\photocopy_mobile')
+        $taskRunPath = $taskMobilePath
+        # Android tren Windows can duong dan ASCII; chi anh xa, khong di chuyen source.
+        if ($taskMobilePath -match '[^\x00-\x7F]') {
+            $taskDrive = Get-PhotocopyAppDrive -OccupiedLetters @(Get-PSDrive -PSProvider FileSystem | ForEach-Object Name)
+            subst $taskDrive $taskMobilePath
+            if ($LASTEXITCODE -ne 0) { throw 'Khong tao duoc o Android tam.' }
+            $taskMappedDrive = $taskDrive
+            $taskRunPath = $taskDrive + '\'
+        }
+        Push-Location $taskRunPath
+        $taskPushed = $true
         flutter run
         if ($LASTEXITCODE -ne 0) { throw 'Flutter run khong thanh cong.' }
     }
     finally {
-        Pop-Location
+        if ($taskPushed) { Pop-Location }
         Stop-Job $taskKeep -ErrorAction SilentlyContinue
         Remove-Job $taskKeep -Force -ErrorAction SilentlyContinue
+        # Chi go o tam da tao thanh cong; khong go cac o ton tai tu truoc.
+        if ($taskMappedDrive) {
+            subst $taskMappedDrive /D
+        }
     }
 }
 

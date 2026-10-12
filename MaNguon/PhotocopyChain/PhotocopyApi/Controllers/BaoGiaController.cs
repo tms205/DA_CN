@@ -11,6 +11,7 @@ using Microsoft.Extensions.Caching.Memory;
 using PhotocopyApi.Models;
 using PhotocopyShared.Constants;
 using PhotocopyShared.Dtos.DatIn;
+using PhotocopyShared.QuyCachIn;
 
 namespace PhotocopyApi.Controllers;
 
@@ -57,6 +58,8 @@ public class BaoGiaController : ControllerBase
 
         if (req.FileIn.Count == 0)
             return BadRequest(new { message = "Vui lòng chọn ít nhất 1 file để báo giá." });
+        if (req.FileIn.Any(x => !QuyTacIn.HuongGiayHopLe(x.HuongGiay)))
+            return BadRequest(new { message = "Hướng giấy phải là giấy đứng hoặc giấy ngang." });
         if (req.HinhThucNhan != "TAI_QUAY" && req.HinhThucNhan != "GIAO_HANG")
             return BadRequest(new { message = "Hình thức nhận hàng không hợp lệ." });
 

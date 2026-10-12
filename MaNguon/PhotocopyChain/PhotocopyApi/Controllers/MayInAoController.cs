@@ -106,7 +106,7 @@ public sealed class MayInAoController : ControllerBase
 
         lenh.DsDongIn = (await conn.QueryAsync<DongLenhInDto>(
             @"SELECT ct.MaChiTiet, ct.MaFile, f.TenFile,
-                     dv.KhoGiay, dv.MauSac, dv.MatIn, ct.SoTrang, ct.SoBan, ct.TuTrang, ct.DenTrang
+                     dv.KhoGiay, dv.MauSac, dv.MatIn, ct.HuongGiay, ct.SoTrang, ct.SoBan, ct.TuTrang, ct.DenTrang
               FROM ChiTietDonHang ct
               JOIN FileIn f ON f.MaFile = ct.MaFile
               JOIN DichVu dv ON dv.MaDichVu = ct.MaDichVu

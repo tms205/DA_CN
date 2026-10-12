@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../api.dart';
 import '../../dinh_dang.dart';
 import '../../models.dart';
+import '../../quy_cach_in.dart';
 import '../../theme.dart';
 import '../../widgets/icons.dart';
 import '../../widgets/widgets.dart';
@@ -42,6 +43,8 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
   // Lựa chọn của khách
   String? _giay; // "A4 70gsm"
   String _matIn = '2_MAT';
+  String _huongGiay = 'DUNG';
+  String? _thongBaoGiaCong;
   String _mauSac = 'DEN_TRANG';
   int _soBan = 1;
   final List<int> _dsGiaCong =
@@ -68,20 +71,44 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
     super.dispose();
   }
 
-  // Tải bảng giá + danh sách chi nhánh, xong thì báo giá lần đầu
+  // Tải chi nhánh trước để lấy bảng giá tạm tính của chi nhánh đầu tiên.
   Future<void> _taiBangGia() async {
     setState(() {
       _dangTaiBangGia = true;
       _loiTaiBangGia = null;
     });
 
-    KetQuaApi kqGia = await Api.get('/api/danh-muc/bang-gia');
     KetQuaApi kqChiNhanh = await Api.get('/api/danh-muc/chi-nhanh');
     if (!mounted) return;
 
-    if (!kqGia.thanhCong || !kqChiNhanh.thanhCong) {
+    if (!kqChiNhanh.thanhCong) {
       setState(() {
-        _loiTaiBangGia = kqGia.thanhCong ? kqChiNhanh.loi : kqGia.loi;
+        _loiTaiBangGia = kqChiNhanh.loi;
+        _dangTaiBangGia = false;
+      });
+      return;
+    }
+
+    List<ChiNhanh> dsChiNhanh = [];
+    for (var cn in kqChiNhanh.duLieu) {
+      dsChiNhanh.add(ChiNhanh.fromJson(cn));
+    }
+    if (dsChiNhanh.isEmpty) {
+      setState(() {
+        _loiTaiBangGia = 'Chưa có chi nhánh nào đang hoạt động.';
+        _dangTaiBangGia = false;
+      });
+      return;
+    }
+
+    int maChiNhanh = dsChiNhanh[0].maChiNhanh;
+    KetQuaApi kqGia = await Api.get(
+      '/api/danh-muc/bang-gia?maChiNhanh=$maChiNhanh',
+    );
+    if (!mounted) return;
+    if (!kqGia.thanhCong) {
+      setState(() {
+        _loiTaiBangGia = kqGia.loi;
         _dangTaiBangGia = false;
       });
       return;
@@ -91,16 +118,13 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
     for (var dong in kqGia.duLieu) {
       bangGia.add(DichVu.fromJson(dong));
     }
-    List<ChiNhanh> dsChiNhanh = [];
-    for (var cn in kqChiNhanh.duLieu) {
-      dsChiNhanh.add(ChiNhanh.fromJson(cn));
-    }
 
     setState(() {
       _bangGia = bangGia;
       _dsChiNhanh = dsChiNhanh;
       _dangTaiBangGia = false;
       _chuanHoaLuaChon();
+      _kiemTraKimGoc();
     });
     _goiBaoGia();
   }
@@ -140,8 +164,9 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
   // Dòng giá ứng với lựa chọn hiện tại
   DichVu? _dongDaChon() {
     for (DichVu d in _dongIn()) {
-      if (d.tenGiay == _giay && d.matIn == _matIn && d.mauSac == _mauSac)
+      if (d.tenGiay == _giay && d.matIn == _matIn && d.mauSac == _mauSac) {
         return d;
+      }
     }
     return null;
   }
@@ -165,6 +190,9 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
     setState(() {
       thayDoi();
       _chuanHoaLuaChon();
+      _kiemTraKimGoc();
+      _baoGia = null;
+      _lanGoi++; // Không nhận giá cũ trong thời gian chờ debounce.
     });
     _hen?.cancel();
     _hen = Timer(const Duration(milliseconds: 350), _goiBaoGia);
@@ -193,8 +221,8 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
     });
 
     KetQuaApi kq = await Api.post('/api/bao-gia', {
-      // Chưa tới bước chọn chi nhánh → tạm tính theo chi nhánh đầu tiên (bảng giá dùng chung toàn chuỗi,
-      // chỉ giờ in xong dự kiến là tùy chi nhánh). Bước 3 sẽ báo giá lại theo chi nhánh khách chọn.
+      // Tạm tính theo chi nhánh đã dùng để tải bảng giá ở bước này.
+      // Bước 3 sẽ báo giá lại theo đúng chi nhánh khách chọn.
       'maChiNhanh': _dsChiNhanh[0].maChiNhanh,
       'hinhThucNhan': 'TAI_QUAY',
       'inGap': _hoaToc,
@@ -203,6 +231,7 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
           'maFileIn': widget.file.maFileIn,
           'maDichVu': dong.maDichVu,
           'soBanIn': _soBan,
+          'huongGiay': _huongGiay,
           'dsGiaCong': _dsGiaCong, // mỗi gia công tính theo từng bản in
         },
       ],
@@ -233,8 +262,9 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
           file: widget.file,
           maDichVu: dong.maDichVu,
           tenCauHinh:
-              '${dong.tenGiay} · ${_matIn == '2_MAT' ? '2 mặt' : '1 mặt'} · ${_mauSac == 'MAU' ? 'In màu' : 'Đen trắng'}',
+              '${dong.tenGiay} · ${_matIn == '2_MAT' ? '2 mặt' : '1 mặt'} · ${_mauSac == 'MAU' ? 'In màu' : 'Đen trắng'} · ${_huongGiay == 'NGANG' ? 'Giấy ngang' : 'Giấy đứng'}',
           soBan: _soBan,
+          huongGiay: _huongGiay,
           dsGiaCong: _dsGiaCong,
           hoaToc: _hoaToc,
           ghiChu: _ghiChu,
@@ -348,6 +378,17 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
                   (giaTri) => _doiLuaChon(() => _matIn = giaTri),
                 ),
                 const SizedBox(height: 12),
+                const NhanTruong('Hướng giấy'),
+                const SizedBox(height: 6),
+                _chonDoan(
+                  [
+                    LuaChon('DUNG', 'Giấy đứng', null, true, ''),
+                    LuaChon('NGANG', 'Giấy ngang', null, true, ''),
+                  ],
+                  _huongGiay,
+                  (giaTri) => _doiLuaChon(() => _huongGiay = giaTri),
+                ),
+                const SizedBox(height: 12),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -398,6 +439,23 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
                 const NhanTruong('Gia công đi kèm'),
                 const SizedBox(height: 6),
                 _luoiGiaCong(),
+                const SizedBox(height: 8),
+                Text(
+                  'Kim góc: tối đa 50 tờ/bản (${soToMoiBan(widget.file.soTrang ?? 0, _matIn)} tờ hiện tại). Lò xo không chọn cùng kim góc; ép plastic vẫn chọn cùng lò xo.',
+                  style: AppTheme.font(size: 12, color: AppColors.chuPhu),
+                ),
+                if (_thongBaoGiaCong != null || !_kimGocHopLe())
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      _thongBaoGiaCong ??
+                          'File vượt 50 tờ/bản, không thể bấm kim góc.',
+                      style: AppTheme.font(
+                        size: 12,
+                        color: AppColors.accentDeep,
+                      ),
+                    ),
+                  ),
                 const SizedBox(height: 12),
                 _theHoaToc(),
               ],
@@ -627,7 +685,7 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
     }
 
     return Container(
-      height: 44,
+      height: 60,
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         color: AppColors.nenXam,
@@ -715,30 +773,49 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
     return Column(children: dsHang);
   }
 
-  // Tick / bỏ tick 1 ô gia công. Khách chọn bao nhiêu cái cũng được, chỉ trừ 2 kiểu đóng gáy
-  // (lò xo, bìa kiếng) là loại trừ nhau — chọn cái này thì tự bỏ cái kia.
+  bool _kimGocHopLe() =>
+      widget.file.soTrang != null &&
+      widget.file.soTrang! > 0 &&
+      soToMoiBan(widget.file.soTrang!, _matIn) <= 50;
+
+  void _kiemTraKimGoc() {
+    if (_kimGocHopLe()) return;
+    for (final dv in _dongGiaCong().where((dv) => laKimGoc(dv))) {
+      if (_dsGiaCong.remove(dv.maDichVu)) {
+        _thongBaoGiaCong = 'Đã bỏ bấm kim góc vì vượt 50 tờ giấy mỗi bản.';
+      }
+    }
+  }
+
+  // Gia công cùng nhóm và cặp lò xo/kim góc loại trừ nhau.
   void _bamGiaCong(DichVu dv) {
     if (_dsGiaCong.contains(dv.maDichVu)) {
       _doiLuaChon(() => _dsGiaCong.remove(dv.maDichVu));
       return;
     }
 
-    DichVu? biBo;
-    if (dv.nhomGiaCong != null) {
-      for (DichVu d in _dongGiaCong()) {
-        if (d.nhomGiaCong == dv.nhomGiaCong && _dsGiaCong.contains(d.maDichVu))
-          biBo = d;
-      }
-    }
-    if (biBo != null) {
+    if (laKimGoc(dv) && !_kimGocHopLe()) {
       hienThongBaoNhanh(
         context,
-        'Mỗi bản in chỉ đóng 1 kiểu gáy — đã bỏ "${biBo.tenDichVu}".',
+        'Kim góc chỉ áp dụng tối đa 50 tờ giấy mỗi bản.',
+      );
+      return;
+    }
+    final biBo = _dongGiaCong()
+        .where((d) => _dsGiaCong.contains(d.maDichVu) && giaCongLoaiTru(d, dv))
+        .toList();
+    if (biBo.isNotEmpty) {
+      hienThongBaoNhanh(
+        context,
+        'Gia công không thể chọn cùng nhau — đã bỏ "${biBo.map((d) => d.tenDichVu).join(', ')}".',
       );
     }
 
     _doiLuaChon(() {
-      if (biBo != null) _dsGiaCong.remove(biBo.maDichVu);
+      _thongBaoGiaCong = null;
+      for (final d in biBo) {
+        _dsGiaCong.remove(d.maDichVu);
+      }
       _dsGiaCong.add(dv.maDichVu);
     });
   }
@@ -750,10 +827,15 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
       onTap: () => _bamGiaCong(dv),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 120),
-        height: 42,
+        constraints: const BoxConstraints(minHeight: 48),
+        alignment: Alignment.center,
         padding: const EdgeInsets.symmetric(horizontal: 11),
         decoration: BoxDecoration(
-          color: daChon ? AppColors.accentSoft : AppColors.trang,
+          color: laKimGoc(dv) && !_kimGocHopLe()
+              ? AppColors.nenXam
+              : daChon
+              ? AppColors.accentSoft
+              : AppColors.trang,
           border: Border.all(
             color: daChon ? AppColors.accent : AppColors.vien,
             width: daChon ? 1.5 : 1,
@@ -788,8 +870,8 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
     return GestureDetector(
       onTap: () => _doiLuaChon(() => _hoaToc = !_hoaToc),
       child: Container(
-        height: 56,
-        padding: const EdgeInsets.symmetric(horizontal: 13),
+        constraints: const BoxConstraints(minHeight: 56),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
         decoration: BoxDecoration(
           color: AppColors.hoaTocNen,
           border: Border.all(color: AppColors.hoaTocVien, width: 1.5),
@@ -877,8 +959,9 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
     // Tên các gia công đang chọn, vd "Đóng bìa kiếng" + "Ép plastic" → "bìa kiếng, ép plastic"
     List<String> dsTen = [];
     for (DichVu d in _dongGiaCong()) {
-      if (_dsGiaCong.contains(d.maDichVu))
+      if (_dsGiaCong.contains(d.maDichVu)) {
         dsTen.add(d.tenDichVu.toLowerCase().replaceFirst('đóng ', ''));
+      }
     }
     String tenGiaCong = dsTen.join(', ');
 

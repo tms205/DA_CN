@@ -9,6 +9,7 @@ public sealed class DongLenhInDto
     public string KhoGiay { get; set; } = "A4";
     public string MauSac { get; set; } = "DEN_TRANG";
     public string MatIn { get; set; } = "1_MAT";
+    public string HuongGiay { get; set; } = "DUNG";
     public int SoTrang { get; set; }
     public int? TuTrang { get; set; }
     public int? DenTrang { get; set; }

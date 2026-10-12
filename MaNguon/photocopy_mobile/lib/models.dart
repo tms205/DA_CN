@@ -292,6 +292,7 @@ class DongInChiTiet {
   String? khoGiay;
   String? loaiGiay;
   String? matIn;
+  String huongGiay = 'DUNG';
   String? mauSac;
   int soTrang = 0;
   int soBan = 1;
@@ -309,6 +310,7 @@ class DongInChiTiet {
     khoGiay = json['khoGiay'];
     loaiGiay = json['loaiGiay'];
     matIn = json['matIn'];
+    huongGiay = json['huongGiay'] ?? 'DUNG';
     mauSac = json['mauSac'];
     soTrang = json['soTrang'] ?? 0;
     soBan = json['soBan'] ?? 1;
@@ -321,7 +323,7 @@ class DongInChiTiet {
   String get quyCach {
     String mat = matIn == '2_MAT' ? '2 mặt' : '1 mặt';
     String mau = mauSac == 'MAU' ? 'In màu' : 'Đen trắng';
-    return '${khoGiay ?? ''} ${loaiGiay ?? ''} · $mat · $mau';
+    return '${khoGiay ?? ''} ${loaiGiay ?? ''} · $mat · $mau · ${huongGiay == 'NGANG' ? 'Giấy ngang' : 'Giấy đứng'}';
   }
 }
 
@@ -475,13 +477,27 @@ class ThanhToan {
   bool get daTra => trangThai == 'DA_THANH_TOAN';
 }
 
-// Link checkout do API tạo từ payOS. App chỉ mở link, không giữ bất kỳ khóa bí mật nào.
+// QR và link do API lấy từ payOS. App không giữ khóa bí mật hay tự xác nhận tiền.
 class LienKetPayOS {
   String checkoutUrl = '';
   DateTime? hanThanhToan;
+  int maDonHang = 0;
+  double soTien = 0;
+  String qrCode = '';
+  String maNganHang = '';
+  String soTaiKhoan = '';
+  String chuTaiKhoan = '';
+  String noiDungChuyenKhoan = '';
 
   LienKetPayOS.fromJson(Map<String, dynamic> json) {
     checkoutUrl = json['checkoutUrl'] ?? '';
+    maDonHang = json['maDonHang'] ?? 0;
+    soTien = soThuc(json['soTien']);
+    qrCode = json['qrCode'] ?? '';
+    maNganHang = json['maNganHang'] ?? '';
+    soTaiKhoan = json['soTaiKhoan'] ?? '';
+    chuTaiKhoan = json['chuTaiKhoan'] ?? '';
+    noiDungChuyenKhoan = json['noiDungChuyenKhoan'] ?? '';
     if (json['hanThanhToan'] != null) {
       hanThanhToan = DateTime.parse(json['hanThanhToan']);
     }

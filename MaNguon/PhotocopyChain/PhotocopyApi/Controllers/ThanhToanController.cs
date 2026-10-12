@@ -19,7 +19,7 @@ using PayOSWebhook = PayOS.Models.Webhooks.Webhook;
 namespace PhotocopyApi.Controllers;
 
 // F-10: thanh toán đơn hàng.
-//   - Khách chọn "Chuyển khoản VietQR": API tạo link payOS và App mở trang checkout chính thức.
+//   - Khách chọn "Chuyển khoản VietQR": API trả QR payOS để App hiển thị trực tiếp.
 //   - Ngân hàng nhận được tiền → payOS gọi vào /api/thanh-toan/webhook,
 //     API gọi sp_XacNhanChuyenKhoan rồi đẩy tin real-time để màn Thanh toán trên App tự chuyển sang "Đã thanh toán".
 //   - Đơn VietQR quá 15 phút chưa chuyển khoản sẽ bị DonQuaHanJob hủy.
@@ -34,6 +34,7 @@ public class ThanhToanController : ControllerBase
     private readonly ILogger<ThanhToanController> _logger;
     private readonly PayOSClient _payOs;
     private readonly TuDongInService _tuDongIn;
+    private readonly DuLieuQrPayOSStore _qrStore;
 
     // Đơn chuyển khoản phải trả trong 15 phút (đúng bằng thời gian sp_HuyDonQuaHan dùng)
     private const int SoPhutChoChuyenKhoan = 15;
@@ -43,13 +44,15 @@ public class ThanhToanController : ControllerBase
         IHubContext<CapNhatHub> hub,
         ILogger<ThanhToanController> logger,
         PayOSClient payOs,
-        TuDongInService tuDongIn)
+        TuDongInService tuDongIn,
+        DuLieuQrPayOSStore qrStore = null)
     {
         _config = config;
         _hub = hub;
         _logger = logger;
         _payOs = payOs;
         _tuDongIn = tuDongIn;
+        _qrStore = qrStore;
         _chuoiKetNoi = config.GetConnectionString("PhotocopyChain");
     }
 
@@ -106,12 +109,7 @@ public class ThanhToanController : ControllerBase
         try
         {
             string kenh = User.IsInRole(VaiTro.Customer) ? "mobile" : "admin";
-            string checkoutUrl = await TaoHoacLayCheckoutUrl(tt, diaChiGoc, kenh);
-            return Ok(new LienKetPayOSDto
-            {
-                CheckoutUrl = checkoutUrl,
-                HanThanhToan = tt.HanThanhToan.Value
-            });
+            return Ok(await TaoHoacLayLienKetPayOS(tt, diaChiGoc, kenh));
         }
         catch (InvalidOperationException ex)
         {
@@ -309,18 +307,22 @@ public class ThanhToanController : ControllerBase
             new { MaDonHang = maDonHang, MaChiNhanh = maChiNhanh, SoPhut = SoPhutChoChuyenKhoan });
     }
 
-    private async Task<string> TaoHoacLayCheckoutUrl(ThanhToanDto tt, string diaChiGoc, string kenh)
+    private async Task<LienKetPayOSDto> TaoHoacLayLienKetPayOS(ThanhToanDto tt, string diaChiGoc, string kenh)
     {
         try
         {
             PaymentLink linkCu = await _payOs.PaymentRequests.GetAsync(tt.MaDonHang);
 
-            if (linkCu.Amount != decimal.ToInt64(tt.SoTien))
+            if (linkCu.OrderCode != tt.MaDonHang || !QuyTacPayOS.SoTienKhop(tt.SoTien, linkCu.Amount))
                 throw new InvalidOperationException("Số tiền trên link payOS cũ không khớp với đơn hàng.");
             if (linkCu.Status is PaymentLinkStatus.Cancelled or PaymentLinkStatus.Expired or PaymentLinkStatus.Failed)
                 throw new InvalidOperationException("Link payOS của đơn đã hết hiệu lực, vui lòng đặt lại đơn.");
 
-            return QuyTacPayOS.TaoCheckoutUrl(linkCu.Id);
+            LienKetPayOSDto data = _qrStore?.Doc(tt.MaDonHang, linkCu.Id, tt.SoTien)
+                ?? new LienKetPayOSDto { MaDonHang = tt.MaDonHang, SoTien = tt.SoTien };
+            data.CheckoutUrl = QuyTacPayOS.TaoCheckoutUrl(linkCu.Id);
+            data.HanThanhToan = tt.HanThanhToan.Value;
+            return data;
         }
         catch (ApiException ex) when (QuyTacPayOS.ChuaCoLienKet(ex.StatusCode, ex.ErrorCode))
         {
@@ -344,7 +346,18 @@ public class ThanhToanController : ControllerBase
         };
 
         CreatePaymentLinkResponse linkMoi = await _payOs.PaymentRequests.CreateAsync(yeuCau);
-        return linkMoi.CheckoutUrl;
+        LienKetPayOSDto qr = QuyTacPayOS.TaoDuLieuQr(
+            linkMoi, tt.MaDonHang, tt.SoTien, tt.HanThanhToan.Value);
+        try
+        {
+            _qrStore?.Luu(tt.MaDonHang, linkMoi.PaymentLinkId, qr);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Không mất QR đang có nếu máy chủ không ghi được cache.
+            _logger.LogWarning("Không lưu được dữ liệu QR cho đơn {MaDonHang}.", tt.MaDonHang);
+        }
+        return qr;
     }
 
     // Ghi nhận đã nhận tiền: gọi thủ tục rồi báo real-time cho khách và cho quầy

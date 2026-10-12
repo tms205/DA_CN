@@ -1,4 +1,5 @@
 @page "/ban-giao"
+@using PhotocopyShared.QuyCachIn
 @attribute [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
 @using Microsoft.AspNetCore.SignalR.Client
 @using PhotocopyShared.Dtos.DonHang
@@ -156,11 +157,11 @@
                 </label>
                 <label class="truong">
                     <span class="nhan">Từ trang</span>
-                    <input class="ca-o-loc mono" type="number" min="@TrangNhoNhat" max="@TrangLonNhat" @bind="_tuTrangPhatSinh" />
+                    <input class="ca-o-loc mono" type="number" min="@TrangNhoNhat" max="@TrangLonNhat" @bind="_tuTrangPhatSinh" @bind:after="KiemTraKimGocBoSung" />
                 </label>
                 <label class="truong">
                     <span class="nhan">Đến trang</span>
-                    <input class="ca-o-loc mono" type="number" min="@TrangNhoNhat" max="@TrangLonNhat" @bind="_denTrangPhatSinh" />
+                    <input class="ca-o-loc mono" type="number" min="@TrangNhoNhat" max="@TrangLonNhat" @bind="_denTrangPhatSinh" @bind:after="KiemTraKimGocBoSung" />
                 </label>
                 <label class="truong">
                     <span class="nhan">Số bản</span>
@@ -172,7 +173,7 @@
             {
                 <div class="truong">
                     <label class="nhan">Quy cách in mới</label>
-                    <select class="ca-o-loc" @bind="_maDichVuBoSung">
+                    <select class="ca-o-loc" @bind="_maDichVuBoSung" @bind:after="KiemTraKimGocBoSung">
                         @foreach (DichVuDto dichVu in _dsDichVu.Where(x => x.LoaiDichVu == "IN_AN"))
                         {
                             <option value="@dichVu.MaDichVu">@MoTaDichVu(dichVu) · @Tien(dichVu.DonGia)/trang</option>
@@ -187,6 +188,7 @@
                         {
                             <label class="hop-chon">
                                 <input type="checkbox" checked="@_dsGiaCongBoSung.Contains(dichVu.MaDichVu)"
+                                       disabled="@(QuyTacIn.LaKimGoc(dichVu.TenDichVu) && !KimGocBoSungHopLe)"
                                        @onchange="e => DoiGiaCongBoSung(dichVu, (bool)e.Value)" />
                                 <span class="o-vuong">✓</span>@dichVu.TenDichVu · @Tien(dichVu.DonGia)/bản
                             </label>
@@ -208,6 +210,7 @@
             }
 
             <div class="bg-tom-tat-phat-sinh">
+                <div class="nv-phu">Hướng giấy giữ theo tài liệu gốc: @(DongPhatSinhDangChon?.HuongGiay == "NGANG" ? "Giấy ngang" : "Giấy đứng"). Kim góc tối đa 50 tờ/bản; không chọn cùng lò xo.</div>
                 <div>
                     <span class="nv-phu">Phạm vi xử lý</span>
                     <b>@SoTrangPhatSinh trang × @_soBanPhatSinh bản</b>
@@ -383,12 +386,10 @@
             return;
         }
 
-        if (!string.IsNullOrWhiteSpace(dichVu.NhomGiaCong))
-        {
-            foreach (DichVuDto cu in _dsDichVu.Where(x => x.MaDichVu != dichVu.MaDichVu
-                         && string.Equals(x.NhomGiaCong, dichVu.NhomGiaCong, StringComparison.OrdinalIgnoreCase)))
-                _dsGiaCongBoSung.Remove(cu.MaDichVu);
-        }
+        if (QuyTacIn.LaKimGoc(dichVu.TenDichVu) && !KimGocBoSungHopLe) return;
+        foreach (DichVuDto cu in _dsDichVu.Where(x => x.MaDichVu != dichVu.MaDichVu &&
+                     QuyTacIn.LoaiTruNhau(x.TenDichVu, x.NhomGiaCong, dichVu.TenDichVu, dichVu.NhomGiaCong)))
+            _dsGiaCongBoSung.Remove(cu.MaDichVu);
         if (!_dsGiaCongBoSung.Contains(dichVu.MaDichVu))
             _dsGiaCongBoSung.Add(dichVu.MaDichVu);
     }
@@ -503,6 +504,8 @@
         && _denTrangPhatSinh >= _tuTrangPhatSinh
         && _soBanPhatSinh >= 1
         && _soBanPhatSinh <= SoBanLonNhat
+        && (_cheDoPhatSinh != "BO_SUNG" || KimGocBoSungHopLe || !_dsDichVu.Any(x =>
+            _dsGiaCongBoSung.Contains(x.MaDichVu) && QuyTacIn.LaKimGoc(x.TenDichVu)))
         && (_cheDoPhatSinh == "IN_LAI_LOI_QUAY"
             ? (_lyDoInLai?.Trim().Length ?? 0) >= 5
             : _maDichVuBoSung > 0);
@@ -511,7 +514,17 @@
     {
         int tu = dong.TuTrang ?? 1;
         int den = dong.DenTrang ?? (tu + dong.SoTrang - 1);
-        return $"trang {tu}-{den} · {dong.TenDichVu}";
+        return $"trang {tu}-{den} · {dong.TenDichVu} · " + (dong.HuongGiay == "NGANG" ? "Giấy ngang" : "Giấy đứng");
+    }
+
+    private bool KimGocBoSungHopLe => SoTrangPhatSinh > 0 && QuyTacIn.SoToMoiBan(SoTrangPhatSinh,
+        _dsDichVu.FirstOrDefault(x => x.MaDichVu == _maDichVuBoSung)?.MatIn ?? "1_MAT") <= QuyTacIn.SoToKimGocToiDa;
+
+    private void KiemTraKimGocBoSung()
+    {
+        if (KimGocBoSungHopLe) return;
+        foreach (DichVuDto dv in _dsDichVu.Where(x => QuyTacIn.LaKimGoc(x.TenDichVu)))
+            if (_dsGiaCongBoSung.Remove(dv.MaDichVu)) _loi = "Đã bỏ kim góc vì phạm vi in vượt 50 tờ giấy mỗi bản.";
     }
 
     private string MoTaDichVu(DichVuDto dichVu)

@@ -33,6 +33,10 @@ string payOsChecksumKey = builder.Configuration["PayOS:ChecksumKey"]
 // Dùng chung một payOS client trong toàn bộ API
 builder.Services.AddSingleton(
     new PayOSClient(payOsClientId, payOsApiKey, payOsChecksumKey));
+builder.Services.AddSingleton(new DuLieuQrPayOSStore(
+    builder.Configuration["PayOS:ThuMucQr"] ?? Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "PhotocopyChain", "PayOSQr")));
 // ================== ĐĂNG KÝ DỊCH VỤ ==================
 
 builder.Services.AddControllers()

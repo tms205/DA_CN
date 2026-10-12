@@ -1,9 +1,34 @@
+using PayOS.Models.V2.PaymentRequests;
+using PhotocopyShared.Dtos.DonHang;
+
 namespace PhotocopyApi.ThanhToan;
 
 // Các quy tắc nhỏ của payOS được tách riêng để dễ đọc và kiểm thử.
 // Lớp này không gọi mạng, không đọc CSDL và không chứa khóa bí mật.
 public static class QuyTacPayOS
 {
+    // Giữ nguyên chuỗi QR do payOS cấp, không tự tạo mã chuyển khoản khác.
+    public static LienKetPayOSDto TaoDuLieuQr(
+        CreatePaymentLinkResponse link, int maDonHang, decimal soTien, DateTime hanThanhToan)
+    {
+        if (link.OrderCode != maDonHang || !SoTienKhop(soTien, link.Amount)
+            || string.IsNullOrWhiteSpace(link.QrCode))
+            throw new InvalidOperationException("Dữ liệu QR payOS không khớp đơn hàng.");
+
+        return new LienKetPayOSDto
+        {
+            CheckoutUrl = link.CheckoutUrl,
+            HanThanhToan = hanThanhToan,
+            MaDonHang = maDonHang,
+            SoTien = soTien,
+            QrCode = link.QrCode,
+            MaNganHang = link.Bin,
+            SoTaiKhoan = link.AccountNumber,
+            ChuTaiKhoan = link.AccountName,
+            NoiDungChuyenKhoan = link.Description
+        };
+    }
+
     // Nội dung chuyển khoản phải ngắn, không dấu và nhận ra được mã đơn.
     public static string TaoMoTaDon(int maDonHang)
     {

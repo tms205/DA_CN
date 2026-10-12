@@ -11,6 +11,11 @@ if ($taskErrors.Count) { throw 'PowerShell trong launcher khong hop le.' }
 foreach ($taskFunction in $taskAst.EndBlock.Statements | Where-Object { $_ -is [Management.Automation.Language.FunctionDefinitionAst] }) {
     . ([scriptblock]::Create($taskFunction.Extent.Text))
 }
+if (-not (Get-Command Get-PhotocopyAppDrive -ErrorAction SilentlyContinue)) { throw 'Launcher app phai chon o ASCII tam, khong dung o dang duoc su dung.' }
+if ((Get-PhotocopyAppDrive -OccupiedLetters @('C', 'P', 'Q')) -ne 'R:') { throw 'Chon nham o da duoc su dung.' }
+$taskFullDrives = $false
+try { Get-PhotocopyAppDrive -OccupiedLetters @('P','Q','R','S','T','U','V','W','X','Y','Z') | Out-Null } catch { $taskFullDrives = $true }
+if (-not $taskFullDrives) { throw 'Phai dung neu khong con o ASCII trong.' }
 
 # Kiem tra danh tinh tien trinh ma khong dung hay chay dich vu that.
 $taskRoot = Join-Path ([IO.Path]::GetTempPath()) 'photocopy-process-fixture'

@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../api.dart';
@@ -14,7 +16,7 @@ import '../don_hang/tien_do_screen.dart';
 import '../trang_chinh_screen.dart';
 
 // F-10 — Figma 02-Mobile-ThanhToan. Bước 4/4: hoàn tất đặt đơn.
-//   - Đơn chuyển khoản VietQR: mở trang checkout chính thức của payOS, đếm ngược 15 phút.
+//   - Đơn VietQR: hiển thị QR payOS trong App, đếm ngược hạn thanh toán.
 //     Ngân hàng báo đã nhận tiền → máy chủ đẩy tin real-time xuống, màn này tự chuyển sang "Đã thanh toán".
 //     Cứ 5 giây màn hình cũng tự hỏi lại máy chủ một lần cho chắc (chuyện tiền bạc, không để lỡ).
 //   - Đơn tiền mặt: không phải làm gì, chỉ báo đặt đơn thành công.
@@ -27,13 +29,18 @@ class ThanhToanScreen extends StatefulWidget {
   State<ThanhToanScreen> createState() => _ThanhToanScreenState();
 }
 
-class _ThanhToanScreenState extends State<ThanhToanScreen> {
+class _ThanhToanScreenState extends State<ThanhToanScreen>
+    with WidgetsBindingObserver {
   ThanhToan? _tt; // null = đang tải
   LienKetPayOS? _lienKetPayOS;
+  QrValidationResult? _qrDaVe;
   String? _loi;
   String? _loiPayOS;
   bool _dangTaiLink = false;
   bool _daThuTaiLink = false;
+  bool _dangKiemTra = false;
+  bool _kiemTraLai = false;
+  bool _dangHienThi = true;
 
   Timer? _dongHo; // nhịp 1 giây: đếm ngược + cứ 5 nhịp thì hỏi lại máy chủ
   int _soNhip = 0;
@@ -42,6 +49,7 @@ class _ThanhToanScreenState extends State<ThanhToanScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _taiThanhToan();
     Realtime.dangKyNghe(_khiCoTin);
     _dongHo = Timer.periodic(const Duration(seconds: 1), _moiGiay);
@@ -50,17 +58,26 @@ class _ThanhToanScreenState extends State<ThanhToanScreen> {
   @override
   void dispose() {
     _dongHo?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     Realtime.boNghe(_khiCoTin);
     super.dispose();
   }
 
   // GET /api/thanh-toan/{maDonHang}
-  Future<void> _taiThanhToan() async {
+  Future<void> _taiThanhToan({bool kiemTraNgay = false}) async {
+    if (_tt?.daTra == true) return;
+    if (_dangKiemTra) {
+      if (kiemTraNgay) _kiemTraLai = true;
+      return;
+    }
+    _dangKiemTra = true;
     KetQuaApi kq = await Api.get('/api/thanh-toan/${widget.maDonHang}');
+    _dangKiemTra = false;
     if (!mounted) return;
 
     if (!kq.thanhCong) {
       setState(() => _loi = kq.loi);
+      _thuKiemTraLai();
       return;
     }
     ThanhToan thanhToanMoi = ThanhToan.fromJson(kq.duLieu);
@@ -69,21 +86,50 @@ class _ThanhToanScreenState extends State<ThanhToanScreen> {
       _tt = thanhToanMoi;
       _tinhConLai();
     });
+    if (_thuKiemTraLai()) return;
 
     if (thanhToanMoi.phuongThuc == 'VIETQR' &&
         !thanhToanMoi.daTra &&
+        _duocThanhToan &&
         !_daThuTaiLink) {
       await _taiLienKetPayOS();
     }
   }
 
+  // Nếu resume trùng lúc request cũ còn chờ thì đối soát tiếp khi nó kết thúc.
+  bool _thuKiemTraLai() {
+    if (!_kiemTraLai) return false;
+    _kiemTraLai = false;
+    if (!_dangHienThi || _tt?.daTra == true) return false;
+    _taiThanhToan();
+    return true;
+  }
+
+  // Quay lại từ app ngân hàng thì đối soát ngay, không chờ nhịp 5 giây.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _dangHienThi = state == AppLifecycleState.resumed;
+    if (_dangHienThi) {
+      setState(_tinhConLai);
+      _taiThanhToan(kiemTraNgay: true);
+    }
+  }
+
+  bool get _duocThanhToan =>
+      _tt != null &&
+      !_tt!.daTra &&
+      _tt!.trangThaiDonHang != 'DA_HUY' &&
+      _conLai > Duration.zero &&
+      (_lienKetPayOS?.hanThanhToan == null ||
+          _lienKetPayOS!.hanThanhToan!.isAfter(DateTime.now()));
+
   // Máy chủ báo có thay đổi (ngân hàng đã nhận tiền, quầy đã tiếp nhận…) → tải lại
   void _khiCoTin(Map<String, dynamic> tin) {
-    if (tin['maDonHang'] == widget.maDonHang) _taiThanhToan();
+    if (_dangHienThi && tin['maDonHang'] == widget.maDonHang) _taiThanhToan();
   }
 
   void _moiGiay(Timer t) {
-    if (!mounted) return;
+    if (!mounted || !_dangHienThi || _tt?.daTra == true) return;
     setState(_tinhConLai);
 
     _soNhip++;
@@ -107,7 +153,7 @@ class _ThanhToanScreenState extends State<ThanhToanScreen> {
 
   // Tạo link lần đầu; nếu App mở lại đơn cũ thì API lấy lại link theo mã đơn.
   Future<void> _taiLienKetPayOS() async {
-    if (_dangTaiLink) return;
+    if (_dangTaiLink || !_duocThanhToan) return;
 
     setState(() {
       _dangTaiLink = true;
@@ -129,20 +175,42 @@ class _ThanhToanScreenState extends State<ThanhToanScreen> {
       return;
     }
 
+    LienKetPayOS link = LienKetPayOS.fromJson(kq.duLieu);
+    final qr = link.qrCode.isEmpty
+        ? null
+        : QrValidator.validate(
+            data: link.qrCode,
+            errorCorrectionLevel: QrErrorCorrectLevel.M,
+          );
+    if (link.qrCode.isNotEmpty &&
+        (link.maDonHang != widget.maDonHang ||
+            link.soTien != _tt!.soTien ||
+            qr?.isValid != true)) {
+      setState(() {
+        _dangTaiLink = false;
+        _lienKetPayOS = null;
+        _qrDaVe = null;
+        _loiPayOS = 'Dữ liệu QR không khớp đơn hàng. Vui lòng thử lại.';
+      });
+      return;
+    }
     setState(() {
       _dangTaiLink = false;
-      _lienKetPayOS = LienKetPayOS.fromJson(kq.duLieu);
+      _lienKetPayOS = link;
+      _qrDaVe = qr;
     });
   }
 
   Future<void> _moTrangThanhToanPayOS() async {
     String? checkoutUrl = _lienKetPayOS?.checkoutUrl;
-    if (checkoutUrl == null || checkoutUrl == '') return;
+    if (!_duocThanhToan || checkoutUrl == null || checkoutUrl == '') return;
+    Uri? url = Uri.tryParse(checkoutUrl);
+    if (url == null || url.scheme != 'https' || url.host != 'pay.payos.vn') {
+      hienThongBaoNhanh(context, 'Link thanh toán không hợp lệ.');
+      return;
+    }
 
-    bool daMo = await launchUrl(
-      Uri.parse(checkoutUrl),
-      mode: LaunchMode.externalApplication,
-    );
+    bool daMo = await launchUrl(url, mode: LaunchMode.externalApplication);
     if (!daMo && mounted) {
       hienThongBaoNhanh(
         context,
@@ -187,7 +255,7 @@ class _ThanhToanScreenState extends State<ThanhToanScreen> {
       noiDung = const Center(
         child: CircularProgressIndicator(color: AppColors.accent),
       );
-    } else if (_loi != null) {
+    } else if (_tt == null && _loi != null) {
       noiDung = Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -230,7 +298,7 @@ class _ThanhToanScreenState extends State<ThanhToanScreen> {
   // ---- Màn chờ khách chuyển khoản ----
   Widget _manChoChuyenKhoan() {
     ThanhToan tt = _tt!;
-    bool hetHan = _conLai == Duration.zero;
+    bool hetHan = !_duocThanhToan;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
@@ -262,7 +330,9 @@ class _ThanhToanScreenState extends State<ThanhToanScreen> {
                 Expanded(
                   child: Text(
                     hetHan
-                        ? 'Đã quá hạn chuyển khoản, đơn sẽ bị hủy trong ít phút.'
+                        ? (tt.trangThaiDonHang == 'DA_HUY'
+                              ? 'Đơn đã bị hủy. Không chuyển tiền cho đơn này.'
+                              : 'Đã quá hạn. Không chuyển tiền bằng QR này.')
                         : 'Đơn tự động hủy nếu quá hạn mà chưa nhận được thanh toán',
                     style: AppTheme.font(
                       size: 11.5,
@@ -285,56 +355,13 @@ class _ThanhToanScreenState extends State<ThanhToanScreen> {
           ),
           const SizedBox(height: 12),
 
-          // Thẻ mở trang thanh toán chính thức của payOS
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-            decoration: BoxDecoration(
-              color: AppColors.trang,
-              border: Border.all(color: AppColors.vach),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              children: [
-                Text(
-                  'Thanh toán an toàn qua payOS',
-                  style: AppTheme.font(size: 13, weight: FontWeight.w700),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  'Trang thanh toán sẽ hiển thị mã VietQR đúng số tiền của đơn',
-                  textAlign: TextAlign.center,
-                  style: AppTheme.font(size: 10.5, color: AppColors.chuPhu),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  tien(tt.soTien),
-                  style: AppTheme.mono(
-                    size: 26,
-                    weight: FontWeight.w800,
-                    color: AppColors.accentDeep,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                if (_loiPayOS != null) ...[
-                  HopThongBao(_loiPayOS!),
-                  const SizedBox(height: 10),
-                  NutPhu(
-                    nhan: 'Thử tạo lại link thanh toán',
-                    onPressed: hetHan ? null : _taiLienKetPayOS,
-                  ),
-                ] else
-                  NutChinh(
-                    nhan: 'Mở trang thanh toán payOS',
-                    dangTai: _dangTaiLink,
-                    iconSau: Ico.muiTenPhai,
-                    onPressed: hetHan || _lienKetPayOS == null
-                        ? null
-                        : _moTrangThanhToanPayOS,
-                  ),
-              ],
-            ),
-          ),
+          _theQr(),
+          const SizedBox(height: 12),
+          if (_loi != null) ...[
+            HopThongBao('Chưa kiểm tra được thanh toán. $_loi'),
+            const SizedBox(height: 12),
+          ],
+          NutPhu(nhan: 'Kiểm tra thanh toán', onPressed: _taiThanhToan),
           const SizedBox(height: 12),
 
           // Dòng "đang chờ ngân hàng"
@@ -351,7 +378,9 @@ class _ThanhToanScreenState extends State<ThanhToanScreen> {
               const SizedBox(width: 9),
               Expanded(
                 child: Text(
-                  'Đang chờ xác nhận tự động từ ngân hàng…',
+                  hetHan
+                      ? 'Có thể kiểm tra lại nếu bạn đã chuyển tiền trước đó.'
+                      : 'Đang chờ xác nhận tự động từ ngân hàng…',
                   style: AppTheme.font(
                     size: 12,
                     weight: FontWeight.w600,
@@ -366,8 +395,9 @@ class _ThanhToanScreenState extends State<ThanhToanScreen> {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
               child: Text(
-                'Không tự sửa số tiền hoặc nội dung trên trang payOS. '
-                'Khi ngân hàng ghi nhận giao dịch, màn hình này sẽ tự chuyển sang trạng thái đã thanh toán.',
+                'Chụp màn hình QR, mở app ngân hàng và chọn quét QR từ ảnh. '
+                'Kiểm tra người nhận, giữ nguyên số tiền và nội dung chuyển khoản. '
+                'Sau khi chuyển tiền, quay lại đây để nhận kết quả từ máy chủ.',
                 style: AppTheme.font(
                   size: 11,
                   color: AppColors.chuPhu,
@@ -378,6 +408,136 @@ class _ThanhToanScreenState extends State<ThanhToanScreen> {
           ),
           const SizedBox(height: 14),
           NutPhu(nhan: 'Để sau, về trang chính', onPressed: _veTrangChinh),
+        ],
+      ),
+    );
+  }
+
+  Widget _theQr() {
+    LienKetPayOS? link = _lienKetPayOS;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.trang,
+        border: Border.all(color: AppColors.vach),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Chuyển khoản VietQR',
+            textAlign: TextAlign.center,
+            style: AppTheme.font(size: 16, weight: FontWeight.w700),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            tien(_tt!.soTien),
+            textAlign: TextAlign.center,
+            style: AppTheme.mono(
+              size: 26,
+              weight: FontWeight.w800,
+              color: AppColors.accentDeep,
+            ),
+          ),
+          const SizedBox(height: 14),
+          if (_duocThanhToan) ...[
+            if (_dangTaiLink)
+              const Center(child: CircularProgressIndicator())
+            else if (_loiPayOS != null) ...[
+              HopThongBao(_loiPayOS!),
+              const SizedBox(height: 10),
+              NutPhu(
+                nhan: 'Thử lại QR thanh toán',
+                onPressed: _taiLienKetPayOS,
+              ),
+            ] else if (link != null && link.qrCode.isNotEmpty) ...[
+              LayoutBuilder(
+                builder: (context, kichThuoc) {
+                  double rong = kichThuoc.maxWidth.clamp(0, 260).toDouble();
+                  return Center(
+                    child: Semantics(
+                      label:
+                          'Mã VietQR thanh toán đơn ${_tt!.maDonHangHienThi}',
+                      image: true,
+                      child: QrImageView.withQr(
+                        key: const ValueKey('payos-qr'),
+                        qr: _qrDaVe!.qrCode!,
+                        size: rong,
+                        // Vùng trắng đủ 4 ô QR ở mỗi cạnh, kể cả khi co màn hình.
+                        padding: EdgeInsets.all(
+                          rong * 4 / (_qrDaVe!.qrCode!.moduleCount + 8),
+                        ),
+                        backgroundColor: Colors.white,
+                        errorCorrectionLevel: QrErrorCorrectLevel.M,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 10),
+              _dongNhanTien('Người nhận', link.chuTaiKhoan),
+              _dongNhanTien('Mã ngân hàng (BIN)', link.maNganHang),
+              _dongNhanTien('Số tài khoản', link.soTaiKhoan, saoChep: true),
+              _dongNhanTien('Nội dung', link.noiDungChuyenKhoan, saoChep: true),
+            ] else if (link != null) ...[
+              const HopThongBao(
+                'Link cũ chưa có dữ liệu QR trong app.',
+                loai: LoaiThongBao.canhBao,
+              ),
+              const SizedBox(height: 10),
+              NutChinh(
+                nhan: 'Mở trang thanh toán payOS',
+                onPressed: _moTrangThanhToanPayOS,
+              ),
+            ],
+          ] else
+            Text(
+              'QR không còn hiệu lực. Vui lòng không chuyển tiền.',
+              textAlign: TextAlign.center,
+              style: AppTheme.font(size: 14, color: AppColors.loiChu),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dongNhanTien(String nhan, String giaTri, {bool saoChep = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  nhan,
+                  style: AppTheme.font(size: 12, color: AppColors.chuPhu),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  giaTri,
+                  style: AppTheme.font(size: 14, weight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+          if (saoChep)
+            IconButton(
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+              tooltip: 'Sao chép ${nhan.toLowerCase()}',
+              icon: const Icon(Icons.copy_outlined, size: 20),
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: giaTri));
+                if (mounted) {
+                  hienThongBaoNhanh(
+                    context,
+                    'Đã sao chép ${nhan.toLowerCase()}.',
+                  );
+                }
+              },
+            ),
         ],
       ),
     );

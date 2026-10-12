@@ -113,6 +113,7 @@ public sealed class DongInChiTietDto
     public string? KhoGiay { get; set; }
     public string? LoaiGiay { get; set; }
     public string? MatIn { get; set; }
+    public string HuongGiay { get; set; } = "DUNG";
     public string? MauSac { get; set; }
     public int SoTrang { get; set; }
     public int? TuTrang { get; set; }
@@ -269,11 +270,18 @@ public sealed class ThanhToanDto
     public bool ChoPhepGiaLap { get; set; }
 }
 
-/// <summary>Đường dẫn checkout chính thức do payOS cấp cho một đơn VietQR.</summary>
+/// <summary>Link và dữ liệu VietQR chính thức do payOS cấp cho một đơn.</summary>
 public sealed class LienKetPayOSDto
 {
     public string CheckoutUrl { get; set; } = "";
     public DateTime HanThanhToan { get; set; }
+    public int MaDonHang { get; set; }
+    public decimal SoTien { get; set; }
+    public string QrCode { get; set; } = "";
+    public string MaNganHang { get; set; } = "";
+    public string SoTaiKhoan { get; set; } = "";
+    public string ChuTaiKhoan { get; set; } = "";
+    public string NoiDungChuyenKhoan { get; set; } = "";
 }
 
 // ==================================================================== F-24B: CA LÀM VIỆC

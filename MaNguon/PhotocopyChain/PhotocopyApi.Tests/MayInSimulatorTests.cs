@@ -71,8 +71,26 @@ public class MayInSimulatorTests
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage req, CancellationToken dung)
         {
             DuongDan.Add(req.RequestUri.AbsolutePath);
-            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK));
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(new byte[] { 1, 2, 3 }) });
         }
+    }
+
+    [Theory]
+    [InlineData("DUNG", true)]
+    [InlineData("NGANG", true)]
+    [InlineData("TUY_Y", false)]
+    public async Task HuongGiay_DungNgangDuocXuLy_SaiThiKhongTaiFile(string huong, bool hopLe)
+    {
+        using var handler = new GhiNhanRequest();
+        using var http = new HttpClient(handler) { BaseAddress = new Uri("http://localhost/") };
+        using var simulator = new MayInSimulator(http, Options.Create(new CauHinhSimulator()), NullLogger<MayInSimulator>.Instance);
+        var lenh = new LenhInAoDto { MaMayIn = 1, MaLenh = "lenh-test", DsDongIn = new() {
+            new() { HuongGiay = huong, DuongDanTaiFile = "api/file-test", SoTrang = 2, SoBan = 1 }
+        }};
+        var ham = typeof(MayInSimulator).GetMethod("KiemTraFileIn", BindingFlags.NonPublic | BindingFlags.Instance);
+        Task Chay() => (Task)ham.Invoke(simulator, new object[] { lenh, CancellationToken.None });
+        if (hopLe) { await Chay(); Assert.Single(handler.DuongDan); }
+        else { await Assert.ThrowsAsync<InvalidOperationException>(Chay); Assert.Empty(handler.DuongDan); }
     }
 
     private sealed class ApiChoSimulator : HttpMessageHandler

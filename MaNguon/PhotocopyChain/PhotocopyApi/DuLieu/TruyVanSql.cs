@@ -89,7 +89,7 @@ internal static class TruyVanSql
                    f.SoTrang AS TongSoTrangFile,
                    f.TrangThai AS TrangThaiFile,
                    dv.TenDichVu, dv.KhoGiay, dv.LoaiGiay, dv.MatIn, dv.MauSac,
-                   ct.SoTrang, ct.TuTrang, ct.DenTrang, ct.SoBan, ct.DonGia, ct.ThanhTien,
+                   ct.SoTrang, ct.TuTrang, ct.DenTrang, ct.SoBan, ct.HuongGiay, ct.DonGia, ct.ThanhTien,
                    STUFF((
                        SELECT N', ' + gc.TenDichVu
                        FROM ChiTietGiaCong g
@@ -126,7 +126,8 @@ internal static class TruyVanSql
                    (SELECT TOP 1
                         dv.KhoGiay + ' ' + dv.LoaiGiay + N' · ' +
                         CASE WHEN dv.MatIn = '2_MAT' THEN N'2 mặt' ELSE N'1 mặt' END + N' · ' +
-                        CASE WHEN dv.MauSac = 'MAU' THEN N'In màu' ELSE N'Đen trắng' END
+                        CASE WHEN dv.MauSac = 'MAU' THEN N'In màu' ELSE N'Đen trắng' END + N' · ' +
+                        CASE WHEN c.HuongGiay = 'NGANG' THEN N'Giấy ngang' ELSE N'Giấy đứng' END
                     FROM ChiTietDonHang c
                     JOIN DichVu dv ON dv.MaDichVu = c.MaDichVu
                     WHERE c.MaDonHang = dh.MaDonHang

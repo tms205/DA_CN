@@ -163,9 +163,13 @@ CREATE TABLE ChiTietDonHang (
     TuTrang      INT,
     DenTrang     INT,
     SoBan        INT DEFAULT 1,
+    HuongGiay    VARCHAR(5) NOT NULL CONSTRAINT DF_ChiTietDonHang_HuongGiay DEFAULT 'DUNG',
     DonGia       DECIMAL(12,0),
     ThanhTien    DECIMAL(12,0),         -- tien in + tien gia cong cua dong nay
     CONSTRAINT UQ_ChiTietDonHang_DonHang_File UNIQUE (MaDonHang, MaFile),
+    CONSTRAINT CK_ChiTietDonHang_HuongGiay CHECK (
+        (HuongGiay COLLATE Latin1_General_100_BIN2 = 'DUNG' AND DATALENGTH(HuongGiay) = 4) OR
+        (HuongGiay COLLATE Latin1_General_100_BIN2 = 'NGANG' AND DATALENGTH(HuongGiay) = 5)),
     CONSTRAINT CK_ChiTietDonHang_PhamViTrang CHECK (
         (TuTrang IS NULL AND DenTrang IS NULL) OR
         (TuTrang >= 1 AND DenTrang >= TuTrang AND SoTrang = DenTrang - TuTrang + 1)

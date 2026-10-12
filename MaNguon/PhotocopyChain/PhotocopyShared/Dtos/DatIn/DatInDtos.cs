@@ -35,6 +35,8 @@ public sealed class DongInRequest
     /// <summary>Dòng giá IN_AN khách chọn (khổ giấy + loại giấy + mặt in + màu).</summary>
     public int MaDichVu { get; set; }
     public int SoBanIn { get; set; } = 1;
+    /// <summary>DUNG / NGANG. Hướng giấy không làm thay đổi giá.</summary>
+    public string HuongGiay { get; set; } = "DUNG";
     /// <summary>Các dịch vụ gia công đi kèm (chọn được nhiều), mỗi cái tính theo số bản in.
     /// Lò xo và bìa kiếng cùng nhóm đóng gáy nên chỉ được chọn 1 trong 2.</summary>
     public List<int> DsGiaCong { get; set; } = [];

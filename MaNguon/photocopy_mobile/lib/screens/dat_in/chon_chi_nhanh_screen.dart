@@ -23,6 +23,7 @@ class ChonChiNhanhScreen extends StatefulWidget {
     required this.soBan,
     required this.dsGiaCong,
     required this.hoaToc,
+    this.huongGiay = 'DUNG',
     this.ghiChu,
   });
 
@@ -32,6 +33,7 @@ class ChonChiNhanhScreen extends StatefulWidget {
   final int soBan;
   final List<int> dsGiaCong;
   final bool hoaToc;
+  final String huongGiay;
   final String? ghiChu;
 
   @override
@@ -164,6 +166,7 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
           'maFileIn': widget.file.maFileIn,
           'maDichVu': widget.maDichVu,
           'soBanIn': widget.soBan,
+          'huongGiay': widget.huongGiay,
           'dsGiaCong': widget.dsGiaCong,
         }
       ],
@@ -202,6 +205,7 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
           'maFileIn': widget.file.maFileIn,
           'maDichVu': widget.maDichVu,
           'soBanIn': widget.soBan,
+          'huongGiay': widget.huongGiay,
           'dsGiaCong': widget.dsGiaCong,
         }
       ],

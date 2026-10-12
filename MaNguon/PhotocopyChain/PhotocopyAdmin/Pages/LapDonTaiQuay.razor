@@ -3,6 +3,7 @@
 @inject HttpClient Http
 @inject PhienDangNhap Phien
 @inject PhamViChiNhanh PhamVi
+@using PhotocopyShared.QuyCachIn
 
 <PageTitle>Lập đơn tại quầy · PhotocopyChain</PageTitle>
 <TieuDeTrang TieuDe="Lập đơn tại quầy" MoTa="Khách chọn quét QR payOS hoặc COD · thanh toán khi nhận tài liệu" />
@@ -106,6 +107,13 @@
                     </select>
                 </div>
                 <div class="truong">
+                    <label class="nhan">Hướng giấy</label>
+                    <select class="ca-o-loc" @bind="_huongGiay" @bind:after="XoaBaoGia">
+                        <option value="DUNG">Giấy đứng</option>
+                        <option value="NGANG">Giấy ngang</option>
+                    </select>
+                </div>
+                <div class="truong">
                     <label class="nhan">Màu sắc</label>
                     <select class="ca-o-loc" value="@_mauSac" @onchange="DoiMauSac">
                         @foreach (string mau in DsMauSac())
@@ -137,11 +145,16 @@
                 @foreach (DichVuDto dv in _dsDichVu.Where(x => x.LoaiDichVu == "GIA_CONG"))
                 {
                     <label class="hop-chon">
-                        <input type="checkbox" checked="@_dsGiaCong.Contains(dv.MaDichVu)" @onchange="e => DoiGiaCong(dv, (bool)e.Value)" />
+                        <input type="checkbox" checked="@_dsGiaCong.Contains(dv.MaDichVu)" disabled="@(QuyTacIn.LaKimGoc(dv.TenDichVu) && !KimGocHopLe())" @onchange="e => DoiGiaCong(dv, (bool)e.Value)" />
                         <span class="o-vuong">✓</span>@dv.TenDichVu · @Tien(dv.DonGia)/bản
                     </label>
                 }
             </div>
+            <p class="nv-phu">Kim góc: tối đa 50 tờ giấy mỗi file, mỗi bản. Lò xo không chọn cùng kim góc; ép plastic vẫn chọn cùng lò xo.</p>
+            @if (!KimGocHopLe())
+            {
+                <div class="o-canh-bao">Có file vượt 50 tờ/bản theo mặt in hiện tại, không thể chọn bấm kim góc.</div>
+            }
             @if (_thongBaoGiaCong != null)
             {
                 <div class="o-canh-bao"><span>@_thongBaoGiaCong</span></div>
@@ -187,6 +200,7 @@
     private string _soDienThoai = "";
     private KhachTaiQuayDto _khach;
     private List<FileInDto> _dsFile = new();
+    private string _huongGiay = "DUNG";
     private List<DichVuDto> _dsDichVu = new();
     private List<int> _dsGiaCong = new();
     private int _maDichVu;
@@ -260,6 +274,7 @@
         _khoaGiay = KhoaGiay(dichVu);
         _matIn = dichVu.MatIn ?? "";
         _mauSac = dichVu.MauSac ?? "";
+        KiemTraKimGoc();
         _baoGia = null;
     }
 
@@ -329,6 +344,7 @@
             catch { _loi = "Không tải được file " + file.Name + "."; }
         }
         _dangTaiFile = false;
+        KiemTraKimGoc();
         if (_dsFile.Count > 0) await BaoGiaAsync();
     }
 
@@ -364,20 +380,18 @@
             return;
         }
 
-        if (!string.IsNullOrWhiteSpace(dichVu.NhomGiaCong))
+        if (QuyTacIn.LaKimGoc(dichVu.TenDichVu) && !KimGocHopLe())
         {
-            List<DichVuDto> dsBiBo = _dsDichVu.Where(x =>
-                x.MaDichVu != dichVu.MaDichVu &&
-                string.Equals(x.NhomGiaCong, dichVu.NhomGiaCong, StringComparison.OrdinalIgnoreCase) &&
-                _dsGiaCong.Contains(x.MaDichVu)).ToList();
-
-            foreach (DichVuDto biBo in dsBiBo)
-                _dsGiaCong.Remove(biBo.MaDichVu);
-
-            if (dsBiBo.Count > 0)
-                _thongBaoGiaCong = "Mỗi bản in chỉ đóng 1 kiểu gáy — đã bỏ \"" +
-                    string.Join("\", \"", dsBiBo.Select(x => x.TenDichVu)) + "\".";
+            _thongBaoGiaCong = "Kim góc chỉ áp dụng tối đa 50 tờ giấy mỗi bản.";
+            return;
         }
+
+        List<DichVuDto> dsBiBo = DsGiaCongDaChon().Where(x => x.MaDichVu != dichVu.MaDichVu &&
+            QuyTacIn.LoaiTruNhau(x.TenDichVu, x.NhomGiaCong, dichVu.TenDichVu, dichVu.NhomGiaCong)).ToList();
+        foreach (DichVuDto biBo in dsBiBo) _dsGiaCong.Remove(biBo.MaDichVu);
+        if (dsBiBo.Count > 0)
+            _thongBaoGiaCong = "Gia công không thể chọn cùng nhau — đã bỏ \"" +
+                string.Join("\", \"", dsBiBo.Select(x => x.TenDichVu)) + "\".";
 
         if (!_dsGiaCong.Contains(dichVu.MaDichVu)) _dsGiaCong.Add(dichVu.MaDichVu);
         _baoGia = null;
@@ -387,8 +401,23 @@
     {
         var ds = new List<DongInRequest>();
         foreach (FileInDto file in _dsFile)
-            ds.Add(new DongInRequest { MaFileIn = file.MaFileIn, MaDichVu = _maDichVu, SoBanIn = _soBan, DsGiaCong = new List<int>(_dsGiaCong) });
+            ds.Add(new DongInRequest { MaFileIn = file.MaFileIn, MaDichVu = _maDichVu, SoBanIn = _soBan, HuongGiay = _huongGiay, DsGiaCong = new List<int>(_dsGiaCong) });
         return ds;
+    }
+
+    private void XoaBaoGia() => _baoGia = null;
+
+    private bool KimGocHopLe() => _dsFile.All(x => x.SoTrang > 0 &&
+        QuyTacIn.SoToMoiBan(x.SoTrang.Value, _matIn) <= QuyTacIn.SoToKimGocToiDa);
+
+    private void KiemTraKimGoc()
+    {
+        if (KimGocHopLe()) return;
+        foreach (DichVuDto dv in DsGiaCongDaChon().Where(x => QuyTacIn.LaKimGoc(x.TenDichVu)))
+        {
+            _dsGiaCong.Remove(dv.MaDichVu);
+            _thongBaoGiaCong = "Đã bỏ bấm kim góc vì có file vượt 50 tờ giấy mỗi bản.";
+        }
     }
 
     private async Task BaoGiaAsync()

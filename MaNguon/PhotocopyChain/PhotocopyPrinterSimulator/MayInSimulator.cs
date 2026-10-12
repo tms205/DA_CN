@@ -140,6 +140,8 @@ public sealed class MayInSimulator : BackgroundService
     {
         foreach (DongLenhInDto dong in lenh.DsDongIn)
         {
+            if (!PhotocopyShared.QuyCachIn.QuyTacIn.HuongGiayHopLe(dong.HuongGiay))
+                throw new InvalidOperationException("Lệnh in có hướng giấy không hợp lệ.");
             using var yeuCau = new HttpRequestMessage(HttpMethod.Get, dong.DuongDanTaiFile);
             yeuCau.Headers.Add("X-Printer-Job-Token", lenh.MaLenh);
             using HttpResponseMessage phanHoi = await _http.SendAsync(yeuCau, dung);
@@ -151,6 +153,9 @@ public sealed class MayInSimulator : BackgroundService
                 if (noiDung.Length == 0)
                     throw new InvalidOperationException($"File {dong.TenFile} không có dữ liệu.");
             }
+            _logger.LogInformation("Máy {MaMayIn}: file {MaFile}, {HuongGiay}, {MatIn}, {SoTrang} trang × {SoBan} bản.",
+                lenh.MaMayIn, dong.MaFile, dong.HuongGiay == "NGANG" ? "Giấy ngang" : "Giấy đứng",
+                dong.MatIn, dong.SoTrang, dong.SoBan);
         }
     }
 

@@ -20,6 +20,7 @@ using PhotocopyShared.Dtos.DatIn;
 using PhotocopyShared.Dtos.DonHang;
 using PhotocopyShared.Dtos.Tuan3;
 using PhotocopyShared.MayInAo;
+using PhotocopyShared.QuyCachIn;
 
 namespace PhotocopyApi.Controllers;
 
@@ -116,6 +117,8 @@ public class DonHangController : ControllerBase
 
         if (req.FileIn.Count == 0)
             return BadRequest(new { message = "Vui lòng chọn ít nhất 1 file để đặt in." });
+        if (req.FileIn.Any(x => !QuyTacIn.HuongGiayHopLe(x.HuongGiay)))
+            return BadRequest(new { message = "Hướng giấy phải là giấy đứng hoặc giấy ngang." });
         if (req.HinhThucNhan != "TAI_QUAY" && req.HinhThucNhan != "GIAO_HANG")
             return BadRequest(new { message = "Hình thức nhận hàng không hợp lệ." });
 
@@ -224,6 +227,7 @@ public class DonHangController : ControllerBase
         thamSo.Add("@MaCode", maKhuyenMai);
         thamSo.Add("@DsFile", bangDongIn.AsTableValuedParameter("Kieu_DongDonHang"));
         thamSo.Add("@DsGiaCong", bangGiaCong.AsTableValuedParameter("Kieu_DongGiaCong"));
+        thamSo.Add("@HuongGiayJson", JsonSerializer.Serialize(req.FileIn.Select(x => new { maFile = x.MaFileIn, huongGiay = x.HuongGiay })));
         thamSo.Add("@MaDonHang", dbType: DbType.Int32, direction: ParameterDirection.Output);
 
         try
@@ -328,6 +332,8 @@ public class DonHangController : ControllerBase
             return BadRequest(new { message = "Phương thức thanh toán phải là VietQR hoặc COD." });
         if (req.FileIn.Count == 0)
             return BadRequest(new { message = "Vui lòng tải ít nhất 1 file để lập đơn." });
+        if (req.FileIn.Any(x => !QuyTacIn.HuongGiayHopLe(x.HuongGiay)))
+            return BadRequest(new { message = "Hướng giấy phải là giấy đứng hoặc giấy ngang." });
 
         using var conn = new SqlConnection(_chuoiKetNoi);
         int? maCa = await LayCaDangMo(conn, maNhanVien, maChiNhanh);
@@ -393,6 +399,7 @@ public class DonHangController : ControllerBase
         thamSo.Add("@MaCode", maKhuyenMai);
         thamSo.Add("@DsFile", bangDongIn.AsTableValuedParameter("Kieu_DongDonHang"));
         thamSo.Add("@DsGiaCong", bangGiaCong.AsTableValuedParameter("Kieu_DongGiaCong"));
+        thamSo.Add("@HuongGiayJson", JsonSerializer.Serialize(req.FileIn.Select(x => new { maFile = x.MaFileIn, huongGiay = x.HuongGiay })));
         thamSo.Add("@MaDonHang", dbType: DbType.Int32, direction: ParameterDirection.Output);
 
         try
@@ -1116,7 +1123,7 @@ public class DonHangController : ControllerBase
             @"SELECT dh.MaDonHang, dh.MaKhachHang, dh.MaChiNhanh, dh.HinhThucNhan,
                      dh.TrangThai AS TrangThaiDonHang, kh.SoDienThoai AS SoDienThoaiKhach,
                      cn.TenChiNhanh, ct.MaChiTiet, ct.MaFile, ct.MaDichVu,
-                     ct.SoTrang, ct.TuTrang, ct.DenTrang, ct.SoBan,
+                     ct.SoTrang, ct.TuTrang, ct.DenTrang, ct.SoBan, ct.HuongGiay,
                      f.SoTrang AS TongSoTrangFile, f.TrangThai AS TrangThaiFile
               FROM DonHang dh
               JOIN ChiNhanh cn ON cn.MaChiNhanh = dh.MaChiNhanh
@@ -1217,6 +1224,7 @@ public class DonHangController : ControllerBase
         thamSo.Add("@MaCode", null);
         thamSo.Add("@DsFile", bangDongIn.AsTableValuedParameter("Kieu_DongDonHang"));
         thamSo.Add("@DsGiaCong", bangGiaCong.AsTableValuedParameter("Kieu_DongGiaCong"));
+        thamSo.Add("@HuongGiayJson", JsonSerializer.Serialize(new[] { new { maFile = nguon.MaFile, huongGiay = nguon.HuongGiay } }));
         thamSo.Add("@MaDonHang", dbType: DbType.Int32, direction: ParameterDirection.Output);
 
         await using var giaoDich = (SqlTransaction)await conn.BeginTransactionAsync();
@@ -1345,6 +1353,7 @@ public class DonHangController : ControllerBase
         public int? DenTrang { get; set; }
         public int SoBan { get; set; }
         public int TongSoTrangFile { get; set; }
+        public string HuongGiay { get; set; } = "DUNG";
         public string TrangThaiFile { get; set; } = "";
     }
 
