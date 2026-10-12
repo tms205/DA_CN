@@ -64,19 +64,61 @@
 
         <div class="the">
             <h2 class="the-tieu-de nho">2. Tài liệu</h2>
+            <div class="truong">
+                <label class="nhan" for="ldq-loai-dich-vu">Dịch vụ đặt in</label>
+                <select id="ldq-loai-dich-vu" class="ca-o-loc" @bind="_loaiTai" @bind:after="DoiLoaiTaiAsync" disabled="@(_dsFile.Count > 0 || _dangGui || _dangTaiFile)">
+                    <option value="TAI_LIEU">In tài liệu của khách</option>
+                    <option value="MAU_DON">In mẫu đơn trống để viết tay</option>
+                    <option value="ANH_THE">In ảnh thẻ · tính từng ảnh</option>
+                </select>
+            </div>
+            @if (LaAnhThe)
+            {
+                <div class="ca-loc-luoi">
+                    <div class="truong"><label class="nhan">Kích thước mỗi ảnh</label>
+                        <select class="ca-o-loc" @bind="_kichThuocAnh" @bind:after="DoiQuyCachAnh" disabled="@(_dsFile.Count > 0 || _dangTaiFile || _dangGui)">
+                            @foreach (var qc in QuyCachAnhThe.DanhSach) { <option value="@qc.Ma">@qc.Ten</option> }
+                        </select>
+                    </div>
+                    <div class="truong"><label class="nhan">Số ảnh mỗi file</label>
+                        <input class="ca-o-loc" type="number" min="1" max="100" step="1" @bind="_soLuongAnh" disabled="@(_dsFile.Count > 0 || _dangTaiFile || _dangGui)" />
+                    </div>
+                </div>
+                <p class="the-mo-ta nho">Giữ tỉ lệ ảnh, thêm nền trắng nếu lệch tỉ lệ; không tự cắt khuôn mặt. Ghép đúng số ảnh trên PDF A4 và in 100% kích thước. Muốn đổi số ảnh, xóa file rồi tải lại.</p>
+                @if (_maDichVu == 0) { <div class="o-canh-bao">Chi nhánh chưa bán kích thước ảnh này. Kiểm tra dịch vụ và bảng giá.</div> }
+            }
             @if (_khach == null)
             {
                 <p class="the-mo-ta nho">Chọn khách hàng trước khi tải file.</p>
             }
             else
             {
-                <InputFile OnChange="TaiFileAsync" multiple disabled="@(_dangGui || _dangTaiFile)" />
+                @if (_loaiTai == "MAU_DON")
+                {
+                    @foreach (var mau in _dsMau)
+                    {
+                        <div class="hd-dong-in"><b>@mau.TenMau</b><span class="nv-phu">@mau.MoTa</span>
+                            <button class="nut-nho" disabled="@(_dangGui || _dangTaiFile)" @onclick="() => XemMauAsync(mau)">Xem mẫu</button>
+                            <button class="nut-nho chinh" disabled="@(_dangGui || _dangTaiFile)" @onclick="() => ChonMauAsync(mau)">Chọn để in</button>
+                        </div>
+                    }
+                    @if (_dsMau.Count == 0) { <button class="nut-nho" @onclick="DoiLoaiTaiAsync">Tải lại mẫu đơn</button> }
+                }
+                else
+                {
+                    <InputFile OnChange="TaiFileAsync" multiple accept="@(LaAnhThe ? ".png,.jpg,.jpeg" : null)" disabled="@(_dangGui || _dangTaiFile || (LaAnhThe && (_soLuongAnh < 1 || _soLuongAnh > 100 || _maDichVu == 0)))" />
+                }
+                @if (_mauXem != null)
+                {
+                    <button class="nut-nho" @onclick="() => _mauXem = null">Đóng bản xem trước</button>
+                    <iframe title="Bản xem trước mẫu đơn" src="@_mauXem" style="width:100%;height:560px;border:0"></iframe>
+                }
                 @if (_dangTaiFile) { <p class="the-mo-ta nho">Đang chuẩn hóa PDF và đếm trang…</p> }
                 @foreach (FileInDto file in _dsFile)
                 {
                     <div class="hd-dong-in">
                         <b>@file.TenFileGoc</b>
-                        <span class="nv-phu">@file.SoTrang trang · đã chuẩn hóa PDF</span>
+                        <span class="nv-phu">@(file.KichThuocAnh != null ? file.SoLuongAnh + " ảnh · " + QuyCachAnhThe.Lay(file.KichThuocAnh)?.Ten + " · " : "")@file.SoTrang trang PDF</span>
                         <button class="nut-nho nguy-hiem" disabled="@(_dangGui || _dangTaiFile)" @onclick="() => XoaFileAsync(file)">Xóa</button>
                     </div>
                 }
@@ -89,6 +131,12 @@
         <form @onsubmit="GuiQuyCachAsync" @onsubmit:preventDefault class="the the-rong">
             <h2 class="the-tieu-de nho">3. Quy cách và báo giá</h2>
             <div class="ca-loc-luoi">
+                @if (LaAnhThe)
+                {
+                    <p class="the-mo-ta">Ảnh thẻ @QuyCachAnhThe.Lay(_kichThuocAnh)?.Ten · Giấy ảnh A4 · In màu một mặt · Giá theo từng ảnh. Không nhân số bản hoặc gia công tài liệu.</p>
+                }
+                else
+                {
                 <div class="truong">
                     <label class="nhan">Khổ giấy & loại giấy</label>
                     <select class="ca-o-loc" value="@_khoaGiay" @onchange="DoiKhoGiay">
@@ -127,6 +175,7 @@
                     <label class="nhan">Số bản mỗi file</label>
                     <input max="2147483647" required step="1" class="ca-o-loc" type="number" min="1" @bind="_soBan" @bind:after="XoaBaoGia" />
                 </div>
+                }
                 <div class="truong">
                     <label class="nhan">Tốc độ xử lý</label>
                     <select class="ca-o-loc" @bind="KieuIn" @bind:after="DoiKieuInAsync" disabled="@(_dangGui || _dangTaiFile)">
@@ -169,6 +218,8 @@
                 </div>
             </div>
 
+            @if (!LaAnhThe)
+            {
             <h3 class="hd-muc">Gia công</h3>
             <div class="thanh-loc">
                 @foreach (DichVuDto dv in _dsDichVu.Where(x => x.LoaiDichVu == "GIA_CONG"))
@@ -187,6 +238,7 @@
             @if (_thongBaoGiaCong != null)
             {
                 <div class="o-canh-bao"><span>@_thongBaoGiaCong</span></div>
+            }
             }
 
             <div class="truong">
@@ -229,6 +281,52 @@
     private string _soDienThoai = "";
     private KhachTaiQuayDto _khach;
     private List<FileInDto> _dsFile = new();
+    private string _loaiTai = "TAI_LIEU";
+    private string _kichThuocAnh = "3X4";
+    private int _soLuongAnh = 8;
+    private bool LaAnhThe => _loaiTai == "ANH_THE";
+    private List<MauDonDto> _dsMau = new();
+    private string _mauXem;
+
+    private async Task DoiLoaiTaiAsync()
+    {
+        _mauXem = null; _loi = null; _soBan = 1; _huongGiay = "DUNG"; _dsGiaCong.Clear();
+        DoiQuyCachAnh();
+        if (_loaiTai != "MAU_DON") return;
+        try { _dsMau = await Http.GetFromJsonAsync<List<MauDonDto>>("api/file-in/mau") ?? new(); }
+        catch { _loi = "Không tải được mẫu đơn. Bạn có thể thử lại."; }
+    }
+
+    private IEnumerable<DichVuDto> DichVuInHopLe() => _dsDichVu.Where(x => x.LoaiDichVu == "IN_AN" &&
+        (LaAnhThe ? x.KichThuocAnh == _kichThuocAnh : x.KichThuocAnh == null));
+
+    private void DoiQuyCachAnh()
+    {
+        _maDichVu = 0; XoaBaoGia();
+        var dv = DichVuInHopLe().FirstOrDefault();
+        if (dv != null) ApDungDichVu(dv);
+    }
+
+    private async Task XemMauAsync(MauDonDto mau)
+    {
+        try { _mauXem = "data:application/pdf;base64," + Convert.ToBase64String(await Http.GetByteArrayAsync("api/file-in/mau/" + mau.MaMau + "/pdf")); }
+        catch { _loi = "Không mở được bản xem trước mẫu đơn."; }
+    }
+
+    private async Task ChonMauAsync(MauDonDto mau)
+    {
+        if (_khach == null || _dangGui || _dangTaiFile) return;
+        _dangTaiFile = true; _loi = null; XoaBaoGia();
+        try
+        {
+            using var res = await Http.PostAsync("api/file-in/mau/" + mau.MaMau + "?maKhachHang=" + _khach.MaKhachHang, null);
+            if (res.IsSuccessStatusCode) _dsFile.Add(await res.Content.ReadFromJsonAsync<FileInDto>());
+            else _loi = (await res.Content.ReadFromJsonAsync<ApiError>()).Message;
+        }
+        catch { _loi = "Không tạo được file mẫu đơn."; }
+        finally { _dangTaiFile = false; }
+        if (_dsFile.Count > 0) await BaoGiaAsync();
+    }
     private string _huongGiay = "DUNG";
     private List<DichVuDto> _dsDichVu = new();
     private List<int> _dsGiaCong = new();
@@ -278,7 +376,7 @@
             }
 
             _dsDichVu = await Http.GetFromJsonAsync<List<DichVuDto>>("api/danh-muc/bang-gia?maChiNhanh=" + maChiNhanh) ?? new();
-            DichVuDto dau = _dsDichVu.FirstOrDefault(x => x.LoaiDichVu == "IN_AN");
+            DichVuDto dau = DichVuInHopLe().FirstOrDefault();
             if (dau != null) ApDungDichVu(dau);
         }
         catch { _loi = "Không tải được bảng giá."; }
@@ -288,19 +386,19 @@
 
     private List<DichVuDto> DsKhoGiay()
     {
-        return _dsDichVu.Where(x => x.LoaiDichVu == "IN_AN")
+        return DichVuInHopLe()
             .GroupBy(KhoaGiay).Select(x => x.First()).ToList();
     }
 
     private List<string> DsMatIn()
     {
-        return _dsDichVu.Where(x => x.LoaiDichVu == "IN_AN" && KhoaGiay(x) == _khoaGiay)
+        return DichVuInHopLe().Where(x => KhoaGiay(x) == _khoaGiay)
             .Select(x => x.MatIn).Where(x => x != null).Distinct().ToList();
     }
 
     private List<string> DsMauSac()
     {
-        return _dsDichVu.Where(x => x.LoaiDichVu == "IN_AN" && KhoaGiay(x) == _khoaGiay && x.MatIn == _matIn)
+        return DichVuInHopLe().Where(x => KhoaGiay(x) == _khoaGiay && x.MatIn == _matIn)
             .Select(x => x.MauSac).Where(x => x != null).Distinct().ToList();
     }
 
@@ -317,7 +415,7 @@
     private void DoiKhoGiay(ChangeEventArgs e)
     {
         _khoaGiay = e.Value?.ToString() ?? "";
-        List<DichVuDto> ds = _dsDichVu.Where(x => x.LoaiDichVu == "IN_AN" && KhoaGiay(x) == _khoaGiay).ToList();
+        List<DichVuDto> ds = DichVuInHopLe().Where(x => KhoaGiay(x) == _khoaGiay).ToList();
         DichVuDto chon = ds.FirstOrDefault(x => x.MatIn == _matIn && x.MauSac == _mauSac) ?? ds.FirstOrDefault();
         if (chon != null) ApDungDichVu(chon);
     }
@@ -325,7 +423,7 @@
     private void DoiMatIn(ChangeEventArgs e)
     {
         _matIn = e.Value?.ToString() ?? "";
-        List<DichVuDto> ds = _dsDichVu.Where(x => x.LoaiDichVu == "IN_AN" && KhoaGiay(x) == _khoaGiay && x.MatIn == _matIn).ToList();
+        List<DichVuDto> ds = DichVuInHopLe().Where(x => KhoaGiay(x) == _khoaGiay && x.MatIn == _matIn).ToList();
         DichVuDto chon = ds.FirstOrDefault(x => x.MauSac == _mauSac) ?? ds.FirstOrDefault();
         if (chon != null) ApDungDichVu(chon);
     }
@@ -333,7 +431,7 @@
     private void DoiMauSac(ChangeEventArgs e)
     {
         _mauSac = e.Value?.ToString() ?? "";
-        DichVuDto chon = _dsDichVu.FirstOrDefault(x => x.LoaiDichVu == "IN_AN" && KhoaGiay(x) == _khoaGiay &&
+        DichVuDto chon = DichVuInHopLe().FirstOrDefault(x => KhoaGiay(x) == _khoaGiay &&
             x.MatIn == _matIn && x.MauSac == _mauSac);
         if (chon != null) ApDungDichVu(chon);
     }
@@ -378,7 +476,9 @@
                 using var stream = file.OpenReadStream(60 * 1024 * 1024);
                 using var noiDung = new StreamContent(stream);
                 form.Add(noiDung, "file", file.Name);
-                var res = await Http.PostAsync("api/file-in?maKhachHang=" + _khach.MaKhachHang, form);
+                string uri = "api/file-in?maKhachHang=" + _khach.MaKhachHang;
+                if (LaAnhThe) uri += "&kichThuocAnh=" + _kichThuocAnh + "&soLuongAnh=" + _soLuongAnh;
+                var res = await Http.PostAsync(uri, form);
                 if (res.IsSuccessStatusCode) _dsFile.Add(await res.Content.ReadFromJsonAsync<FileInDto>());
                 else _loi = (await res.Content.ReadFromJsonAsync<ApiError>()).Message;
             }

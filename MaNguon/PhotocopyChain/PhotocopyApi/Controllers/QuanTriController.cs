@@ -32,7 +32,7 @@ public class QuanTriController : ControllerBase
         using var conn = new SqlConnection(_chuoiKetNoi);
         var ds = await conn.QueryAsync<DichVuQuanTriDto>(
             @"SELECT dv.MaDichVu, bg.MaChiNhanh, cn.TenChiNhanh, dv.TenDichVu, dv.LoaiDichVu,
-                     dv.KhoGiay, dv.LoaiGiay, dv.MatIn, dv.MauSac, dv.NhomGiaCong,
+                     dv.KhoGiay, dv.LoaiGiay, dv.MatIn, dv.MauSac, dv.NhomGiaCong, dv.KichThuocAnh,
                      bg.DonGia, dv.MaVatTu, vt.TenVatTu, bg.TrangThai
               FROM BangGiaChiNhanh bg
               JOIN DichVu dv ON dv.MaDichVu = bg.MaDichVu
@@ -55,11 +55,13 @@ public class QuanTriController : ControllerBase
         using var conn = new SqlConnection(_chuoiKetNoi);
         await conn.OpenAsync();
         await using var giaoDich = await conn.BeginTransactionAsync();
+        if (req.KichThuocAnh != null)
+            req.MaVatTu = await conn.QueryFirstAsync<int>("SELECT TOP 1 MaVatTu FROM VatTu WHERE TenVatTu=N'Giấy ảnh A4'", transaction: giaoDich);
         int ma = await conn.ExecuteScalarAsync<int>(
             @"INSERT INTO DichVu (TenDichVu, LoaiDichVu, KhoGiay, LoaiGiay, MatIn, MauSac,
-                                  NhomGiaCong, DonGia, MaVatTu, TrangThai)
+                                  NhomGiaCong, DonGia, MaVatTu, TrangThai, KichThuocAnh)
               VALUES (@TenDichVu, @LoaiDichVu, @KhoGiay, @LoaiGiay, @MatIn, @MauSac,
-                      @NhomGiaCong, @DonGia, @MaVatTu, @TrangThai);
+                      @NhomGiaCong, @DonGia, @MaVatTu, @TrangThai, @KichThuocAnh);
               SELECT CAST(SCOPE_IDENTITY() AS INT);", req, giaoDich);
         await conn.ExecuteAsync(
             @"INSERT INTO BangGiaChiNhanh (MaChiNhanh, MaDichVu, DonGia, TrangThai)
@@ -80,15 +82,24 @@ public class QuanTriController : ControllerBase
         using var conn = new SqlConnection(_chuoiKetNoi);
         await conn.OpenAsync();
         await using var giaoDich = await conn.BeginTransactionAsync();
+        // Đơn cũ đã chốt đơn vị tính và quy cách: chỉ sửa giá/hiển thị, không đổi kích thước ảnh.
+        bool doiQuyCachDaDung = await conn.ExecuteScalarAsync<bool>(
+            @"SELECT CAST(CASE WHEN EXISTS (SELECT 1 FROM DichVu dv WHERE dv.MaDichVu=@MaDichVu
+                AND ISNULL(dv.KichThuocAnh,'')<>ISNULL(@KichThuocAnh,'')
+                AND EXISTS(SELECT 1 FROM ChiTietDonHang ct WHERE ct.MaDichVu=dv.MaDichVu))
+                THEN 1 ELSE 0 END AS BIT)", new { MaDichVu = maDichVu, req.KichThuocAnh }, giaoDich);
+        if (doiQuyCachDaDung) return BadRequest(new { message = "Dịch vụ đã có đơn hàng: hãy thêm quy cách mới, không đổi đơn vị tính của dịch vụ cũ." });
+        if (req.KichThuocAnh != null)
+            req.MaVatTu = await conn.QueryFirstAsync<int>("SELECT TOP 1 MaVatTu FROM VatTu WHERE TenVatTu=N'Giấy ảnh A4'", transaction: giaoDich);
         int soDong = await conn.ExecuteAsync(
             @"UPDATE DichVu SET TenDichVu=@TenDichVu, LoaiDichVu=@LoaiDichVu, KhoGiay=@KhoGiay,
                     LoaiGiay=@LoaiGiay, MatIn=@MatIn, MauSac=@MauSac, NhomGiaCong=@NhomGiaCong,
-                    DonGia=@DonGia, MaVatTu=@MaVatTu, TrangThai=@TrangThai
+                    DonGia=@DonGia, MaVatTu=@MaVatTu, TrangThai=@TrangThai, KichThuocAnh=@KichThuocAnh
               WHERE MaDichVu=@MaDichVu",
             new
             {
                 MaDichVu = maDichVu, req.TenDichVu, req.LoaiDichVu, req.KhoGiay, req.LoaiGiay,
-                req.MatIn, req.MauSac, req.NhomGiaCong, req.DonGia, req.MaVatTu, req.TrangThai
+                req.MatIn, req.MauSac, req.NhomGiaCong, req.DonGia, req.MaVatTu, req.TrangThai, req.KichThuocAnh
             }, giaoDich);
         if (soDong == 0) return NotFound(new { message = "Không tìm thấy dịch vụ." });
         await conn.ExecuteAsync(

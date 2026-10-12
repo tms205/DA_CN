@@ -9,6 +9,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using PhotocopyShared.Constants;
 using PhotocopyShared.Dtos.DatIn;
+using PhotocopyShared.QuyCachIn;
+using PhotocopyApi.DichVu;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Content;
 using UglyToad.PdfPig.Core;
@@ -17,7 +19,8 @@ using UglyToad.PdfPig.Writer;
 namespace PhotocopyApi.Controllers;
 
 // khách tải file lên -> hệ thống đổi sang PDF -> đếm số trang.
-// Mọi file đều được lưu thành PDF (file gốc bị xóa) để số trang tính tiền = số trang sẽ in.
+// Mọi file đều được lưu thành PDF (file gốc bị xóa). Tài liệu tính tiền theo trang;
+// ảnh thẻ tính theo số ảnh, còn số trang PDF dùng cho máy in và lượng giấy.
 // File lưu ở thư mục NGOÀI mã nguồn (LuuTruFile:ThuMucGoc), không ai tải trực tiếp được qua đường link.
 [ApiController]
 [Route("api/file-in")]
@@ -48,8 +51,14 @@ public class FileInController : ControllerBase
     // Request du 1 MB cho thong tin form, kich thuoc file toi da la 60 MB.
     [RequestSizeLimit(61 * 1024 * 1024)]
     [RequestFormLimits(MultipartBodyLengthLimit = 60 * 1024 * 1024)]
-    public async Task<IActionResult> TaiLen(IFormFile file, [FromQuery] [Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int? maKhachHang)
+    public async Task<IActionResult> TaiLen(IFormFile file, [FromQuery] [Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int? maKhachHang,
+        [FromQuery] string kichThuocAnh = null, [FromQuery] int? soLuongAnh = null)
     {
+        if ((kichThuocAnh == null) != (soLuongAnh == null) ||
+            (kichThuocAnh != null && (QuyCachAnhThe.Lay(kichThuocAnh) == null || soLuongAnh is < 1 or > 100)))
+            return BadRequest(new { message = "Ảnh thẻ cần kích thước hợp lệ và số lượng từ 1 đến 100 ảnh." });
+        if (kichThuocAnh != null && (file == null || !DuoiAnh.Contains(Path.GetExtension(file.FileName).TrimStart('.').ToLowerInvariant())))
+            return BadRequest(new { message = "In ảnh thẻ chỉ nhận ảnh JPG hoặc PNG." });
         string vaiTro = User.FindFirst(TenClaim.VaiTro).Value;
         int maNguoiDung = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
         int maKhachHangLuu = maNguoiDung;
@@ -125,7 +134,11 @@ public class FileInController : ControllerBase
             if (duoi == "pdf")
                 duongDanPdf = duongDanGoc;// PDF sẵn rồi, không cần đổi
             else if (DuoiAnh.Contains(duoi))
-                AnhSangPdf(duongDanGoc, duongDanPdf);
+            {
+                if (kichThuocAnh == null) AnhSangPdf(duongDanGoc, duongDanPdf);
+                else System.IO.File.WriteAllBytes(duongDanPdf,
+                    AnhThePdf.Tao(System.IO.File.ReadAllBytes(duongDanGoc), kichThuocAnh, soLuongAnh.Value));
+            }
             else
                 OfficeSangPdf(duongDanGoc, duongDanPdf, duoi);
 
@@ -143,8 +156,8 @@ public class FileInController : ControllerBase
             XoaFile(duongDanGoc);   // chỉ giữ bản PDF để in
 
         //lưu thông tin file vào bảng FileIn
-        string sql = @"INSERT INTO FileIn (MaKhachHang, TenFile, DinhDang, DungLuong, DuongDan, SoTrang)
-                       VALUES (@MaKhachHang, @TenFile, @DinhDang, @DungLuong, @DuongDan, @SoTrang);
+        string sql = @"INSERT INTO FileIn (MaKhachHang, TenFile, DinhDang, DungLuong, DuongDan, SoTrang, KichThuocAnh, SoLuongAnh)
+                       VALUES (@MaKhachHang, @TenFile, @DinhDang, @DungLuong, @DuongDan, @SoTrang, @KichThuocAnh, @SoLuongAnh);
                        SELECT CAST(SCOPE_IDENTITY() AS INT);";
 
         using var conn = new SqlConnection(_chuoiKetNoi);
@@ -155,13 +168,35 @@ public class FileInController : ControllerBase
             DinhDang = duoi,
             DungLuong = (int)file.Length,
             DuongDan = duongDanPdf,
-            SoTrang = soTrang
+            SoTrang = soTrang,
+            KichThuocAnh = kichThuocAnh,
+            SoLuongAnh = soLuongAnh
         });
 
         return Ok(await DocFile(conn, maFile, maKhachHangLuu));
     }
 
     // xem lại thông tin 1 file (chỉ xem được file của chính mình)
+    [HttpGet("mau")]
+    public IActionResult DanhSachMau() => Ok(MauDonPdf.DanhSach);
+
+    [HttpGet("mau/{maMau}/pdf")]
+    public IActionResult XemMau(string maMau)
+    {
+        if (!MauDonPdf.DanhSach.Any(x => x.MaMau == maMau)) return NotFound(new { message = "Mẫu đơn không tồn tại." });
+        return File(MauDonPdf.Tao(maMau), "application/pdf");
+    }
+
+    [HttpPost("mau/{maMau}")]
+    public async Task<IActionResult> ChonMau(string maMau, [FromQuery] [Range(1, int.MaxValue)] int? maKhachHang)
+    {
+        var mau = MauDonPdf.DanhSach.FirstOrDefault(x => x.MaMau == maMau);
+        if (mau == null) return NotFound(new { message = "Mẫu đơn không tồn tại." });
+        using var stream = new MemoryStream(MauDonPdf.Tao(maMau));
+        // Dùng đúng quyền và cách lưu file tại quầy / khách hàng, không bỏ qua kiểm tra chủ sở hữu.
+        return await TaiLen(new FormFile(stream, 0, stream.Length, "file", mau.TenMau + ".pdf"), maKhachHang);
+    }
+
     [HttpGet("{maFileIn}")]
     [Authorize(Roles = "CUSTOMER")]
     public async Task<IActionResult> ChiTiet([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maFileIn)
@@ -218,7 +253,7 @@ public class FileInController : ControllerBase
     private async Task<FileInDto> DocFile(SqlConnection conn, int maFile, int maKhachHang)
     {
         string sql = @"SELECT MaFile AS MaFileIn, TenFile AS TenFileGoc, DinhDang AS DinhDangGoc, DungLuong, SoTrang,
-                              TrangThai AS TrangThaiFile, NgayTaiLen
+                              TrangThai AS TrangThaiFile, NgayTaiLen, KichThuocAnh, SoLuongAnh
                        FROM FileIn
                        WHERE MaFile = @MaFile AND MaKhachHang = @MaKhachHang";
         return await conn.QueryFirstOrDefaultAsync<FileInDto>(sql, new { MaFile = maFile, MaKhachHang = maKhachHang });

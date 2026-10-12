@@ -196,14 +196,19 @@
                             <dd>@(dong.HuongGiay == "NGANG" ? "Giấy ngang" : "Giấy đứng")</dd>
                             <dt>Phạm vi / số bản</dt>
                             <dd>@MoTaPhamVi(dong) × @dong.SoBan bản</dd>
+                            @if (dong.KichThuocAnh != null)
+                            {
+                                <dt>Ảnh thẻ</dt>
+                                <dd>@dong.SoLuongAnh ảnh · @PhotocopyShared.QuyCachIn.QuyCachAnhThe.Lay(dong.KichThuocAnh)?.Ten · @Tien(dong.DonGia)/ảnh</dd>
+                            }
                             <dt>Gia công</dt>
                             <dd>@(string.IsNullOrEmpty(dong.TenGiaCong) ? "Không" : dong.TenGiaCong)</dd>
                         </dl>
                         @if (LaInTuDong(don) && don.TrangThaiDonHang == "DA_XAC_NHAN")
                         {
                             <div class="truong">
-                                <label class="nhan">Tải lại PDF nếu file đã mất (@dong.TongSoTrangFile trang)</label>
-                                <InputFile accept=".pdf" disabled="@_dangGui"
+                                <label class="nhan">@(dong.KichThuocAnh != null ? "Tải lại ảnh gốc để ghép đúng " + dong.SoLuongAnh + " ảnh" : "Tải lại PDF nếu file đã mất (" + dong.TongSoTrangFile + " trang)")</label>
+                                <InputFile accept="@(dong.KichThuocAnh != null ? ".png,.jpg,.jpeg" : ".pdf")" disabled="@_dangGui"
                                            OnChange="e => PhucHoiFileAsync(e, don, dong)" />
                                 <p class="goi-y">Chọn đúng file cũ của khách. Không đổi số trang, số bản hoặc giá đã thanh toán.</p>
                             </div>
@@ -617,9 +622,10 @@
     private async Task PhucHoiFileAsync(InputFileChangeEventArgs e, DonHangChiTietDto don, DongInChiTietDto dong)
     {
         if (_dangGui) return;
-        if (!e.File.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+        string duoi = System.IO.Path.GetExtension(e.File.Name).ToLowerInvariant();
+        if (dong.KichThuocAnh == null ? duoi != ".pdf" : !new[] { ".jpg", ".jpeg", ".png" }.Contains(duoi))
         {
-            _loiThaoTac = "Vui lòng chọn đúng PDF gốc để phục hồi file.";
+            _loiThaoTac = dong.KichThuocAnh == null ? "Vui lòng chọn đúng PDF gốc để phục hồi file." : "Vui lòng chọn ảnh JPG/PNG gốc để ghép lại đúng kích thước và số ảnh của đơn.";
             return;
         }
         await GuiThaoTac(async () =>
@@ -628,7 +634,9 @@
             using var stream = e.File.OpenReadStream(60 * 1024 * 1024);
             using var noiDung = new StreamContent(stream);
             form.Add(noiDung, "file", e.File.Name);
-            var taiLen = await Http.PostAsync("api/file-in?maKhachHang=" + don.MaKhachHang, form);
+            string uri = "api/file-in?maKhachHang=" + don.MaKhachHang;
+            if (dong.KichThuocAnh != null) uri += "&kichThuocAnh=" + dong.KichThuocAnh + "&soLuongAnh=" + dong.SoLuongAnh;
+            var taiLen = await Http.PostAsync(uri, form);
             if (!taiLen.IsSuccessStatusCode) return taiLen;
             FileInDto fileMoi;
             using (taiLen) fileMoi = await taiLen.Content.ReadFromJsonAsync<FileInDto>();

@@ -431,7 +431,9 @@ class _TienDoScreenState extends State<TienDoScreen> {
             Padding(
               padding: const EdgeInsets.only(left: 22),
               child: Text(
-                '${dong.soTrang} trang × ${dong.soBan} bản · ${dong.quyCach}',
+                dong.kichThuocAnh != null
+                    ? '${dong.quyCach} · ${tien(dong.donGia)}/ảnh'
+                    : '${dong.soTrang} trang × ${dong.soBan} bản · ${dong.quyCach}',
                 style: AppTheme.font(size: 11, color: AppColors.chuPhu),
               ),
             ),

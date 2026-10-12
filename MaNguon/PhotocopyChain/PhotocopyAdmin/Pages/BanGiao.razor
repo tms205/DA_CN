@@ -157,15 +157,15 @@
                 </label>
                 <label class="truong">
                     <span class="nhan">Từ trang</span>
-                    <input required step="1" class="ca-o-loc mono" type="number" min="@TrangNhoNhat" max="@TrangLonNhat" @bind="_tuTrangPhatSinh" @bind:after="KiemTraKimGocBoSung" />
+                    <input required step="1" class="ca-o-loc mono" type="number" disabled="@LaAnhPhatSinh" min="@TrangNhoNhat" max="@TrangLonNhat" @bind="_tuTrangPhatSinh" @bind:after="KiemTraKimGocBoSung" />
                 </label>
                 <label class="truong">
                     <span class="nhan">Đến trang</span>
-                    <input required step="1" class="ca-o-loc mono" type="number" min="@TrangNhoNhat" max="@TrangLonNhat" @bind="_denTrangPhatSinh" @bind:after="KiemTraKimGocBoSung" />
+                    <input required step="1" class="ca-o-loc mono" type="number" disabled="@LaAnhPhatSinh" min="@TrangNhoNhat" max="@TrangLonNhat" @bind="_denTrangPhatSinh" @bind:after="KiemTraKimGocBoSung" />
                 </label>
                 <label class="truong">
                     <span class="nhan">Số bản</span>
-                    <input required step="1" class="ca-o-loc mono" type="number" min="1" max="@SoBanLonNhat" @bind="_soBanPhatSinh" />
+                    <input required step="1" class="ca-o-loc mono" type="number" disabled="@LaAnhPhatSinh" min="1" max="@SoBanLonNhat" @bind="_soBanPhatSinh" />
                 </label>
             </div>
 
@@ -174,13 +174,15 @@
                 <div class="truong">
                     <label class="nhan">Quy cách in mới</label>
                     <select class="ca-o-loc" @bind="_maDichVuBoSung" @bind:after="KiemTraKimGocBoSung">
-                        @foreach (DichVuDto dichVu in _dsDichVu.Where(x => x.LoaiDichVu == "IN_AN"))
+                        @foreach (DichVuDto dichVu in _dsDichVu.Where(x => x.LoaiDichVu == "IN_AN" && x.KichThuocAnh == DongPhatSinhDangChon?.KichThuocAnh))
                         {
-                            <option value="@dichVu.MaDichVu">@MoTaDichVu(dichVu) · @Tien(dichVu.DonGia)/trang</option>
+                            <option value="@dichVu.MaDichVu">@MoTaDichVu(dichVu) · @Tien(dichVu.DonGia)/@(LaAnhPhatSinh ? "ảnh" : "trang")</option>
                         }
                     </select>
                 </div>
 
+                @if (!LaAnhPhatSinh)
+                {
                 <div class="truong">
                     <label class="nhan">Dịch vụ hoàn thiện đi kèm</label>
                     <div class="thanh-loc bg-gia-cong">
@@ -195,6 +197,7 @@
                         }
                     </div>
                 </div>
+                }
 
                 <label class="truong">
                     <span class="nhan">Ghi chú yêu cầu mới</span>
@@ -210,10 +213,12 @@
             }
 
             <div class="bg-tom-tat-phat-sinh">
-                <div class="nv-phu">Hướng giấy giữ theo tài liệu gốc: @(DongPhatSinhDangChon?.HuongGiay == "NGANG" ? "Giấy ngang" : "Giấy đứng"). Kim góc tối đa 50 tờ/bản; không chọn cùng lò xo.</div>
+                <div class="nv-phu">@(LaAnhPhatSinh
+                    ? "Giữ toàn bộ số ảnh và kích thước đã chốt. Muốn đổi số lượng hoặc kích thước, hãy lập đơn mới."
+                    : "Hướng giấy giữ theo tài liệu gốc. Kim góc tối đa 50 tờ/bản; không chọn cùng lò xo.")</div>
                 <div>
                     <span class="nv-phu">Phạm vi xử lý</span>
-                    <b>@SoTrangPhatSinh trang × @_soBanPhatSinh bản</b>
+                    <b>@(LaAnhPhatSinh ? $"{DongPhatSinhDangChon.SoLuongAnh} ảnh · {SoTrangPhatSinh} tờ PDF" : $"{SoTrangPhatSinh} trang × {_soBanPhatSinh} bản")</b>
                 </div>
                 <div>
                     <span class="nv-phu">Khách cần trả thêm</span>
@@ -376,6 +381,13 @@
             _denTrangPhatSinh = Math.Max(1, dong.TongSoTrangFile);
         }
         _soBanPhatSinh = Math.Max(1, dong.SoBan);
+        if (dong.KichThuocAnh != null)
+        {
+            _tuTrangPhatSinh = 1;
+            _denTrangPhatSinh = Math.Max(1, dong.TongSoTrangFile);
+            _soBanPhatSinh = 1;
+            _dsGiaCongBoSung.Clear();
+        }
     }
 
     private void DoiGiaCongBoSung(DichVuDto dichVu, bool chon)
@@ -461,6 +473,8 @@
     private DongInChiTietDto DongPhatSinhDangChon =>
         _donPhatSinh?.DongIn.FirstOrDefault(x => x.MaChiTiet == _maChiTietPhatSinh);
 
+    private bool LaAnhPhatSinh => DongPhatSinhDangChon?.KichThuocAnh != null;
+
     private int TrangNhoNhat => _cheDoPhatSinh == "IN_LAI_LOI_QUAY"
         ? DongPhatSinhDangChon?.TuTrang ?? 1
         : 1;
@@ -481,7 +495,7 @@
         ? _denTrangPhatSinh - _tuTrangPhatSinh + 1
         : 0;
 
-    private int SoBanLonNhat => _cheDoPhatSinh == "IN_LAI_LOI_QUAY"
+    private int SoBanLonNhat => LaAnhPhatSinh ? 1 : _cheDoPhatSinh == "IN_LAI_LOI_QUAY"
         ? Math.Max(1, DongPhatSinhDangChon?.SoBan ?? 1)
         : 100;
 
@@ -490,6 +504,8 @@
         get
         {
             DichVuDto inAn = _dsDichVu.FirstOrDefault(x => x.MaDichVu == _maDichVuBoSung);
+            if (LaAnhPhatSinh)
+                return (inAn?.DonGia ?? 0) * (DongPhatSinhDangChon.SoLuongAnh ?? 0);
             decimal tienIn = (inAn?.DonGia ?? 0) * SoTrangPhatSinh * _soBanPhatSinh;
             decimal tienGiaCong = _dsDichVu.Where(x => _dsGiaCongBoSung.Contains(x.MaDichVu))
                 .Sum(x => x.DonGia) * _soBanPhatSinh;
@@ -512,6 +528,8 @@
 
     private string MoTaDongIn(DongInChiTietDto dong)
     {
+        if (dong.KichThuocAnh != null)
+            return $"{dong.SoLuongAnh} ảnh · {QuyCachAnhThe.Lay(dong.KichThuocAnh)?.Ten}";
         int tu = dong.TuTrang ?? 1;
         int den = dong.DenTrang ?? (tu + dong.SoTrang - 1);
         return $"trang {tu}-{den} · {dong.TenDichVu} · " + (dong.HuongGiay == "NGANG" ? "Giấy ngang" : "Giấy đứng");
@@ -529,6 +547,8 @@
 
     private string MoTaDichVu(DichVuDto dichVu)
     {
+        if (dichVu.KichThuocAnh != null)
+            return "Ảnh thẻ " + QuyCachAnhThe.Lay(dichVu.KichThuocAnh)?.Ten;
         return $"Khổ {dichVu.KhoGiay} · giấy {dichVu.LoaiGiay} · "
             + (dichVu.MatIn == "2_MAT" ? "2 mặt" : "1 mặt") + " · "
             + (dichVu.MauSac == "MAU" ? "In màu" : "Đen trắng");

@@ -22,7 +22,7 @@ public sealed class ChiNhanhDto
     public string? LyDoKhongDapUng { get; set; }
 }
 
-/// <summary>Một dòng bảng giá: in ấn (giá / trang) hoặc gia công (giá / cuốn).</summary>
+/// <summary>Một dòng bảng giá: tài liệu / trang, ảnh thẻ / ảnh hoặc gia công / cuốn.</summary>
 public sealed class DichVuDto
 {
     public int MaDichVu { get; set; }
@@ -39,4 +39,6 @@ public sealed class DichVuDto
     /// <summary>Nhóm gia công loại trừ nhau — DONG_GAY: lò xo hoặc bìa kiếng, chỉ chọn 1. NULL = chọn thoải mái.</summary>
     public string? NhomGiaCong { get; set; }
     public decimal DonGia { get; set; }
+    /// <summary>NULL: tài liệu; mã kích thước: giá tính theo từng ảnh thẻ.</summary>
+    public string? KichThuocAnh { get; set; }
 }

@@ -90,6 +90,7 @@ internal static class TruyVanSql
                    f.TrangThai AS TrangThaiFile,
                    dv.TenDichVu, dv.KhoGiay, dv.LoaiGiay, dv.MatIn, dv.MauSac,
                    ct.SoTrang, ct.TuTrang, ct.DenTrang, ct.SoBan, ct.HuongGiay, ct.DonGia, ct.ThanhTien,
+                   ct.KichThuocAnh, ct.SoLuongAnh,
                    STUFF((
                        SELECT N', ' + gc.TenDichVu
                        FROM ChiTietGiaCong g

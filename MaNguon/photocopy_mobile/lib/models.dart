@@ -1,4 +1,5 @@
 // Các class dữ liệu — tên thuộc tính trùng JSON mà API trả về (DTO trong PhotocopyShared).
+import 'quy_cach_anh_the.dart';
 // Mỗi class có hàm fromJson: đổi Map (JSON đã giải mã) thành đối tượng.
 
 // JSON có thể trả số nguyên (15000) hoặc số thực (15000.5) → đổi hết về double
@@ -66,6 +67,12 @@ class NguoiDung {
 
 // ============================================================ File in (FileInDto)
 class FileIn {
+  String? kichThuocAnh;
+  int? soLuongAnh;
+  bool get laAnhThe => kichThuocAnh != null;
+  String get moTaSoLuong => laAnhThe
+      ? '${soLuongAnh ?? 0} ảnh · ${kichThuocAnhThe[kichThuocAnh] ?? kichThuocAnh} · ${soTrang ?? 0} tờ PDF'
+      : '${soTrang ?? 0} trang';
   int maFileIn = 0;
   String tenFileGoc = '';
   String? dinhDangGoc; // pdf, docx, png...
@@ -74,6 +81,8 @@ class FileIn {
   String trangThaiFile = ''; // SAN_SANG / DA_XOA
 
   FileIn.fromJson(Map<String, dynamic> json) {
+    kichThuocAnh = json['kichThuocAnh'];
+    soLuongAnh = json['soLuongAnh'];
     maFileIn = json['maFileIn'];
     tenFileGoc = json['tenFileGoc'];
     dinhDangGoc = json['dinhDangGoc'];
@@ -88,6 +97,7 @@ class FileIn {
 
 // ============================================================ Một dòng bảng giá (bảng DichVu)
 class DichVu {
+  String? kichThuocAnh;
   int maDichVu = 0;
   String tenDichVu = '';
   String loaiDichVu = ''; // IN_AN (giá / trang) hoặc GIA_CONG (giá / cuốn)
@@ -100,6 +110,7 @@ class DichVu {
   double donGia = 0;
 
   DichVu.fromJson(Map<String, dynamic> json) {
+    kichThuocAnh = json['kichThuocAnh'];
     maDichVu = json['maDichVu'];
     tenDichVu = json['tenDichVu'];
     loaiDichVu = json['loaiDichVu'];
@@ -114,7 +125,11 @@ class DichVu {
   bool get laDongIn => loaiDichVu == 'IN_AN';
 
   // "A4 70gsm" — dùng làm nhãn chip "Khổ giấy & loại giấy"
-  String get tenGiay => '${khoGiay ?? ''} ${loaiGiay ?? ''}'.trim();
+  String get tenGiay => kichThuocAnh != null
+      ? '${kichThuocAnhThe[kichThuocAnh] ?? kichThuocAnh} · Giấy ảnh A4'
+      : '${khoGiay ?? ''} ${loaiGiay ?? ''}'.trim();
+
+  bool hopVoiFile(FileIn file) => laDongIn && kichThuocAnh == file.kichThuocAnh;
 }
 
 // ============================================================ Chi nhánh (ChiNhanhDto)
@@ -283,6 +298,8 @@ class ThongBao {
 
 // ============================================================ Một dòng in trong đơn (DongInChiTietDto)
 class DongInChiTiet {
+  String? kichThuocAnh;
+  int? soLuongAnh;
   int maChiTiet = 0;
   int maFile = 0;
   String tenFile = '';
@@ -301,6 +318,8 @@ class DongInChiTiet {
   String? tenGiaCong; // "Đóng lò xo, Ép plastic" — null nếu không gia công
 
   DongInChiTiet.fromJson(Map<String, dynamic> json) {
+    kichThuocAnh = json['kichThuocAnh'];
+    soLuongAnh = json['soLuongAnh'];
     maChiTiet = json['maChiTiet'];
     maFile = json['maFile'];
     tenFile = json['tenFile'];
@@ -321,6 +340,9 @@ class DongInChiTiet {
 
   // "A4 70gsm · 2 mặt · Đen trắng"
   String get quyCach {
+    if (kichThuocAnh != null) {
+      return '${soLuongAnh ?? 0} ảnh · ${kichThuocAnhThe[kichThuocAnh] ?? kichThuocAnh} · Giấy ảnh A4 · In màu một mặt';
+    }
     String mat = matIn == '2_MAT' ? '2 mặt' : '1 mặt';
     String mau = mauSac == 'MAU' ? 'In màu' : 'Đen trắng';
     return '${khoGiay ?? ''} ${loaiGiay ?? ''} · $mat · $mau · ${huongGiay == 'NGANG' ? 'Giấy ngang' : 'Giấy đứng'}';

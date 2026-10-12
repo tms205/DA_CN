@@ -42,6 +42,8 @@ public sealed partial class LuuDichVuRequest : IValidatableObject
 {
     public IEnumerable<ValidationResult> Validate(ValidationContext context)
     {
+        if (KichThuocAnh != null && (LoaiDichVu != "IN_AN" || KhoGiay != "A4" || LoaiGiay != "GIAY_ANH" || MatIn != "1_MAT" || MauSac != "MAU"))
+            yield return new ValidationResult("Ảnh thẻ phải in màu một mặt trên giấy ảnh A4.", [nameof(KichThuocAnh)]);
         if (LoaiDichVu == "IN_AN" && (string.IsNullOrWhiteSpace(KhoGiay) ||
             string.IsNullOrWhiteSpace(LoaiGiay) || string.IsNullOrWhiteSpace(MatIn) || string.IsNullOrWhiteSpace(MauSac)))
             yield return new ValidationResult("Dịch vụ in cần đủ khổ giấy, loại giấy, mặt in và màu sắc.",

@@ -155,6 +155,7 @@ public sealed class CapNhatTrangThaiRequest
 
 public sealed class DichVuQuanTriDto
 {
+    public string? KichThuocAnh { get; set; }
     public int MaDichVu { get; set; }
     public int MaChiNhanh { get; set; }
     public string TenChiNhanh { get; set; } = "";
@@ -173,6 +174,8 @@ public sealed class DichVuQuanTriDto
 
 public sealed partial class LuuDichVuRequest
 {
+    [RegularExpression(@"^(2X3|3X4|4X6|35X45|5X5)$", ErrorMessage = "Kích thước ảnh thẻ không hợp lệ.")]
+    public string? KichThuocAnh { get; set; }
     [Required(ErrorMessage = "Vui lòng nhập tên dịch vụ.")]
     [MaxLength(100, ErrorMessage = "Tên dịch vụ tối đa 100 ký tự.")]
     public string TenDichVu { get; set; } = "";

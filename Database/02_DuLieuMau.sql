@@ -82,3 +82,32 @@ GO
 
 PRINT N'Da nhap du lieu mau';
 GO
+-- In anh the: seed sau khi danh muc, chi nhanh va ton kho goc da duoc tao.
+-- Gia de xuat, don vi dong/anh; khong ghi de gia da sua cua chi nhanh.
+DECLARE @VatTu INT;
+SELECT TOP 1 @VatTu=MaVatTu FROM VatTu WHERE TenVatTu=N'Giấy ảnh A4';
+IF @VatTu IS NULL
+BEGIN
+    INSERT VatTu(TenVatTu,DonViTinh,DonGia) VALUES(N'Giấy ảnh A4',N'tờ',0);
+    SET @VatTu=SCOPE_IDENTITY();
+END;
+DECLARE @Gia TABLE(Ma VARCHAR(10), Ten NVARCHAR(100), Gia DECIMAL(12,0));
+INSERT @Gia VALUES
+('2X3',N'In ảnh thẻ 2x3 cm',3000),
+('3X4',N'In ảnh thẻ 3x4 cm',5000),
+('4X6',N'In ảnh thẻ 4x6 cm',10000),
+('35X45',N'In ảnh thẻ 3,5x4,5 cm',7000),
+('5X5',N'In ảnh thẻ 5x5 cm',10000);
+INSERT DichVu(TenDichVu,LoaiDichVu,KhoGiay,LoaiGiay,MatIn,MauSac,DonGia,MaVatTu,TrangThai,KichThuocAnh)
+SELECT g.Ten,'IN_AN','A4','GIAY_ANH','1_MAT','MAU',g.Gia,@VatTu,N'HIEN',g.Ma
+FROM @Gia g WHERE NOT EXISTS(SELECT 1 FROM DichVu dv WHERE dv.KichThuocAnh=g.Ma);
+INSERT BangGiaChiNhanh(MaChiNhanh,MaDichVu,DonGia,TrangThai)
+SELECT cn.MaChiNhanh,dv.MaDichVu,dv.DonGia,N'HIEN'
+FROM ChiNhanh cn CROSS JOIN DichVu dv
+WHERE dv.KichThuocAnh IS NOT NULL
+  AND NOT EXISTS(SELECT 1 FROM BangGiaChiNhanh bg WHERE bg.MaChiNhanh=cn.MaChiNhanh AND bg.MaDichVu=dv.MaDichVu);
+-- Ton ban dau = 0: quan ly nhap va nhan giay anh truoc khi in, khong tao ton gia.
+INSERT TonKho(MaChiNhanh,MaVatTu,SoLuong,MucToiThieu)
+SELECT MaChiNhanh,@VatTu,0,10 FROM ChiNhanh cn
+WHERE NOT EXISTS(SELECT 1 FROM TonKho tk WHERE tk.MaChiNhanh=cn.MaChiNhanh AND tk.MaVatTu=@VatTu);
+GO

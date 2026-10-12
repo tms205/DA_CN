@@ -352,7 +352,7 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
                 Text(widget.file.tenFileGoc,
                     maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTheme.font(size: 13, weight: FontWeight.w600)),
                 const SizedBox(height: 3),
-                Text('${widget.file.soTrang ?? 0} trang × ${widget.soBan} bản',
+                Text(widget.file.laAnhThe ? widget.file.moTaSoLuong : '${widget.file.soTrang ?? 0} trang × ${widget.soBan} bản',
                     style: AppTheme.font(size: 11, color: AppColors.chuPhu)),
                 const SizedBox(height: 2),
                 Text(widget.tenCauHinh,
@@ -573,7 +573,7 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
             if (_loiBaoGia != null)
               Padding(padding: const EdgeInsets.only(bottom: 8), child: HopThongBao(_loiBaoGia!))
             else if (b != null) ...[
-              _dongTien('Tiền in', '${widget.file.soTrang ?? 0} trang × ${widget.soBan} bản', tien(b.tienIn)),
+              _dongTien('Tiền in', widget.file.laAnhThe ? widget.file.moTaSoLuong : '${widget.file.soTrang ?? 0} trang × ${widget.soBan} bản', tien(b.tienIn)),
               if (b.tienGiaCong > 0) _dongTien('Tiền gia công', null, tien(b.tienGiaCong)),
               if (b.phuPhiGap > 0) _dongTien('Phụ phí in hỏa tốc', null, '+${tien(b.phuPhiGap)}', mau: AppColors.hoaToc),
               if (b.phiShip > 0) _dongTien('Phí giao hàng', null, '+${tien(b.phiShip)}'),

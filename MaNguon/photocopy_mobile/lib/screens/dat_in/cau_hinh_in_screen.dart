@@ -131,9 +131,11 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
 
   // ---------------------------------------------------------------- Suy ra lựa chọn hợp lệ từ bảng giá
 
-  List<DichVu> _dongIn() => _bangGia.where((d) => d.laDongIn).toList();
+  List<DichVu> _dongIn() =>
+      _bangGia.where((d) => d.hopVoiFile(widget.file)).toList();
 
-  List<DichVu> _dongGiaCong() => _bangGia.where((d) => !d.laDongIn).toList();
+  List<DichVu> _dongGiaCong() =>
+      widget.file.laAnhThe ? [] : _bangGia.where((d) => !d.laDongIn).toList();
 
   // Danh sách loại giấy có trong bảng giá, A4 trước rồi A3
   List<String> _dsGiay() {
@@ -340,123 +342,130 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
               children: [
                 _theFile(),
                 const SizedBox(height: 12),
-                const NhanTruong('Khổ giấy & loại giấy'),
-                const SizedBox(height: 6),
-                SizedBox(
-                  height: 42,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    children: [
-                      for (String g in _dsGiay()) ...[
-                        _chipGiay(g),
-                        const SizedBox(width: 7),
+                if (widget.file.laAnhThe)
+                  Text(
+                    '${widget.file.moTaSoLuong}\nGiấy ảnh A4 · in màu một mặt · giá theo ảnh. Số ảnh đã ghép, không nhân số bản hay gia công.',
+                    style: AppTheme.font(size: 14, height: 1.5),
+                  )
+                else ...[
+                  const NhanTruong('Khổ giấy & loại giấy'),
+                  const SizedBox(height: 6),
+                  SizedBox(
+                    height: 42,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: [
+                        for (String g in _dsGiay()) ...[
+                          _chipGiay(g),
+                          const SizedBox(width: 7),
+                        ],
                       ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const NhanTruong('Mặt in'),
+                  const SizedBox(height: 6),
+                  _chonDoan(
+                    [
+                      LuaChon(
+                        '2_MAT',
+                        'In 2 mặt',
+                        'tiết kiệm 50% giấy',
+                        _coDong(mat: '2_MAT'),
+                        'Bảng giá chưa có $_giay in 2 mặt.',
+                      ),
+                      LuaChon(
+                        '1_MAT',
+                        'In 1 mặt',
+                        null,
+                        _coDong(mat: '1_MAT'),
+                        'Bảng giá chưa có $_giay in 1 mặt.',
+                      ),
+                    ],
+                    _matIn,
+                    (giaTri) => _doiLuaChon(() => _matIn = giaTri),
+                  ),
+                  const SizedBox(height: 12),
+                  const NhanTruong('Hướng giấy'),
+                  const SizedBox(height: 6),
+                  _chonDoan(
+                    [
+                      LuaChon('DUNG', 'Giấy đứng', null, true, ''),
+                      LuaChon('NGANG', 'Giấy ngang', null, true, ''),
+                    ],
+                    _huongGiay,
+                    (giaTri) => _doiLuaChon(() => _huongGiay = giaTri),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const NhanTruong('Màu sắc'),
+                            const SizedBox(height: 6),
+                            _chonDoan(
+                              [
+                                LuaChon(
+                                  'DEN_TRANG',
+                                  'Đen trắng',
+                                  null,
+                                  _coDong(mat: _matIn, mau: 'DEN_TRANG'),
+                                  'Bảng giá chưa có $_giay ${_tenMatIn()} đen trắng.',
+                                ),
+                                LuaChon(
+                                  'MAU',
+                                  'In màu',
+                                  null,
+                                  _coDong(mat: _matIn, mau: 'MAU'),
+                                  'Bảng giá chưa có $_giay ${_tenMatIn()} màu.',
+                                ),
+                              ],
+                              _mauSac,
+                              (giaTri) => _doiLuaChon(() => _mauSac = giaTri),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      SizedBox(
+                        width: 128,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const NhanTruong('Số bản in'),
+                            const SizedBox(height: 6),
+                            _boDem(),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 12),
-                const NhanTruong('Mặt in'),
-                const SizedBox(height: 6),
-                _chonDoan(
-                  [
-                    LuaChon(
-                      '2_MAT',
-                      'In 2 mặt',
-                      'tiết kiệm 50% giấy',
-                      _coDong(mat: '2_MAT'),
-                      'Bảng giá chưa có $_giay in 2 mặt.',
-                    ),
-                    LuaChon(
-                      '1_MAT',
-                      'In 1 mặt',
-                      null,
-                      _coDong(mat: '1_MAT'),
-                      'Bảng giá chưa có $_giay in 1 mặt.',
-                    ),
-                  ],
-                  _matIn,
-                  (giaTri) => _doiLuaChon(() => _matIn = giaTri),
-                ),
-                const SizedBox(height: 12),
-                const NhanTruong('Hướng giấy'),
-                const SizedBox(height: 6),
-                _chonDoan(
-                  [
-                    LuaChon('DUNG', 'Giấy đứng', null, true, ''),
-                    LuaChon('NGANG', 'Giấy ngang', null, true, ''),
-                  ],
-                  _huongGiay,
-                  (giaTri) => _doiLuaChon(() => _huongGiay = giaTri),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const NhanTruong('Màu sắc'),
-                          const SizedBox(height: 6),
-                          _chonDoan(
-                            [
-                              LuaChon(
-                                'DEN_TRANG',
-                                'Đen trắng',
-                                null,
-                                _coDong(mat: _matIn, mau: 'DEN_TRANG'),
-                                'Bảng giá chưa có $_giay ${_tenMatIn()} đen trắng.',
-                              ),
-                              LuaChon(
-                                'MAU',
-                                'In màu',
-                                null,
-                                _coDong(mat: _matIn, mau: 'MAU'),
-                                'Bảng giá chưa có $_giay ${_tenMatIn()} màu.',
-                              ),
-                            ],
-                            _mauSac,
-                            (giaTri) => _doiLuaChon(() => _mauSac = giaTri),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    SizedBox(
-                      width: 128,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const NhanTruong('Số bản in'),
-                          const SizedBox(height: 6),
-                          _boDem(),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                const NhanTruong('Gia công đi kèm'),
-                const SizedBox(height: 6),
-                _luoiGiaCong(),
-                const SizedBox(height: 8),
-                Text(
-                  'Kim góc: tối đa 50 tờ/bản (${soToMoiBan(widget.file.soTrang ?? 0, _matIn)} tờ hiện tại). Lò xo không chọn cùng kim góc; ép plastic vẫn chọn cùng lò xo.',
-                  style: AppTheme.font(size: 12, color: AppColors.chuPhu),
-                ),
-                if (_thongBaoGiaCong != null || !_kimGocHopLe())
-                  Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Text(
-                      _thongBaoGiaCong ??
-                          'File vượt 50 tờ/bản, không thể bấm kim góc.',
-                      style: AppTheme.font(
-                        size: 12,
-                        color: AppColors.accentDeep,
-                      ),
-                    ),
+                  const SizedBox(height: 12),
+                  const NhanTruong('Gia công đi kèm'),
+                  const SizedBox(height: 6),
+                  _luoiGiaCong(),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Kim góc: tối đa 50 tờ/bản (${soToMoiBan(widget.file.soTrang ?? 0, _matIn)} tờ hiện tại). Lò xo không chọn cùng kim góc; ép plastic vẫn chọn cùng lò xo.',
+                    style: AppTheme.font(size: 12, color: AppColors.chuPhu),
                   ),
-                const SizedBox(height: 12),
+                  if (_thongBaoGiaCong != null || !_kimGocHopLe())
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        _thongBaoGiaCong ??
+                            'File vượt 50 tờ/bản, không thể bấm kim góc.',
+                        style: AppTheme.font(
+                          size: 12,
+                          color: AppColors.accentDeep,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 12),
+                ],
                 _theHoaToc(),
               ],
             ),
@@ -522,7 +531,7 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
                 Row(
                   children: [
                     Text(
-                      '${f.soTrang ?? 0} trang',
+                      f.moTaSoLuong,
                       style: AppTheme.font(size: 11, color: AppColors.chuPhu),
                     ),
                     Text(
@@ -1038,7 +1047,9 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
             else if (b != null) ...[
               _dongTien(
                 'Tiền in',
-                '${widget.file.soTrang ?? 0} trang × $_soBan bản',
+                widget.file.laAnhThe
+                    ? widget.file.moTaSoLuong
+                    : '${widget.file.soTrang ?? 0} trang × $_soBan bản',
                 tien(b.tienIn),
               ),
               if (b.tienGiaCong > 0)

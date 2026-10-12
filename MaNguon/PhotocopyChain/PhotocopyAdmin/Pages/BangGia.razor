@@ -2,6 +2,7 @@
 @inject HttpClient Http
 @inject PhienDangNhap Phien
 @inject PhamViChiNhanh PhamVi
+@using PhotocopyShared.QuyCachIn
 
 <PageTitle>Bảng giá · PhotocopyChain</PageTitle>
 
@@ -45,14 +46,24 @@
                 </div>
                 <div class="truong">
                     <label class="nhan">Nhóm dịch vụ</label>
-                    <select class="ca-o-loc" @bind="_form.LoaiDichVu">
+                    <select class="ca-o-loc" @bind="_form.LoaiDichVu" @bind:after="DoiLoai">
                         <option value="IN_AN">In ấn tài liệu</option>
                         <option value="GIA_CONG">Hoàn thiện / gia công</option>
                     </select>
                 </div>
                 <div class="truong">
+                    <label class="nhan">Quy cách ảnh thẻ</label>
+                    <select class="ca-o-loc" @bind="KichThuocAnh" disabled="@(_form.LoaiDichVu != "IN_AN")">
+                        <option value="">Không áp dụng · tài liệu</option>
+                        @foreach (var qc in QuyCachAnhThe.DanhSach)
+                        {
+                            <option value="@qc.Ma">@qc.Ten · tính từng ảnh</option>
+                        }
+                    </select>
+                </div>
+                <div class="truong">
                     <label class="nhan">Khổ giấy</label>
-                    <select class="ca-o-loc" @bind="_form.KhoGiay">
+                    <select class="ca-o-loc" @bind="_form.KhoGiay" disabled="@(_form.KichThuocAnh != null)">
                         <option value="">Không phân biệt</option>
                         <option value="A4">Khổ A4</option>
                         <option value="A3">Khổ A3</option>
@@ -60,7 +71,7 @@
                 </div>
                 <div class="truong">
                     <label class="nhan">Mặt in</label>
-                    <select class="ca-o-loc" @bind="_form.MatIn">
+                    <select class="ca-o-loc" @bind="_form.MatIn" disabled="@(_form.KichThuocAnh != null)">
                         <option value="">Không phân biệt</option>
                         <option value="1_MAT">In 1 mặt</option>
                         <option value="2_MAT">In 2 mặt</option>
@@ -68,14 +79,14 @@
                 </div>
                 <div class="truong">
                     <label class="nhan">Màu sắc</label>
-                    <select class="ca-o-loc" @bind="_form.MauSac">
+                    <select class="ca-o-loc" @bind="_form.MauSac" disabled="@(_form.KichThuocAnh != null)">
                         <option value="">Không phân biệt</option>
                         <option value="DEN_TRANG">Đen trắng</option>
                         <option value="MAU">In màu</option>
                     </select>
                 </div>
                 <div class="truong">
-                    <label class="nhan">Đơn giá (₫)</label>
+                    <label class="nhan">Đơn giá (₫/@(_form.KichThuocAnh != null ? "ảnh" : _form.LoaiDichVu == "IN_AN" ? "trang" : "bản"))</label>
                     <input max="999999999999" required class="ca-o-loc mono" type="number" min="0" step="1" @bind="_form.DonGia" />
                 </div>
             </div>
@@ -126,7 +137,7 @@
                                     <div class="nv-phu">Mã DV: #@dv.MaDichVu</div>
                                 </td>
                                 <td data-nhan="Phân loại">
-                                    <span class="nhan-mau @(dv.LoaiDichVu == "IN_AN" ? "nhan-accent" : "nhan-xam")">@TenLoaiDichVu(dv.LoaiDichVu)</span>
+                                    <span class="nhan-mau @(dv.LoaiDichVu == "IN_AN" ? "nhan-accent" : "nhan-xam")">@(dv.KichThuocAnh != null ? "In ảnh thẻ" : TenLoaiDichVu(dv.LoaiDichVu))</span>
                                 </td>
                                 <td data-nhan="Quy cách áp dụng">
                                     <div>@ThongTinApDung(dv)</div>
@@ -137,7 +148,7 @@
                                 </td>
                                 <td class="mono" data-nhan="Đơn giá">
                                     <b style="font-size: 17px;">@Tien(dv.DonGia)</b>
-                                    <div class="nv-phu">@(dv.LoaiDichVu == "IN_AN" ? "mỗi trang" : "mỗi bản")</div>
+                                    <div class="nv-phu">@(dv.KichThuocAnh != null ? "mỗi ảnh" : dv.LoaiDichVu == "IN_AN" ? "mỗi trang" : "mỗi bản")</div>
                                 </td>
                                 <td data-nhan="Trạng thái">
                                     <span class="nhan-mau @(dv.TrangThai == "HIEN" ? "nhan-xanh" : "nhan-xam")">@TenTrangThai(dv.TrangThai)</span>
@@ -163,6 +174,21 @@
     private LuuDichVuRequest _form = Moi();
     private string _loi;
     private string _thongBao;
+    private string KichThuocAnh
+    {
+        get => _form.KichThuocAnh ?? "";
+        set
+        {
+            _form.KichThuocAnh = string.IsNullOrEmpty(value) ? null : value;
+            if (_form.KichThuocAnh != null)
+            {
+                _form.KhoGiay = "A4"; _form.LoaiGiay = "GIAY_ANH";
+                _form.MatIn = "1_MAT"; _form.MauSac = "MAU"; _form.NhomGiaCong = null;
+            }
+            else if (_form.LoaiGiay == "GIAY_ANH") _form.LoaiGiay = "70GSM";
+        }
+    }
+    private void DoiLoai() { if (_form.LoaiDichVu != "IN_AN") KichThuocAnh = ""; }
 
     protected override async Task OnInitializedAsync() => await TaiAsync();
 
@@ -193,6 +219,7 @@
         {
             TenDichVu = d.TenDichVu,
             LoaiDichVu = d.LoaiDichVu,
+            KichThuocAnh = d.KichThuocAnh,
             KhoGiay = d.KhoGiay,
             LoaiGiay = d.LoaiGiay,
             MatIn = d.MatIn,
@@ -244,6 +271,7 @@
 
     private static string ThongTinApDung(DichVuQuanTriDto d)
     {
+        if (d.KichThuocAnh != null) return $"{QuyCachAnhThe.Lay(d.KichThuocAnh)?.Ten} · Giấy ảnh A4 · In màu 1 mặt";
         if (d.LoaiDichVu == "GIA_CONG")
             return "Thực hiện sau khi in";
 

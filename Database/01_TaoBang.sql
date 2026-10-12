@@ -61,9 +61,14 @@ CREATE TABLE DichVu (
     MatIn        VARCHAR(10),                 
     MauSac       VARCHAR(10),                   
     NhomGiaCong  VARCHAR(20),                   
+    KichThuocAnh VARCHAR(10),                   -- NULL: tai lieu; anh the tinh tien theo anh
     DonGia       DECIMAL(12,0) NOT NULL,
     MaVatTu      INT REFERENCES VatTu(MaVatTu),
-    TrangThai    NVARCHAR(20) DEFAULT N'HIEN'
+    TrangThai    NVARCHAR(20) DEFAULT N'HIEN',
+    CONSTRAINT CK_DichVu_AnhThe CHECK (KichThuocAnh IS NULL OR
+      (KichThuocAnh IN ('2X3','3X4','4X6','35X45','5X5') AND LoaiDichVu='IN_AN'
+       AND KhoGiay IS NOT NULL AND KhoGiay='A4' AND LoaiGiay IS NOT NULL AND LoaiGiay='GIAY_ANH'
+       AND MatIn IS NOT NULL AND MatIn='1_MAT' AND MauSac IS NOT NULL AND MauSac='MAU'))
 );
 GO
 
@@ -112,8 +117,13 @@ CREATE TABLE FileIn (
     DungLuong    INT,
     DuongDan     NVARCHAR(500),
     SoTrang      INT,
+    KichThuocAnh VARCHAR(10),
+    SoLuongAnh   INT,
     TrangThai    NVARCHAR(20) DEFAULT N'SAN_SANG',   
-    NgayTaiLen   DATETIME DEFAULT GETDATE()
+    NgayTaiLen   DATETIME DEFAULT GETDATE(),
+    CONSTRAINT CK_FileIn_AnhThe CHECK ((KichThuocAnh IS NULL AND SoLuongAnh IS NULL) OR
+      (KichThuocAnh IS NOT NULL AND KichThuocAnh IN ('2X3','3X4','4X6','35X45','5X5')
+       AND SoLuongAnh IS NOT NULL AND SoLuongAnh BETWEEN 1 AND 100))
 );
 GO
 
@@ -166,6 +176,12 @@ CREATE TABLE ChiTietDonHang (
     HuongGiay    VARCHAR(5) NOT NULL CONSTRAINT DF_ChiTietDonHang_HuongGiay DEFAULT 'DUNG',
     DonGia       DECIMAL(12,0),
     ThanhTien    DECIMAL(12,0),         -- tien in + tien gia cong cua dong nay
+    KichThuocAnh VARCHAR(10),           -- snapshot quy cach va so anh khi lap don
+    SoLuongAnh   INT,
+    CONSTRAINT CK_ChiTietDonHang_AnhThe CHECK ((KichThuocAnh IS NULL AND SoLuongAnh IS NULL) OR
+      (KichThuocAnh IS NOT NULL AND KichThuocAnh IN ('2X3','3X4','4X6','35X45','5X5')
+       AND SoLuongAnh IS NOT NULL AND SoLuongAnh BETWEEN 1 AND 100
+       AND SoBan IS NOT NULL AND SoBan=1 AND HuongGiay IS NOT NULL AND HuongGiay='DUNG')),
     CONSTRAINT UQ_ChiTietDonHang_DonHang_File UNIQUE (MaDonHang, MaFile),
     CONSTRAINT CK_ChiTietDonHang_HuongGiay CHECK (
         (HuongGiay COLLATE Latin1_General_100_BIN2 = 'DUNG' AND DATALENGTH(HuongGiay) = 4) OR

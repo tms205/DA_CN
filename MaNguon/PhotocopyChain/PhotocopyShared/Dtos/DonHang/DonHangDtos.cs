@@ -115,6 +115,8 @@ public sealed class ChiNhanhDatDonRequest
 /// <summary>Một dòng in trong đơn (1 file + 1 cấu hình in + các gia công đi kèm).</summary>
 public sealed class DongInChiTietDto
 {
+    public string? KichThuocAnh { get; set; }
+    public int? SoLuongAnh { get; set; }
     public int MaChiTiet { get; set; }
     public int MaFile { get; set; }
     public int MaDichVu { get; set; }

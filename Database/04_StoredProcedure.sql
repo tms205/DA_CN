@@ -123,9 +123,25 @@ BEGIN
                           ELSE d.SoTrang END > 50)
         THROW 50111, N'Bấm kim góc chỉ áp dụng tối đa 50 tờ giấy thực tế mỗi bản.', 1;
 
-    SELECT @TienIn = SUM(d.SoTrang * d.SoBan * bg.DonGia),
+    -- Anh the tinh theo so anh, khong theo so trang PDF ghep.
+    IF EXISTS (SELECT 1 FROM @DsFile d
+               LEFT JOIN FileIn f ON f.MaFile = d.MaFile
+               JOIN DichVu dv ON dv.MaDichVu = d.MaDichVu
+               WHERE f.MaFile IS NULL
+                  OR ISNULL(f.KichThuocAnh, '') <> ISNULL(dv.KichThuocAnh, '')
+                  OR (f.KichThuocAnh IS NOT NULL AND
+                      (f.SoLuongAnh IS NULL OR f.SoLuongAnh NOT BETWEEN 1 AND 100
+                       OR d.SoBan <> 1 OR d.SoTrang <> f.SoTrang)))
+        THROW 50130, N'Ảnh thẻ phải chọn đúng kích thước, in toàn bộ PDF và giữ một bản. Muốn đổi số ảnh, vui lòng tải lại.', 1;
+    IF EXISTS (SELECT 1 FROM @DsGiaCong g JOIN FileIn f ON f.MaFile = g.MaFile
+               WHERE f.KichThuocAnh IS NOT NULL)
+        THROW 50131, N'Ảnh thẻ không dùng gia công đóng gáy hoặc ép plastic của tài liệu.', 1;
+
+    SELECT @TienIn = SUM(CASE WHEN f.KichThuocAnh IS NOT NULL THEN f.SoLuongAnh * bg.DonGia
+                             ELSE CAST(d.SoTrang AS BIGINT) * d.SoBan * bg.DonGia END),
            @TongSoTrang = SUM(d.SoTrang * d.SoBan)
     FROM @DsFile d
+    JOIN FileIn f ON f.MaFile = d.MaFile
     JOIN BangGiaChiNhanh bg ON bg.MaChiNhanh = @MaChiNhanh AND bg.MaDichVu = d.MaDichVu;
 
     -- Tien gia cong: cong het cac gia cong da chon, moi cai nhan voi so ban in cua file do
@@ -233,6 +249,10 @@ BEGIN
             THROW 50112, N'Mỗi file phải có đúng một hướng giấy DUNG hoặc NGANG.', 1;
     END
 
+    IF EXISTS (SELECT 1 FROM @Huong h JOIN FileIn f ON f.MaFile = h.MaFile
+               WHERE f.KichThuocAnh IS NOT NULL AND h.HuongGiay <> N'DUNG')
+        THROW 50132, N'PDF ảnh thẻ đã ghép đúng kích thước, không đổi sang giấy ngang.', 1;
+
     DECLARE @TienIn DECIMAL(12,0), @TienGiaCong DECIMAL(12,0), @PhuPhiGap DECIMAL(12,0), @PhiShip DECIMAL(12,0),
             @GiamGia DECIMAL(12,0), @MaKM INT, @LyDoKM NVARCHAR(200), @TongSoTrang INT;
 
@@ -250,10 +270,13 @@ BEGIN
                 dbo.fn_UocTinhGioXong(@MaChiNhanh, @TongSoTrang, @InGap));
         SET @MaDonHang = SCOPE_IDENTITY();
 
-        INSERT INTO ChiTietDonHang (MaDonHang, MaFile, MaDichVu, SoTrang, SoBan, DonGia, ThanhTien)
+        INSERT INTO ChiTietDonHang (MaDonHang, MaFile, MaDichVu, SoTrang, SoBan, DonGia, ThanhTien, KichThuocAnh, SoLuongAnh)
         SELECT @MaDonHang, d.MaFile, d.MaDichVu, d.SoTrang, d.SoBan, bg.DonGia,
-               d.SoTrang * d.SoBan * bg.DonGia
+               CASE WHEN f.KichThuocAnh IS NOT NULL THEN f.SoLuongAnh * bg.DonGia
+                    ELSE CAST(d.SoTrang AS BIGINT) * d.SoBan * bg.DonGia END,
+               f.KichThuocAnh, f.SoLuongAnh
         FROM @DsFile d
+        JOIN FileIn f ON f.MaFile = d.MaFile
         JOIN BangGiaChiNhanh bg ON bg.MaChiNhanh = @MaChiNhanh AND bg.MaDichVu = d.MaDichVu;
 
 

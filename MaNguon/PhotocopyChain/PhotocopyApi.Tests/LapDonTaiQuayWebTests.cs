@@ -47,6 +47,34 @@ public class LapDonTaiQuayWebTests
     }
 
     [Fact]
+    public async Task AnhThe_ChiChonDichVuCungKichThuoc_VaBaoGiaMotBanPdf()
+    {
+        BaoGiaRequest daGui = null;
+        using var http = new HttpClient(new ApiGia(async req => {
+            if (req.RequestUri.AbsolutePath == "/api/auth/me") return Tra(new NguoiDungDto { MaChiNhanh = 1 });
+            daGui = await req.Content.ReadFromJsonAsync<BaoGiaRequest>();
+            return Tra(new BaoGiaResponse { TienIn = 40000, TongTien = 40000, TongSoTrang = 1 });
+        })) { BaseAddress = new Uri("http://test.local/") };
+        var trang = TaoTrang(http);
+        Gan(trang, "_loaiTai", "ANH_THE");
+        Gan(trang, "_dsFile", new List<FileInDto> { new() { MaFileIn = 1, SoTrang = 1, KichThuocAnh = "3X4", SoLuongAnh = 8 } });
+        Gan(trang, "_dsDichVu", new List<PhotocopyShared.Dtos.DanhMuc.DichVuDto> {
+            new() { MaDichVu = 1, LoaiDichVu = "IN_AN" },
+            new() { MaDichVu = 2, LoaiDichVu = "IN_AN", KichThuocAnh = "3X4" },
+            new() { MaDichVu = 3, LoaiDichVu = "IN_AN", KichThuocAnh = "4X6" }
+        });
+        var hopLe = (IEnumerable<PhotocopyShared.Dtos.DanhMuc.DichVuDto>)trang.GetType().GetMethod("DichVuInHopLe", Rieng).Invoke(trang, null);
+        Assert.Equal(2, Assert.Single(hopLe).MaDichVu);
+        Gan(trang, "_maDichVu", 2);
+        await Goi(trang, "BaoGiaAsync");
+        var dong = Assert.Single(daGui.FileIn);
+        Assert.Equal(1, dong.SoBanIn);
+        Assert.Equal("DUNG", dong.HuongGiay);
+        Assert.Empty(dong.DsGiaCong);
+        Assert.Equal(40000, Doc<BaoGiaResponse>(trang, "_baoGia").TongTien);
+    }
+
+    [Fact]
     public async Task DoiThuongHoaToc_GoiLaiGiaVaGioTuApi()
     {
         var dsInGap = new List<bool>();

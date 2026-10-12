@@ -9,6 +9,8 @@ public sealed class FileInDto
     public string? DinhDangGoc { get; set; }
     public int? DungLuong { get; set; }
     public int? SoTrang { get; set; }
+    public string? KichThuocAnh { get; set; }
+    public int? SoLuongAnh { get; set; }
     /// <summary>SAN_SANG / DA_XOA.</summary>
     public string TrangThaiFile { get; set; } = "";
     public DateTime NgayTaiLen { get; set; }

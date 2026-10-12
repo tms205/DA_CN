@@ -64,12 +64,14 @@ class Api {
 
   // Tải 1 file lên (gửi dạng multipart/form-data, tên trường "file").
   // Máy chủ còn phải đổi sang PDF + đếm trang nên cho chờ tới 3 phút.
-  static Future<KetQuaApi> taiFile(String duongDanFile, String tenFile) async {
+  static Future<KetQuaApi> taiFile(String duongDanFile, String tenFile, {String? kichThuocAnh, int? soLuongAnh}) async {
     if (tenFile.trim().isEmpty || tenFile.length > 255) {
       return KetQuaApi()..loi = 'Tên file không được để trống và tối đa 255 ký tự.';
     }
     try {
-      var yeuCau = http.MultipartRequest('POST', Uri.parse('$diaChiApi/api/file-in'));
+      final uri = Uri.parse('$diaChiApi/api/file-in').replace(
+        queryParameters: kichThuocAnh == null ? null : {'kichThuocAnh': kichThuocAnh, 'soLuongAnh': '$soLuongAnh'});
+      var yeuCau = http.MultipartRequest('POST', uri);
       yeuCau.headers['Authorization'] = 'Bearer ${Phien.token}';
       yeuCau.files.add(await http.MultipartFile.fromPath('file', duongDanFile, filename: tenFile));
 

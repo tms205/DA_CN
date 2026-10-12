@@ -633,7 +633,7 @@ public class DonHangController : ControllerBase
             return BadRequest(new { message = "Chỉ phục hồi file cho đơn VietQR đã thanh toán và đang chờ in." });
 
         var fileCu = await conn.QueryFirstOrDefaultAsync<FilePhucHoi>(
-            @"SELECT f.MaFile, f.SoTrang, f.DuongDan, f.TrangThai FROM ChiTietDonHang ct
+            @"SELECT f.MaFile, f.SoTrang, f.DuongDan, f.TrangThai, ct.KichThuocAnh, ct.SoLuongAnh FROM ChiTietDonHang ct
               JOIN FileIn f ON f.MaFile=ct.MaFile WHERE ct.MaDonHang=@MaDonHang AND ct.MaChiTiet=@MaChiTiet",
             new { MaDonHang = maDonHang, MaChiTiet = maChiTiet }, giaoDich);
         if (fileCu == null) return NotFound(new { message = "Không tìm thấy dòng in trong đơn." });
@@ -641,13 +641,16 @@ public class DonHangController : ControllerBase
             return BadRequest(new { message = "File cũ vẫn còn sẵn sàng, không cần phục hồi." });
 
         var fileMoi = await conn.QueryFirstOrDefaultAsync<FilePhucHoi>(
-            @"SELECT MaFile, SoTrang, DuongDan, TrangThai FROM FileIn WITH (UPDLOCK, HOLDLOCK)
+            @"SELECT MaFile, SoTrang, DuongDan, TrangThai, KichThuocAnh, SoLuongAnh FROM FileIn WITH (UPDLOCK, HOLDLOCK)
               WHERE MaFile=@MaFile AND MaKhachHang=@MaKhachHang
                 AND NOT EXISTS (SELECT 1 FROM ChiTietDonHang WHERE MaFile=@MaFile)",
             new { MaFile = req.MaFileIn, don.MaKhachHang }, giaoDich);
         if (fileMoi == null || !QuyTacMayInAo.FilePhucHoiHopLe(fileCu.SoTrang, fileMoi.SoTrang,
             fileMoi.TrangThai, System.IO.File.Exists(fileMoi.DuongDan)))
             return BadRequest(new { message = $"Hãy tải PDF mới của đúng khách, chưa dùng trong đơn khác và có đúng {fileCu.SoTrang} trang như file cũ." });
+
+        if (fileMoi.KichThuocAnh != fileCu.KichThuocAnh || fileMoi.SoLuongAnh != fileCu.SoLuongAnh)
+            return BadRequest(new { message = "File phục hồi phải giữ đúng loại tài liệu, kích thước và số ảnh thẻ của đơn đã thanh toán." });
 
         await conn.ExecuteAsync("UPDATE ChiTietDonHang SET MaFile=@MaFile WHERE MaChiTiet=@MaChiTiet AND MaDonHang=@MaDonHang",
             new { MaFile = req.MaFileIn, MaChiTiet = maChiTiet, MaDonHang = maDonHang }, giaoDich);
@@ -675,6 +678,8 @@ public class DonHangController : ControllerBase
 
     private sealed class FilePhucHoi
     {
+        public string KichThuocAnh { get; set; }
+        public int? SoLuongAnh { get; set; }
         public int MaFile { get; set; }
         public int SoTrang { get; set; }
         public string DuongDan { get; set; }
@@ -1127,6 +1132,7 @@ public class DonHangController : ControllerBase
                      dh.TrangThai AS TrangThaiDonHang, kh.SoDienThoai AS SoDienThoaiKhach,
                      cn.TenChiNhanh, ct.MaChiTiet, ct.MaFile, ct.MaDichVu,
                      ct.SoTrang, ct.TuTrang, ct.DenTrang, ct.SoBan, ct.HuongGiay,
+                     ct.KichThuocAnh, ct.SoLuongAnh,
                      f.SoTrang AS TongSoTrangFile, f.TrangThai AS TrangThaiFile
               FROM DonHang dh
               JOIN ChiNhanh cn ON cn.MaChiNhanh = dh.MaChiNhanh
@@ -1164,9 +1170,13 @@ public class DonHangController : ControllerBase
         string loaiPhatSinh, string lyDo, int tuTrang, int denTrang, int soBan,
         int maDichVu, List<int> dsGiaCong, bool mienPhi)
     {
+        if (nguon.KichThuocAnh != null &&
+            (tuTrang != 1 || denTrang != nguon.TongSoTrangFile || soBan != 1 || dsGiaCong.Count > 0))
+            throw new InvalidOperationException("Ảnh thẻ phải giữ toàn bộ số ảnh đã chốt, in một bản PDF và không kèm gia công. Đổi số lượng cần lập đơn mới.");
+
         DichVuDto dichVuIn = await conn.QueryFirstOrDefaultAsync<DichVuDto>(
             @"SELECT dv.MaDichVu, dv.TenDichVu, dv.LoaiDichVu, dv.KhoGiay, dv.LoaiGiay,
-                     dv.MatIn, dv.MauSac, dv.NhomGiaCong, bg.DonGia
+                     dv.MatIn, dv.MauSac, dv.NhomGiaCong, dv.KichThuocAnh, bg.DonGia
               FROM DichVu dv
               JOIN BangGiaChiNhanh bg ON bg.MaDichVu = dv.MaDichVu
               WHERE dv.MaDichVu = @MaDichVu AND bg.MaChiNhanh = @MaChiNhanh
@@ -1174,6 +1184,8 @@ public class DonHangController : ControllerBase
             new { MaDichVu = maDichVu, nguon.MaChiNhanh });
         if (dichVuIn == null)
             throw new InvalidOperationException("Quy cách in đã chọn không còn được bán.");
+        if (dichVuIn.KichThuocAnh != nguon.KichThuocAnh)
+            throw new InvalidOperationException("Quy cách in phải đúng loại tài liệu và kích thước ảnh của file gốc.");
 
         dsGiaCong = dsGiaCong.Distinct().ToList();
         List<DichVuDto> giaCong = dsGiaCong.Count == 0
@@ -1356,6 +1368,8 @@ public class DonHangController : ControllerBase
         public int? DenTrang { get; set; }
         public int SoBan { get; set; }
         public int TongSoTrangFile { get; set; }
+        public string KichThuocAnh { get; set; }
+        public int? SoLuongAnh { get; set; }
         public string HuongGiay { get; set; } = "DUNG";
         public string TrangThaiFile { get; set; } = "";
     }

@@ -37,7 +37,7 @@ public class DanhMucController : ControllerBase
             return BadRequest(new { message = "Hãy chọn chi nhánh để xem bảng giá." });
 
         string sql = @"SELECT dv.MaDichVu, dv.TenDichVu, dv.LoaiDichVu, dv.KhoGiay, dv.LoaiGiay,
-                              dv.MatIn, dv.MauSac, dv.NhomGiaCong, bg.DonGia
+                              dv.MatIn, dv.MauSac, dv.NhomGiaCong, bg.DonGia, dv.KichThuocAnh
                        FROM BangGiaChiNhanh bg
                        JOIN DichVu dv ON dv.MaDichVu = bg.MaDichVu
                        JOIN ChiNhanh cn ON cn.MaChiNhanh = bg.MaChiNhanh

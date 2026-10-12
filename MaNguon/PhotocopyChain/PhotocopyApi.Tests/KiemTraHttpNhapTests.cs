@@ -55,6 +55,8 @@ public class KiemTraHttpNhapTests
             ("api/quan-tri/phieu-nhap", new { maVatTu = 1, soLuong = 1, donGia = 1.5 }),
             ("api/ca/mo", new { tienDauCa = -1 }),
             ("api/ca/dong", new { tongDoanhThuCuoiCa = 1000000000000m }),
+            ("api/quan-tri/dich-vu", new { tenDichVu = "Ảnh thẻ", loaiDichVu = "IN_AN", khoGiay = "A4", loaiGiay = "GIAY_ANH", matIn = "1_MAT", mauSac = "MAU", kichThuocAnh = "TUY_Y", donGia = 5000 }),
+            ("api/quan-tri/dich-vu", new { tenDichVu = "Ảnh thẻ", loaiDichVu = "IN_AN", khoGiay = "A3", loaiGiay = "GIAY_ANH", matIn = "1_MAT", mauSac = "MAU", kichThuocAnh = "3X4", donGia = 5000 }),
         };
         foreach (var item in cases)
         {
@@ -68,6 +70,23 @@ public class KiemTraHttpNhapTests
         Assert.Equal(HttpStatusCode.BadRequest, invalidBranch.StatusCode);
         using var invalidId = await http.GetAsync("api/don-hang/-1");
         Assert.Equal(HttpStatusCode.BadRequest, invalidId.StatusCode);
+
+        foreach (string query in new[] { "kichThuocAnh=TUY_Y&soLuongAnh=8", "kichThuocAnh=3X4&soLuongAnh=0",
+            "kichThuocAnh=3X4&soLuongAnh=101", "kichThuocAnh=3X4", "soLuongAnh=8", "kichThuocAnh=3X4&soLuongAnh=8" })
+        {
+            using var form = new MultipartFormDataContent();
+            form.Add(new ByteArrayContent(new byte[] { 1, 2, 3 }), "file", "khong_phai_anh.pdf");
+            using var res = await http.PostAsync("api/file-in?" + query, form);
+            Assert.Equal(HttpStatusCode.BadRequest, res.StatusCode);
+        }
+        using var unknownTemplate = await http.GetAsync("api/file-in/mau/KHONG_CO/pdf");
+        Assert.Equal(HttpStatusCode.NotFound, unknownTemplate.StatusCode);
+        var templates = await http.GetFromJsonAsync<List<PhotocopyShared.Dtos.DatIn.MauDonDto>>("api/file-in/mau");
+        Assert.Equal(3, templates.Count);
+        using var preview = await http.GetAsync("api/file-in/mau/DON_XIN_VIEC/pdf");
+        Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
+        Assert.Equal("application/pdf", preview.Content.Headers.ContentType.MediaType);
+        Assert.StartsWith("%PDF", System.Text.Encoding.ASCII.GetString(await preview.Content.ReadAsByteArrayAsync()));
         await app.StopAsync();
     }
 
