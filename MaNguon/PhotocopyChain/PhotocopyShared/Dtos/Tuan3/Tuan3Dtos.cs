@@ -6,14 +6,11 @@ namespace PhotocopyShared.Dtos.Tuan3;
 
 // DTO dùng cho các chức năng Tuần 3. Tên thuộc tính bám sát tên cột CSDL để Dapper tự ánh xạ.
 
-public sealed class KhachTaiQuayRequest
+public sealed partial class KhachTaiQuayRequest
 {
-    [Required(ErrorMessage = "Vui lòng nhập họ tên.")]
     [MaxLength(100, ErrorMessage = "Họ tên tối đa 100 ký tự.")]
-    public string HoTen { get; set; } = "";
-    [Required(ErrorMessage = "Vui lòng nhập số điện thoại.")]
-    [RegularExpression(QuyTacNhap.SoDienThoai, ErrorMessage = QuyTacNhap.LoiSoDienThoai)]
-    public string SoDienThoai { get; set; } = "";
+    public string? HoTen { get; set; } = "";
+    public string? SoDienThoai { get; set; } = "";
 }
 
 public sealed class KhachTaiQuayDto

@@ -73,3 +73,24 @@ Các đường dẫn sau tính từ `MaNguon/PhotocopyChain`, trừ mobile đã 
 2. Android Studio: Stop app cũ rồi Run lại dự án `MaNguon/photocopy_mobile`. Hot reload không thay API đang chạy.
 3. Thử tạo nhân viên với email không phải Gmail, điện thoại thiếu/thừa số, mật khẩu yếu, tiền âm/lẻ, khuyến mãi ngược ngày và số bản 0; hệ thống phải báo lỗi.
 4. Thử đăng nhập/khôi phục bằng email tài khoản cũ không phải Gmail; không được bị chặn chỉ vì domain. Gửi OTP thật cần cấu hình Gmail hiện có hoạt động.
+
+## Bổ sung: không dùng lại mật khẩu hiện tại
+
+- `PhotocopyApi/Controllers/AuthController.cs`: đổi và đặt lại mật khẩu đều kiểm tra mật khẩu mới bằng `BCrypt.Verify` với hash hiện tại. Nếu trùng, trả HTTP 409 và thông báo: “Mật khẩu mới trùng với mật khẩu hiện tại. Vui lòng chọn mật khẩu khác.” Không cập nhật mật khẩu trong nhánh này.
+- Luồng quên mật khẩu kiểm tra OTP trước, nhưng chỉ đánh dấu mã đã dùng sau khi mật khẩu không trùng. Người dùng được sửa mật khẩu và gửi lại với OTP còn hạn; không gia hạn OTP, vẫn kiểm tra lại hạn/mã và chặn dùng mã đồng thời. Quy tắc chỉ so với mật khẩu đang sử dụng, không lưu lịch sử mật khẩu.
+- Web đã có xử lý lỗi API: HTTP 409 giữ bước nhập mật khẩu; lỗi OTP HTTP 400 quay về xác minh. Không cần sửa layout/form web.
+- Mobile: `lib/api.dart` giữ mã HTTP trong kết quả; `lib/screens/xac_thuc/xac_thuc_otp_screen.dart` giữ OTP khi mật khẩu trùng, còn lỗi OTP vẫn xóa ô mã. Màn đổi mật khẩu hiển thị thông báo API hiện có.
+- Thêm `PhotocopyApi.Tests/MatKhauTrungTests.cs`: so với hash BCrypt có salt khác nhau, phân biệt hoa/thường/khoảng trắng, không tiêu thụ OTP trước khi kiểm tra được tài khoản, form web giữ đúng bước khi trùng/sai OTP.
+- Thêm `MaNguon/photocopy_mobile/test/mat_khau_trung_test.dart`: thông báo trùng trên hai màn; cho sửa mật khẩu và gửi lại mà không nhập lại OTP.
+- Kiểm thử phần bổ sung đã đạt; toàn bộ .NET có 201 test đạt, 13 test DB bỏ qua. Build solution thành công, 0 warning/0 error. Không đổi mật khẩu tài khoản thật trong quá trình kiểm thử; không đổi schema, không gửi Gmail và không thêm thư viện.
+- Toàn bộ Flutter có 78 test đạt; analyze không phát hiện vấn đề; APK debug Android arm64 đã build lại thành công. Chạy lại launcher API/web và Stop → Run app để dùng bản mới; các mã OTP trước khi API khởi động lại cần gửi lại vì được giữ trong bộ nhớ.
+
+## Bổ sung: quên mật khẩu mobile theo ba bước giống web
+
+- `MaNguon/photocopy_mobile/lib/screens/xac_thuc/quen_mat_khau_screen.dart`: bước 1/3 nhập email và gửi OTP; cập nhật hướng dẫn, ngăn gửi lặp trong lúc đang xử lý.
+- `lib/screens/xac_thuc/xac_thuc_otp_screen.dart`: bước 2/3 chỉ nhập 6 số và gọi API `POST /api/auth/forgot-password/verify-otp`. Chỉ khi máy chủ xác minh thành công mới mở bước 3/3 gồm **Mật khẩu mới** và **Nhập lại mật khẩu mới**. Kiểm tra bắt buộc, độ mạnh bằng helper hiện có, và hai giá trị phải giống nhau trước khi gửi `reset-password`.
+- Giữ OTP trong bộ nhớ màn hình để gửi khi đặt lại mật khẩu; API vẫn kiểm tra lại mã/hạn và chỉ tiêu thụ mã khi đổi thành công. Lỗi OTP HTTP 400 quay về xác minh, xóa OTP và hai mật khẩu. HTTP 409 trùng mật khẩu hiện tại giữ bước 3 để sửa; lỗi mạng giữ dữ liệu để thử lại. Quay lại nhập mã hoặc gửi mã mới phải xác minh lại; không gia hạn mã khi chuyển bước.
+- Giữ 6 ô số, bàn phím số và hỗ trợ autofill OTP; tăng vùng bấm gửi lại mã, có trạng thái chờ và nút quay lại xác minh. Luồng đăng ký vẫn dùng OTP để tạo tài khoản, không chuyển sang bước đặt lại mật khẩu.
+- Thêm `test/quen_mat_khau_theo_buoc_test.dart` (8 kiểm thử), cập nhật `test/mat_khau_trung_test.dart` theo luồng mới. Đã kiểm tra mã sai, mã hết hạn khi lưu, mất mạng lúc xác minh, chặn gửi lặp, xác nhận mật khẩu rỗng/không khớp, quay lại/gửi mã mới và quay về đăng nhập sau thành công; kiểm tra hai bước ở 320/390px với chữ lớn 150% và bàn phím mở.
+- Kiểm chứng bản cuối: **86 Flutter test đạt**, `flutter analyze` không có vấn đề, APK debug Android arm64 build thành công. Kiểm thử dùng HTTP giả và dữ liệu tổng hợp, không gửi Gmail hay thay mật khẩu tài khoản thật; chưa cài/kiểm thử bản APK này trực tiếp trên điện thoại.
+- Lượt này chỉ sửa mobile và tài liệu/kiểm thử; dùng lại endpoint API đã có, không thêm thư viện, không sửa database. Android Studio: **Stop → Run** app, rồi thử Quên mật khẩu → email → OTP → mật khẩu mới và nhập lại. API cần đang chạy để gửi Gmail và xác minh thật.

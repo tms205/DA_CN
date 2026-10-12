@@ -295,7 +295,7 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> DatLaiMatKhau(DatLaiMatKhauRequest req)
     {
         string email = req.Email.Trim().ToLowerInvariant();
-        if (!_otpDatLai.DungMa(email, req.MaOtp))
+        if (!_otpDatLai.KiemTraMa(email, req.MaOtp))
             return BadRequest(new { message = "Mã OTP không đúng, đã sử dụng, hết hạn hoặc tạm khóa do nhập sai quá 5 lần." });
 
         using var conn = new SqlConnection(_chuoiKetNoi);
@@ -304,6 +304,14 @@ public class AuthController : ControllerBase
             new { Email = email });
         if (nd == null)
             return BadRequest(new { message = "Không thể đặt lại mật khẩu cho tài khoản này." });
+
+        string loiMatKhau = KiemTraMatKhauMoi(req.MatKhauMoi, nd.MatKhau);
+        if (loiMatKhau != null)
+            return Conflict(new { message = loiMatKhau });
+
+        // Chỉ dùng mã sau khi mật khẩu hợp lệ; vẫn chặn hai request dùng cùng OTP.
+        if (!_otpDatLai.DungMa(email, req.MaOtp))
+            return BadRequest(new { message = "Mã OTP không đúng, đã sử dụng, hết hạn hoặc tạm khóa do nhập sai quá 5 lần." });
 
         int soDong = await conn.ExecuteAsync(
             "UPDATE NguoiDung SET MatKhau = @MatKhau WHERE MaNguoiDung = @MaNguoiDung AND TrangThai = 'HOAT_DONG'",
@@ -389,8 +397,9 @@ public class AuthController : ControllerBase
 
         if (!KiemTraMatKhau(req.MatKhauCu, matKhauHienTai))
             return BadRequest(new { message = "Mật khẩu hiện tại không đúng." });
-        if (req.MatKhauCu == req.MatKhauMoi)
-            return BadRequest(new { message = "Mật khẩu mới phải khác mật khẩu hiện tại." });
+        string loiMatKhau = KiemTraMatKhauMoi(req.MatKhauMoi, matKhauHienTai);
+        if (loiMatKhau != null)
+            return Conflict(new { message = loiMatKhau });
 
         await conn.ExecuteAsync("UPDATE NguoiDung SET MatKhau = @MatKhau WHERE MaNguoiDung = @MaNguoiDung",
             new { MatKhau = BCrypt.Net.BCrypt.HashPassword(req.MatKhauMoi), MaNguoiDung = maNguoiDung });
@@ -442,6 +451,14 @@ public class AuthController : ControllerBase
             HetHanLuc = hetHan,
             NguoiDung = nd
         };
+    }
+
+    // Dùng chung cho đổi mật khẩu và quên mật khẩu; không so sánh hai hash có salt khác nhau.
+    private string KiemTraMatKhauMoi(string matKhauMoi, string matKhauDaBam)
+    {
+        if (KiemTraMatKhau(matKhauMoi, matKhauDaBam))
+            return "Mật khẩu mới trùng với mật khẩu hiện tại. Vui lòng chọn mật khẩu khác.";
+        return null;
     }
 
     // So mật khẩu người dùng nhập với mật khẩu đã băm trong CSDL

@@ -1,6 +1,24 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.RegularExpressions;
+using PhotocopyShared.KiemTraDuLieu;
 
 namespace PhotocopyShared.Dtos.Tuan3;
+
+public sealed partial class KhachTaiQuayRequest : IValidatableObject
+{
+    public IEnumerable<ValidationResult> Validate(ValidationContext context)
+    {
+        string ten = (HoTen ?? "").Trim();
+        string sdt = (SoDienThoai ?? "").Trim();
+        if (ten.Length == 0 && sdt.Length == 0)
+            yield return new ValidationResult("Vui lòng nhập họ tên hoặc số điện thoại khách hàng.",
+                [nameof(HoTen), nameof(SoDienThoai)]);
+        if (ten.Length > 0 && ten.Length < 2)
+            yield return new ValidationResult("Họ tên khách hàng cần ít nhất 2 ký tự.", [nameof(HoTen)]);
+        if (sdt.Length > 0 && !Regex.IsMatch(sdt, QuyTacNhap.SoDienThoai))
+            yield return new ValidationResult(QuyTacNhap.LoiSoDienThoai, [nameof(SoDienThoai)]);
+    }
+}
 
 public sealed partial class TaoInLaiTaiQuayRequest : IValidatableObject
 {

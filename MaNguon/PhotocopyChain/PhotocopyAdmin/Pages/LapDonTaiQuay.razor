@@ -45,19 +45,20 @@
     <div class="luoi-hai-cot">
         <form @onsubmit="ChonKhachAsync" @onsubmit:preventDefault class="the">
             <h2 class="the-tieu-de nho">1. Khách hàng</h2>
+            <p class="the-mo-ta nho">Nhập họ tên hoặc số điện thoại; không bắt buộc nhập cả hai. Có SĐT để tìm lại khách đã có.</p>
             <div class="truong">
                 <label class="nhan">Họ tên</label>
-                <div class="o-nhap"><input required maxlength="100" @bind="_hoTen" placeholder="Nguyễn Văn An" /></div>
+                <div class="o-nhap"><input maxlength="100" @bind="_hoTen" placeholder="Nguyễn Văn An" /></div>
             </div>
             <div class="truong">
                 <label class="nhan">Số điện thoại</label>
-                <div class="o-nhap"><input required inputmode="numeric" pattern="0[0-9]{9}" title="10 chữ số, bắt đầu bằng 0" maxlength="10" @bind="_soDienThoai" placeholder="09xxxxxxxx" /></div>
+                <div class="o-nhap"><input inputmode="numeric" pattern="0[0-9]{9}" title="Nếu nhập: 10 chữ số, bắt đầu bằng 0" maxlength="10" @bind="_soDienThoai" placeholder="09xxxxxxxx" /></div>
             </div>
-            <button type="submit" class="nut-chinh" disabled="@_dangGui">Tìm / tạo khách hàng</button>
+            <button type="submit" class="nut-chinh" disabled="@(_dangGui || _dangTaiFile)">Tìm / tạo khách hàng</button>
 
             @if (_khach != null)
             {
-                <div class="o-thanh-cong"><span>@_khach.HoTen · @_khach.SoDienThoai @(_khach.VuaTao ? "· vừa tạo" : "· đã có tài khoản")</span></div>
+                <div class="o-thanh-cong"><span>@_khach.HoTen @(string.IsNullOrWhiteSpace(_khach.SoDienThoai) ? "" : "· " + _khach.SoDienThoai) @(_khach.VuaTao ? "· vừa tạo" : "· đã có tài khoản")</span></div>
             }
         </form>
 
@@ -69,14 +70,14 @@
             }
             else
             {
-                <InputFile OnChange="TaiFileAsync" multiple />
+                <InputFile OnChange="TaiFileAsync" multiple disabled="@(_dangGui || _dangTaiFile)" />
                 @if (_dangTaiFile) { <p class="the-mo-ta nho">Đang chuẩn hóa PDF và đếm trang…</p> }
                 @foreach (FileInDto file in _dsFile)
                 {
                     <div class="hd-dong-in">
                         <b>@file.TenFileGoc</b>
                         <span class="nv-phu">@file.SoTrang trang · đã chuẩn hóa PDF</span>
-                        <button class="nut-nho nguy-hiem" disabled="@_dangTaiFile" @onclick="() => XoaFileAsync(file)">Xóa</button>
+                        <button class="nut-nho nguy-hiem" disabled="@(_dangGui || _dangTaiFile)" @onclick="() => XoaFileAsync(file)">Xóa</button>
                     </div>
                 }
             }
@@ -124,19 +125,47 @@
                 </div>
                 <div class="truong">
                     <label class="nhan">Số bản mỗi file</label>
-                    <input max="2147483647" required step="1" class="ca-o-loc" type="number" min="1" @bind="_soBan" />
-                </div>
-                <label class="hop-chon"><input type="checkbox" @bind="_inGap" /><span class="o-vuong">✓</span>In hỏa tốc (+10.000₫)</label>
-                <div class="truong">
-                    <label class="nhan">Mã khuyến mãi</label>
-                    <input maxlength="30" class="ca-o-loc mono" @bind="_maCode" />
+                    <input max="2147483647" required step="1" class="ca-o-loc" type="number" min="1" @bind="_soBan" @bind:after="XoaBaoGia" />
                 </div>
                 <div class="truong">
-                    <label class="nhan">Thanh toán</label>
-                    <select class="ca-o-loc" @bind="_phuongThucThanhToan">
+                    <label class="nhan">Tốc độ xử lý</label>
+                    <select class="ca-o-loc" @bind="KieuIn" @bind:after="DoiKieuInAsync" disabled="@(_dangGui || _dangTaiFile)">
+                        <option value="THUONG">In thường · theo hàng đợi</option>
+                        <option value="HOA_TOC">In hỏa tốc · ưu tiên (+10.000₫)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="ldq-thanh-toan-khuyen-mai">
+                <div class="truong ldq-thanh-toan">
+                    <label class="nhan" for="ldq-thanh-toan">Thanh toán</label>
+                    <select id="ldq-thanh-toan" class="ca-o-loc" @bind="_phuongThucThanhToan">
                         <option value="VIETQR">Quét QR payOS tại quầy</option>
                         <option value="COD">COD · trả khi nhận tài liệu</option>
                     </select>
+                </div>
+                <div class="truong ldq-khuyen-mai">
+                    <label class="nhan" for="ldq-ma-khuyen-mai">Mã khuyến mãi</label>
+                    <input id="ldq-ma-khuyen-mai" maxlength="30" class="ca-o-loc mono" @bind="_maCode" @bind:after="XoaBaoGia" />
+                </div>
+            </div>
+
+            <div class="o-canh-bao" role="status" aria-live="polite">
+                <div>
+                    <div><b>@(_inGap ? "In hỏa tốc · ưu tiên xử lý" : "In thường · theo hàng đợi")</b></div>
+                    @if (_dangBaoGia)
+                    {
+                        <div>Đang tính giờ nhận dự kiến…</div>
+                    }
+                    else if (_baoGia?.NgayHenTra != null)
+                    {
+                        <div>Giờ nhận dự kiến: <b>@_baoGia.NgayHenTra.Value.ToString("HH:mm dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)</b></div>
+                        <div class="nv-phu">Ước tính theo số trang, hàng đợi và tốc độ máy; có thể thay đổi theo tình trạng xử lý thực tế.</div>
+                    }
+                    else
+                    {
+                        <div>@(_baoGia == null ? "Bấm Tính lại giá để cập nhật giờ nhận theo quy cách đã chọn." : "Chưa ước tính được giờ nhận. Vui lòng kiểm tra máy in của chi nhánh.")</div>
+                    }
                 </div>
             </div>
 
@@ -184,8 +213,8 @@
             }
 
             <div class="xac-nhan-o">
-                <button type="submit" class="nut-nho" disabled="@_dangGui" @onclick="() => _chiBaoGia = true">Tính lại giá</button>
-                <button type="submit" class="nut-nho chinh" disabled="@(_dangGui || _baoGia == null)" @onclick="() => _chiBaoGia = false">@(_phuongThucThanhToan == "VIETQR" ? "Lập đơn & hiện mã QR" : "Lập đơn COD")</button>
+                <button type="submit" class="nut-nho" disabled="@(_dangGui || _dangTaiFile)" @onclick="() => _chiBaoGia = true">Tính lại giá</button>
+                <button type="submit" class="nut-nho chinh" disabled="@(_dangGui || _dangTaiFile || _baoGia == null)" @onclick="() => _chiBaoGia = false">@(_phuongThucThanhToan == "VIETQR" ? "Lập đơn & hiện mã QR" : "Lập đơn COD")</button>
             </div>
         </form>
     }
@@ -209,6 +238,11 @@
     private string _mauSac = "";
     private int _soBan = 1;
     private bool _inGap;
+    private string KieuIn
+    {
+        get => _inGap ? "HOA_TOC" : "THUONG";
+        set => _inGap = value == "HOA_TOC";
+    }
     private string _maCode = "";
     private string _ghiChu = "";
     private string _phuongThucThanhToan = "VIETQR";
@@ -217,6 +251,8 @@
     private LienKetPayOSDto _lienKetPayOS;
     private int? _maDonVuaLap;
     private bool _dangGui;
+    private bool _dangBaoGia;
+    private int _lanBaoGia;
     private bool _dangTaiFile;
     private string _loi;
     private string _thongBao;
@@ -275,7 +311,7 @@
         _matIn = dichVu.MatIn ?? "";
         _mauSac = dichVu.MauSac ?? "";
         KiemTraKimGoc();
-        _baoGia = null;
+        XoaBaoGia();
     }
 
     private void DoiKhoGiay(ChangeEventArgs e)
@@ -309,6 +345,7 @@
 
     private async Task ChonKhachAsync()
     {
+        if (_dangGui || _dangTaiFile) return;
         var req = new KhachTaiQuayRequest { HoTen = _hoTen.Trim(), SoDienThoai = _soDienThoai.Trim() };
         _loi = QuyTacNhap.LayLoi(req);
         if (_loi != null) return;
@@ -320,7 +357,7 @@
             {
                 await XoaTatCaFileDangChonAsync();
                 _khach = await res.Content.ReadFromJsonAsync<KhachTaiQuayDto>();
-                _dsFile.Clear(); _baoGia = null; _thanhToanVuaLap = null; _lienKetPayOS = null; _maDonVuaLap = null;
+                _dsFile.Clear(); XoaBaoGia(); _thanhToanVuaLap = null; _lienKetPayOS = null; _maDonVuaLap = null;
             }
             else _loi = (await res.Content.ReadFromJsonAsync<ApiError>()).Message;
         }
@@ -330,7 +367,8 @@
 
     private async Task TaiFileAsync(InputFileChangeEventArgs e)
     {
-        if (_khach == null) return;
+        if (_khach == null || _dangGui || _dangTaiFile) return;
+        XoaBaoGia();
         _dangTaiFile = true; _loi = null;
         foreach (IBrowserFile file in e.GetMultipleFiles(10))
         {
@@ -353,13 +391,13 @@
 
     private async Task XoaFileAsync(FileInDto file)
     {
-        if (_khach == null) return;
+        if (_khach == null || _dangGui || _dangTaiFile) return;
         _loi = null;
         var res = await Http.DeleteAsync("api/file-in/" + file.MaFileIn + "?maKhachHang=" + _khach.MaKhachHang);
         if (res.IsSuccessStatusCode)
         {
             _dsFile.Remove(file);
-            _baoGia = null;
+            XoaBaoGia();
         }
         else _loi = (await res.Content.ReadFromJsonAsync<ApiError>()).Message;
     }
@@ -379,7 +417,7 @@
         if (!chon)
         {
             _dsGiaCong.Remove(dichVu.MaDichVu);
-            _baoGia = null;
+            XoaBaoGia();
             return;
         }
 
@@ -397,7 +435,7 @@
                 string.Join("\", \"", dsBiBo.Select(x => x.TenDichVu)) + "\".";
 
         if (!_dsGiaCong.Contains(dichVu.MaDichVu)) _dsGiaCong.Add(dichVu.MaDichVu);
-        _baoGia = null;
+        XoaBaoGia();
     }
 
     private List<DongInRequest> TaoDongIn()
@@ -408,7 +446,17 @@
         return ds;
     }
 
-    private void XoaBaoGia() => _baoGia = null;
+    private void XoaBaoGia()
+    {
+        _baoGia = null;
+        _lanBaoGia++; // Kết quả đang chờ theo quy cách cũ không được ghi đè lựa chọn mới.
+    }
+
+    private async Task DoiKieuInAsync()
+    {
+        XoaBaoGia();
+        await BaoGiaAsync();
+    }
 
     private bool KimGocHopLe() => _dsFile.All(x => x.SoTrang > 0 &&
         QuyTacIn.SoToMoiBan(x.SoTrang.Value, _matIn) <= QuyTacIn.SoToKimGocToiDa);
@@ -427,30 +475,44 @@
 
     private async Task GuiQuyCachAsync()
     {
+        if (_dangGui || _dangTaiFile) return;
         if (_chiBaoGia) await BaoGiaAsync();
         else await LapDonAsync();
     }
 
     private async Task BaoGiaAsync()
     {
-        if (_khach == null || _dsFile.Count == 0) return;
-        _dangGui = true; _loi = null;
+        if (_dangGui || _khach == null || _dsFile.Count == 0) return;
+        XoaBaoGia();
+        int lanBaoGia = _lanBaoGia;
+        int maKhachHang = _khach.MaKhachHang;
+        _dangGui = true; _dangBaoGia = true; _loi = null;
         var req = new BaoGiaRequest { HinhThucNhan = "TAI_QUAY", InGap = _inGap, MaCodeKhuyenMai = _maCode, FileIn = TaoDongIn() };
         // API tự lấy chi nhánh từ token nhưng request báo giá vẫn cần mã chi nhánh; đọc từ endpoint hồ sơ.
         try
         {
             NguoiDungDto nd = await Http.GetFromJsonAsync<NguoiDungDto>("api/auth/me");
             req.MaChiNhanh = PhamVi.MaChiNhanh ?? nd.MaChiNhanh ?? 0;
-            var res = await Http.PostAsJsonAsync("api/bao-gia?maKhachHang=" + _khach.MaKhachHang, req);
-            if (res.IsSuccessStatusCode) _baoGia = await res.Content.ReadFromJsonAsync<BaoGiaResponse>();
-            else _loi = (await res.Content.ReadFromJsonAsync<ApiError>()).Message;
+            if (lanBaoGia != _lanBaoGia) return;
+            using var res = await Http.PostAsJsonAsync("api/bao-gia?maKhachHang=" + maKhachHang, req);
+            if (res.IsSuccessStatusCode)
+            {
+                BaoGiaResponse ketQua = await res.Content.ReadFromJsonAsync<BaoGiaResponse>();
+                if (lanBaoGia == _lanBaoGia) _baoGia = ketQua;
+            }
+            else
+            {
+                ApiError loi = await res.Content.ReadFromJsonAsync<ApiError>();
+                if (lanBaoGia == _lanBaoGia) _loi = loi.Message;
+            }
         }
-        catch { _loi = "Không tính được báo giá."; }
-        _dangGui = false;
+        catch { if (lanBaoGia == _lanBaoGia) _loi = "Không tính được báo giá."; }
+        finally { _dangGui = false; _dangBaoGia = false; }
     }
 
     private async Task LapDonAsync()
     {
+        if (_dangGui || _dangTaiFile || _baoGia == null) return;
         if (_khach == null) { _loi = "Vui lòng chọn khách hàng."; return; }
         var req = new DatDonTaiQuayRequest { MaKhachHang = _khach.MaKhachHang, PhuongThucThanhToan = _phuongThucThanhToan, InGap = _inGap, MaCodeKhuyenMai = _maCode, GhiChu = _ghiChu, FileIn = TaoDongIn() };
         _loi = QuyTacNhap.LayLoi(req);
@@ -467,7 +529,7 @@
                 _lienKetPayOS = null;
                 if (kq.PhuongThucThanhToan == "VIETQR") await TaoLienKetPayOSAsync();
                 else _thanhToanVuaLap = null;
-                _dsFile.Clear(); _baoGia = null; _ghiChu = "";
+                _dsFile.Clear(); XoaBaoGia(); _ghiChu = "";
             }
             else _loi = (await res.Content.ReadFromJsonAsync<ApiError>()).Message;
         }

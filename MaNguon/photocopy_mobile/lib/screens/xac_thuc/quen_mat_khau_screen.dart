@@ -6,8 +6,7 @@ import '../../widgets/icons.dart';
 import '../../widgets/widgets.dart';
 import 'xac_thuc_otp_screen.dart';
 
-// F-04 bước 1/2: nhập email để nhận mã OTP. Figma không có nên dựng cùng phong cách màn OTP.
-// Khách hàng nhận OTP; Shipper thì API trả câu hướng dẫn liên hệ Quản lý chi nhánh (không có OTP).
+// F-04 bước 1/3: nhập email, xác minh OTP, rồi mới nhập và xác nhận mật khẩu mới.
 class QuenMatKhauScreen extends StatefulWidget {
   const QuenMatKhauScreen({super.key});
 
@@ -30,6 +29,7 @@ class _QuenMatKhauScreenState extends State<QuenMatKhauScreen> {
   bool _emailHopLe() => RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(_email.text.trim());
 
   Future<void> _guiMa() async {
+    if (_dangGui) return;
     String email = _email.text.trim();
     if (!_emailHopLe()) {
       setState(() => _loi = 'Email không hợp lệ.');
@@ -56,7 +56,7 @@ class _QuenMatKhauScreenState extends State<QuenMatKhauScreen> {
       return;
     }
 
-    // Sang bước 2: nhập mã OTP + mật khẩu mới
+    // Sang bước 2: xác minh mã OTP trước khi mở form mật khẩu ở bước 3.
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -74,7 +74,7 @@ class _QuenMatKhauScreenState extends State<QuenMatKhauScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.nen,
-      appBar: const ThanhTieuDe(tieuDe: 'Quên mật khẩu', phuDe: 'Bước 1 / 2 · Nhập email', soBuoc: 2, buocHienTai: 1),
+      appBar: const ThanhTieuDe(tieuDe: 'Quên mật khẩu', phuDe: 'Bước 1 / 3 · Nhập email', soBuoc: 3, buocHienTai: 1),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(24, 30, 24, 24),
         child: Column(
@@ -126,7 +126,7 @@ class _QuenMatKhauScreenState extends State<QuenMatKhauScreen> {
             NutChinh(nhan: 'Gửi mã OTP', iconSau: Ico.muiTenPhai, dangTai: _dangGui, onPressed: _guiMa),
             const SizedBox(height: 16),
             Text(
-              'Tài khoản Shipper không nhận OTP — vui lòng liên hệ Quản lý chi nhánh để được cấp mật khẩu tạm.',
+              'Dùng email đã đăng ký tài khoản. Xác minh đúng mã OTP trước khi tạo mật khẩu mới.',
               textAlign: TextAlign.center,
               style: AppTheme.font(size: 11, color: AppColors.chuPhu, height: 1.5),
             ),

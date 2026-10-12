@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../../api.dart';
 import '../../dinh_dang.dart';
+import '../../kiem_tra_du_lieu.dart';
 import '../../phien.dart';
 import '../../realtime.dart';
 import '../../theme.dart';
@@ -15,7 +16,7 @@ import '../trang_chinh_screen.dart';
 
 // Figma 08-Mobile-XacThucOTP. Dùng cho 2 trường hợp:
 //  - laDangKy = true : đăng ký bước 2/2 — nhập đúng mã thì API mới tạo tài khoản, đăng nhập luôn
-//  - laDangKy = false: quên mật khẩu bước 2/2 — nhập mã + mật khẩu mới
+//  - laDangKy = false: quên mật khẩu bước 2/3 — xác minh mã, sau đó mới nhập mật khẩu ở bước 3/3
 class XacThucOtpScreen extends StatefulWidget {
   const XacThucOtpScreen({
     super.key,
@@ -39,11 +40,13 @@ class XacThucOtpScreen extends StatefulWidget {
 class _XacThucOtpScreenState extends State<XacThucOtpScreen> {
   final TextEditingController _maOtp = TextEditingController();
   final TextEditingController _matKhauMoi = TextEditingController();
+  final TextEditingController _xacNhanMatKhau = TextEditingController();
   final FocusNode _focusOtp = FocusNode();
   DateTime _hetHanLuc = DateTime.now();
   DateTime _guiLaiLuc = DateTime.now();
   Timer? _dongHo;
   bool _dangGui = false;
+  bool _daXacMinh = false;
   String? _loi;
 
   @override
@@ -68,18 +71,24 @@ class _XacThucOtpScreenState extends State<XacThucOtpScreen> {
     _dongHo?.cancel();
     _maOtp.dispose();
     _matKhauMoi.dispose();
+    _xacNhanMatKhau.dispose();
     _focusOtp.dispose();
     super.dispose();
   }
 
   Future<void> _xacNhan() async {
+    if (_dangGui) return;
+    if (!widget.laDangKy && _daXacMinh) {
+      await _datLaiMatKhau();
+      return;
+    }
     String ma = _maOtp.text;
     if (ma.length != 6) {
       setState(() => _loi = 'Vui lòng nhập đủ 6 chữ số.');
       return;
     }
-    if (!widget.laDangKy && !RegExp(r'^(?=.*[A-Z])(?=.*\d).{8,}$').hasMatch(_matKhauMoi.text)) {
-      setState(() => _loi = 'Mật khẩu mới tối thiểu 8 ký tự, có chữ hoa và số.');
+    if (DateTime.now().isAfter(_hetHanLuc)) {
+      _baoLoi('Mã OTP đã hết hạn. Vui lòng gửi lại mã.');
       return;
     }
     FocusScope.of(context).unfocus();
@@ -105,36 +114,105 @@ class _XacThucOtpScreenState extends State<XacThucOtpScreen> {
         (route) => false,
       );
     } else {
-      // Quên mật khẩu: đúng mã thì đổi sang mật khẩu mới rồi quay về màn đăng nhập
-      KetQuaApi kq = await Api.post('/api/auth/reset-password', {
+      // Chỉ mở form mật khẩu sau khi API xác minh mã thành công. Chưa tiêu thụ OTP.
+      KetQuaApi kq = await Api.post('/api/auth/forgot-password/verify-otp', {
         'email': widget.email,
         'maOtp': ma,
-        'matKhauMoi': _matKhauMoi.text,
       });
       if (!mounted) return;
       if (!kq.thanhCong) {
-        _baoLoi(kq.loi);
+        _baoLoi(kq.loi, xoaMa: kq.maHttp == 400);
         return;
       }
-      hienThongBaoNhanh(context, kq.duLieu['message']);
-      Navigator.popUntil(context, (route) => route.isFirst); // về màn đầu tiên = màn đăng nhập
+      setState(() {
+        _dangGui = false;
+        _daXacMinh = true;
+        _matKhauMoi.clear();
+        _xacNhanMatKhau.clear();
+      });
     }
   }
 
-  // Sai mã: hiện lỗi, xóa 6 ô để nhập lại
-  void _baoLoi(String loi) {
-    setState(() {
-      _loi = loi;
-      _dangGui = false;
-      _maOtp.clear();
-    });
-    _focusOtp.requestFocus();
-  }
-
-  Future<void> _guiLai() async {
+  Future<void> _datLaiMatKhau() async {
+    if (!_daXacMinh || _dangGui) return;
+    if (DateTime.now().isAfter(_hetHanLuc)) {
+      _baoLoi('Mã OTP đã hết hạn. Vui lòng gửi lại mã.');
+      return;
+    }
+    if (!matKhauMoiHopLe(_matKhauMoi.text)) {
+      setState(() => _loi = loiMatKhau);
+      return;
+    }
+    if (_xacNhanMatKhau.text.isEmpty) {
+      setState(() => _loi = 'Vui lòng nhập lại mật khẩu mới.');
+      return;
+    }
+    if (_matKhauMoi.text != _xacNhanMatKhau.text) {
+      setState(() => _loi = 'Mật khẩu nhập lại không khớp.');
+      return;
+    }
+    FocusScope.of(context).unfocus();
     setState(() {
       _dangGui = true;
       _loi = null;
+    });
+    // API vẫn kiểm tra lại hạn mã và chỉ tiêu thụ OTP khi đổi mật khẩu thành công.
+    KetQuaApi kq = await Api.post('/api/auth/reset-password', {
+      'email': widget.email,
+      'maOtp': _maOtp.text,
+      'matKhauMoi': _matKhauMoi.text,
+    });
+    if (!mounted) return;
+    if (!kq.thanhCong) {
+      // Mã sai/hết hạn: xác minh lại. Mật khẩu trùng hoặc lỗi mạng: giữ bước nhập mật khẩu.
+      _baoLoi(kq.loi, xoaMa: kq.maHttp == 400);
+      return;
+    }
+    hienThongBaoNhanh(context, kq.duLieu['message']);
+    Navigator.popUntil(context, (route) => route.isFirst);
+  }
+
+  void _moBanPhimOtp() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_daXacMinh) _focusOtp.requestFocus();
+    });
+  }
+
+  void _quayLaiNhapMa() {
+    if (_dangGui) return;
+    setState(() {
+      _daXacMinh = false;
+      _loi = null;
+      _maOtp.clear();
+      _matKhauMoi.clear();
+      _xacNhanMatKhau.clear();
+    });
+    _moBanPhimOtp();
+  }
+
+  // Sai mã: xóa để nhập lại. Mật khẩu trùng: giữ OTP còn hạn để sửa mật khẩu.
+  void _baoLoi(String loi, {bool xoaMa = true}) {
+    setState(() {
+      _loi = loi;
+      _dangGui = false;
+      if (xoaMa) {
+        _daXacMinh = false;
+        _maOtp.clear();
+        _matKhauMoi.clear();
+        _xacNhanMatKhau.clear();
+      }
+    });
+    if (xoaMa) _moBanPhimOtp();
+  }
+
+  Future<void> _guiLai() async {
+    if (_dangGui || DateTime.now().isBefore(_guiLaiLuc)) return;
+    setState(() {
+      _dangGui = true;
+      _loi = null;
+      _daXacMinh = false;
+      _matKhauMoi.clear();
+      _xacNhanMatKhau.clear();
     });
 
     KetQuaApi kq;
@@ -155,6 +233,7 @@ class _XacThucOtpScreenState extends State<XacThucOtpScreen> {
       _maOtp.clear();
     });
     hienThongBaoNhanh(context, kq.duLieu['message']);
+    _moBanPhimOtp();
   }
 
   @override
@@ -166,10 +245,12 @@ class _XacThucOtpScreenState extends State<XacThucOtpScreen> {
     return Scaffold(
       backgroundColor: AppColors.nen,
       appBar: ThanhTieuDe(
-        tieuDe: widget.laDangKy ? 'Xác thực OTP' : 'Đặt lại mật khẩu',
-        phuDe: widget.laDangKy ? 'Bước 2 / 2 · Kích hoạt tài khoản' : 'Bước 2 / 2 · Xác thực email',
-        soBuoc: 2,
-        buocHienTai: 2,
+        tieuDe: _daXacMinh ? 'Đặt lại mật khẩu' : 'Xác thực OTP',
+        phuDe: widget.laDangKy
+            ? 'Bước 2 / 2 · Kích hoạt tài khoản'
+            : (_daXacMinh ? 'Bước 3 / 3 · Mật khẩu mới' : 'Bước 2 / 3 · Xác thực email'),
+        soBuoc: widget.laDangKy ? 2 : 3,
+        buocHienTai: _daXacMinh ? 3 : 2,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(24, 30, 24, 24),
@@ -189,31 +270,49 @@ class _XacThucOtpScreenState extends State<XacThucOtpScreen> {
               ),
             ),
             const SizedBox(height: 14),
-            Text('Nhập mã xác thực',
+            Text(_daXacMinh ? 'Tạo mật khẩu mới' : 'Nhập mã xác thực',
                 textAlign: TextAlign.center, style: AppTheme.font(size: 19, weight: FontWeight.w800, letterSpacing: -0.38)),
             const SizedBox(height: 6),
             Text.rich(
               TextSpan(children: [
-                const TextSpan(text: 'Mã gồm 6 chữ số đã được gửi tới\n'),
+                TextSpan(text: _daXacMinh ? 'Đã xác minh email\n' : 'Mã gồm 6 chữ số đã được gửi tới\n'),
                 TextSpan(text: widget.email, style: AppTheme.font(size: 12.5, weight: FontWeight.w700, height: 1.55)),
               ]),
               textAlign: TextAlign.center,
               style: AppTheme.font(size: 12.5, color: AppColors.chuPhu, height: 1.55),
             ),
             const SizedBox(height: 20),
-            _oNhapOtp(),
-            if (!widget.laDangKy) ...[
-              const SizedBox(height: 16),
+            if (!_daXacMinh) _oNhapOtp(),
+            if (_daXacMinh) ...[
               const NhanTruong('Mật khẩu mới'),
               const SizedBox(height: 6),
               ONhap(
+                key: const ValueKey('mat-khau-moi'),
                 controller: _matKhauMoi,
                 icon: Ico.khoa,
                 hint: '8+ ký tự, có chữ hoa và số',
                 anChu: true,
                 autofillHints: const [AutofillHints.newPassword],
+                textInputAction: TextInputAction.next,
                 onChanged: (chu) => setState(() => _loi = null),
               ),
+              const SizedBox(height: 16),
+              const NhanTruong('Nhập lại mật khẩu mới'),
+              const SizedBox(height: 6),
+              ONhap(
+                key: const ValueKey('xac-nhan-mat-khau'),
+                controller: _xacNhanMatKhau,
+                icon: Ico.khoa,
+                hint: 'Nhập lại mật khẩu vừa tạo',
+                anChu: true,
+                autofillHints: const [AutofillHints.newPassword],
+                textInputAction: TextInputAction.done,
+                onChanged: (chu) => setState(() => _loi = null),
+                onSubmitted: (chu) => _xacNhan(),
+              ),
+              const SizedBox(height: 10),
+              Text('Ít nhất 8 ký tự, có chữ hoa và số. Không dùng lại mật khẩu hiện tại.',
+                  style: AppTheme.font(size: 12, color: AppColors.chuPhu, height: 1.5)),
             ],
             const SizedBox(height: 20),
             if (_loi != null) ...[HopThongBao(_loi!), const SizedBox(height: 14)],
@@ -232,7 +331,9 @@ class _XacThucOtpScreenState extends State<XacThucOtpScreen> {
                   const SizedBox(width: 7),
                   if (daHetHan)
                     Flexible(
-                      child: Text('Mã đã hết hiệu lực — bấm Gửi lại mã',
+                      child: Text(_daXacMinh
+                          ? 'Mã đã hết hiệu lực — quay lại để gửi mã mới'
+                          : 'Mã đã hết hiệu lực — bấm Gửi lại mã',
                           textAlign: TextAlign.center,
                           style: AppTheme.font(size: 12, weight: FontWeight.w600, color: AppColors.loiChu)),
                     )
@@ -247,7 +348,7 @@ class _XacThucOtpScreenState extends State<XacThucOtpScreen> {
             ),
             const SizedBox(height: 20),
             // Wrap: máy hẹp / cỡ chữ lớn thì tự xuống dòng thay vì tràn
-            Wrap(
+            if (!_daXacMinh) Wrap(
               alignment: WrapAlignment.center,
               crossAxisAlignment: WrapCrossAlignment.center,
               spacing: 5,
@@ -255,8 +356,9 @@ class _XacThucOtpScreenState extends State<XacThucOtpScreen> {
               children: [
                 Text('Không nhận được mã?', style: AppTheme.font(size: 12.5, color: AppColors.chuPhu)),
                 if (choGuiLai.isNegative)
-                  GestureDetector(
-                    onTap: _dangGui ? null : _guiLai,
+                  TextButton(
+                    onPressed: _dangGui ? null : _guiLai,
+                    style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
                     child: Text('Gửi lại mã', style: AppTheme.font(size: 12.5, weight: FontWeight.w700, color: AppColors.accent)),
                   )
                 else
@@ -266,11 +368,21 @@ class _XacThucOtpScreenState extends State<XacThucOtpScreen> {
             ),
             const SizedBox(height: 20),
             NutChinh(
-              nhan: widget.laDangKy ? 'Xác nhận & hoàn tất' : 'Đặt lại mật khẩu',
+              nhan: widget.laDangKy
+                  ? 'Xác nhận & hoàn tất'
+                  : (_daXacMinh ? 'Đặt lại mật khẩu' : 'Xác minh OTP'),
               iconTruoc: Ico.dauTich,
               dangTai: _dangGui,
               onPressed: _xacNhan,
             ),
+            if (_daXacMinh) ...[
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: _dangGui ? null : _quayLaiNhapMa,
+                style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                child: const Text('Quay lại nhập mã OTP'),
+              ),
+            ],
             if (widget.laDangKy) ...[
               const SizedBox(height: 20),
               Container(
@@ -337,7 +449,7 @@ class _XacThucOtpScreenState extends State<XacThucOtpScreen> {
     return LayoutBuilder(builder: (context, khungChoPhep) {
       double khoangCach = 8;
       double rongO = min(48.0, (khungChoPhep.maxWidth - khoangCach * 5) / 6);
-      double caoO = rongO * 58 / 48;
+      double caoO = max(48.0, rongO * 58 / 48);
       String ma = _maOtp.text;
 
       List<Widget> dsO = [];
@@ -359,9 +471,12 @@ class _XacThucOtpScreenState extends State<XacThucOtpScreen> {
             Positioned.fill(
               child: Opacity(
                 opacity: 0,
+                alwaysIncludeSemantics: true,
                 child: TextField(
                   controller: _maOtp,
                   focusNode: _focusOtp,
+                  readOnly: _dangGui,
+                  decoration: const InputDecoration(labelText: 'Mã OTP 6 chữ số'),
                   keyboardType: TextInputType.number,
                   autofillHints: const [AutofillHints.oneTimeCode],
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)],

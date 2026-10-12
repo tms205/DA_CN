@@ -21,6 +21,7 @@ using PhotocopyShared.Dtos.DatIn;
 using PhotocopyShared.Dtos.DonHang;
 using PhotocopyShared.Dtos.Tuan3;
 using PhotocopyShared.MayInAo;
+using PhotocopyShared.KiemTraDuLieu;
 using PhotocopyShared.QuyCachIn;
 
 namespace PhotocopyApi.Controllers;
@@ -275,24 +276,24 @@ public class DonHangController : ControllerBase
         });
     }
 
-    // POST api/don-hang/khach-tai-quay — tìm khách theo SĐT; chưa có thì tạo tài khoản khách vãng lai.
-    // Tài khoản này giúp DonHang/FileIn vẫn giữ được khóa ngoại và lịch sử mua hàng của cùng một số điện thoại.
+    // POST api/don-hang/khach-tai-quay — cần tên hoặc SĐT. Có SĐT thì tìm khách cũ;
+    // chỉ có tên thì tạo khách vãng lai riêng, không gộp hai người có cùng tên.
     [HttpPost("khach-tai-quay")]
     [Authorize(Roles = "BRANCH_ADMIN,STAFF")]
     public async Task<IActionResult> ChonKhachTaiQuay(KhachTaiQuayRequest req)
     {
+        string loi = QuyTacNhap.LayLoi(req);
+        if (loi != null) return BadRequest(new { message = loi });
         string hoTen = (req.HoTen ?? "").Trim();
         string soDienThoai = (req.SoDienThoai ?? "").Trim();
-        if (hoTen.Length < 2)
-            return BadRequest(new { message = "Vui lòng nhập họ tên khách hàng." });
-        if (!System.Text.RegularExpressions.Regex.IsMatch(soDienThoai, PhotocopyShared.KiemTraDuLieu.QuyTacNhap.SoDienThoai))
-            return BadRequest(new { message = PhotocopyShared.KiemTraDuLieu.QuyTacNhap.LoiSoDienThoai });
 
         using var conn = new SqlConnection(_chuoiKetNoi);
-        KhachTaiQuayDto khach = await conn.QueryFirstOrDefaultAsync<KhachTaiQuayDto>(
-            @"SELECT TOP 1 MaNguoiDung AS MaKhachHang, HoTen, SoDienThoai, Email
-              FROM NguoiDung WHERE SoDienThoai = @SoDienThoai AND VaiTro = 'CUSTOMER'
-              ORDER BY MaNguoiDung", new { SoDienThoai = soDienThoai });
+        KhachTaiQuayDto khach = null;
+        if (soDienThoai.Length > 0)
+            khach = await conn.QueryFirstOrDefaultAsync<KhachTaiQuayDto>(
+                @"SELECT TOP 1 MaNguoiDung AS MaKhachHang, HoTen, SoDienThoai, Email
+                  FROM NguoiDung WHERE SoDienThoai = @SoDienThoai AND VaiTro = 'CUSTOMER'
+                  ORDER BY MaNguoiDung", new { SoDienThoai = soDienThoai });
 
         if (khach != null)
         {
@@ -303,12 +304,13 @@ public class DonHangController : ControllerBase
             return Ok(khach);
         }
 
-        string email = "khach." + soDienThoai + "@taiquay.local";
+        if (hoTen.Length == 0) hoTen = "Khách tại quầy";
+        string email = "khach." + (soDienThoai.Length > 0 ? soDienThoai : Guid.NewGuid().ToString("N")) + "@taiquay.local";
         int maKhachHang = await conn.ExecuteScalarAsync<int>(
             @"INSERT INTO NguoiDung (HoTen, Email, SoDienThoai, MatKhau, VaiTro)
               VALUES (@HoTen, @Email, @SoDienThoai, NULL, 'CUSTOMER');
               SELECT CAST(SCOPE_IDENTITY() AS INT);",
-            new { HoTen = hoTen, Email = email, SoDienThoai = soDienThoai });
+            new { HoTen = hoTen, Email = email, SoDienThoai = soDienThoai.Length > 0 ? soDienThoai : null });
 
         return Ok(new KhachTaiQuayDto
         {

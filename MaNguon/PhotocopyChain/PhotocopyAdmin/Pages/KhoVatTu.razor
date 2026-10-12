@@ -148,7 +148,7 @@
                         @foreach (PhieuNhapDto p in _phieu)
                         {
                             <tr>
-                                <td class="mono" data-nhan="Mã phiếu"><b>PN@p.MaPhieuNhap.ToString("0000")</b></td>
+                                <td class="mono" data-nhan="Mã phiếu"><b>@("PN" + p.MaPhieuNhap.ToString("0000"))</b></td>
                                 <td data-nhan="Chi nhánh">@p.TenChiNhanh</td>
                                 <td data-nhan="Vật tư & Nhà cung cấp">
                                     <b>@p.TenVatTu</b>

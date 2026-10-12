@@ -14,6 +14,7 @@ const String diaChiApi = String.fromEnvironment('API_BASE_URL', defaultValue: 'h
 // Kết quả của 1 lần gọi API
 class KetQuaApi {
   bool thanhCong = false;
+  int? maHttp;       // Phân biệt mật khẩu trùng (409) với OTP không hợp lệ (400).
   dynamic duLieu;     // JSON máy chủ trả về (Map hoặc List) khi thành công
   String loi = '';    // câu báo lỗi tiếng Việt khi thất bại (API luôn trả lỗi dạng { "message": "..." })
 }
@@ -89,6 +90,7 @@ class Api {
 
   static KetQuaApi _docKetQua(http.Response res) {
     KetQuaApi kq = KetQuaApi();
+    kq.maHttp = res.statusCode;
     dynamic json;
     if (res.bodyBytes.isNotEmpty) {
       json = jsonDecode(utf8.decode(res.bodyBytes)); // utf8.decode để đọc đúng tiếng Việt
