@@ -1,0 +1,262 @@
+@page "/kho-vat-tu"
+@attribute [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN")]
+@inject HttpClient Http
+@inject PhienDangNhap Phien
+@inject PhamViChiNhanh PhamVi
+
+<PageTitle>Kho vật tư · PhotocopyChain</PageTitle>
+
+<TieuDeTrang TieuDe="Kho vật tư" MoTa="Theo dõi tồn kho thực tế, cảnh báo định mức tối thiểu và quản lý phiếu nhập hàng" />
+
+<div class="than-trang khoi-doc">
+    @if (_loi != null)
+    {
+        <div class="o-loi">
+            @((MarkupString)Svg.ChamThan())
+            <span>@_loi</span>
+        </div>
+    }
+    @if (_thongBao != null)
+    {
+        <div class="o-thanh-cong the-rong">
+            @((MarkupString)Svg.DauTich(16))
+            <span>@_thongBao</span>
+        </div>
+    }
+
+    @if (LaQuanLyChiNhanh() && _tonKho?.Count > 0)
+    {
+        <div class="the the-rong">
+            <h2 class="the-tieu-de nho">@(LaCEO() ? "Lập và duyệt phiếu nhập vật tư" : "Đề xuất lập phiếu nhập vật tư mới")</h2>
+            <div class="ca-loc-luoi">
+                <div class="truong">
+                    <label class="nhan">Vật tư cần nhập</label>
+                    <select class="ca-o-loc" @bind="_form.MaVatTu">
+                        @foreach (TonKhoDto x in _tonKho.GroupBy(x => x.MaVatTu).Select(x => x.First()))
+                        {
+                            <option value="@x.MaVatTu">@x.TenVatTu (@x.DonViTinh)</option>
+                        }
+                    </select>
+                </div>
+                <div class="truong">
+                    <label class="nhan">Nhà cung cấp</label>
+                    <input class="ca-o-loc" placeholder="Tên đơn vị cung ứng" @bind="_form.NhaCungCap" />
+                </div>
+                <div class="truong">
+                    <label class="nhan">Số lượng nhập</label>
+                    <input class="ca-o-loc" type="number" min="1" @bind="_form.SoLuong" />
+                </div>
+                <div class="truong">
+                    <label class="nhan">Đơn giá nhập (₫)</label>
+                    <input class="ca-o-loc mono" type="number" min="0" step="1000" @bind="_form.DonGia" />
+                </div>
+                <div class="truong" style="align-self: flex-end;">
+                    <button class="nut-chinh" style="width: 100%;" @onclick="TaoPhieuAsync">@(LaCEO() ? "Lập phiếu & duyệt trực tiếp" : "Gửi đề xuất CEO duyệt")</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="the the-bang">
+        <div class="bang-tieu-de">
+            <div>
+                <h2>Tồn kho vật tư theo chi nhánh</h2>
+                <p class="bang-mo-ta">Số lượng hiện có và định mức của từng loại vật tư.</p>
+            </div>
+            <span class="bang-dem">@(_tonKho?.Count ?? 0) mặt hàng</span>
+        </div>
+        @if (_tonKho == null)
+        {
+            <div class="bang-trong">Đang tải dữ liệu tồn kho…</div>
+        }
+        else
+        {
+            <div class="bang-cuon">
+                <table role="table" class="bang">
+                    <thead>
+                        <tr>
+                            <th scope="col">Chi nhánh</th>
+                            <th scope="col">Tên vật tư & ĐVT</th>
+                            <th scope="col">Số lượng tồn</th>
+                            <th scope="col">Mức cảnh báo tối thiểu</th>
+                            <th scope="col">Đơn giá bình quân</th>
+                            <th scope="col">Trạng thái tồn</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (TonKhoDto x in _tonKho)
+                        {
+                            <tr class="@(x.CanhBao ? "dang-cho" : "")">
+                                <td data-nhan="Chi nhánh"><b>@x.TenChiNhanh</b></td>
+                                <td data-nhan="Tên vật tư & ĐVT">
+                                    <b>@x.TenVatTu</b>
+                                    <div class="nv-phu">Đơn vị: @x.DonViTinh</div>
+                                </td>
+                                <td class="mono" data-nhan="Số lượng tồn">
+                                    <b style="font-size: 17px; color: @(x.CanhBao ? "var(--loi-chu)" : "var(--chu)");">@x.SoLuong</b>
+                                </td>
+                                <td class="mono" data-nhan="Mức cảnh báo tối thiểu">@x.MucToiThieu</td>
+                                <td class="mono" data-nhan="Đơn giá bình quân">@Tien(x.DonGia)</td>
+                                <td data-nhan="Trạng thái tồn">
+                                    @if (x.CanhBao)
+                                    {
+                                        <span class="nhan-mau nhan-cam">
+                                            @((MarkupString)Svg.CanhBao(14)) Sắp hết hàng
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="nhan-mau nhan-xanh">Đủ tồn kho</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    <div class="the the-bang">
+        <div class="bang-tieu-de">
+            <div>
+                <h2>Lịch sử phiếu nhập vật tư</h2>
+                <p class="bang-mo-ta">Theo dõi đề nghị nhập kho và tiến độ nhận vật tư.</p>
+            </div>
+            <span class="bang-dem">@(_phieu?.Count ?? 0) phiếu</span>
+        </div>
+        @if (_phieu == null)
+        {
+            <div class="bang-trong">Đang tải danh sách phiếu nhập…</div>
+        }
+        else
+        {
+            <div class="bang-cuon">
+                <table role="table" class="bang">
+                    <thead>
+                        <tr>
+                            <th scope="col">Mã phiếu</th>
+                            <th scope="col">Chi nhánh</th>
+                            <th scope="col">Vật tư & Nhà cung cấp</th>
+                            <th scope="col">Số lượng & Đơn giá</th>
+                            <th scope="col">Người tạo</th>
+                            <th scope="col">Trạng thái duyệt</th>
+                            <th scope="col" class="cot-hanh-dong">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (PhieuNhapDto p in _phieu)
+                        {
+                            <tr>
+                                <td class="mono" data-nhan="Mã phiếu"><b>PN@p.MaPhieuNhap.ToString("0000")</b></td>
+                                <td data-nhan="Chi nhánh">@p.TenChiNhanh</td>
+                                <td data-nhan="Vật tư & Nhà cung cấp">
+                                    <b>@p.TenVatTu</b>
+                                    <div class="nv-phu">NCC: @p.NhaCungCap</div>
+                                </td>
+                                <td data-nhan="Số lượng & Đơn giá">
+                                    <span class="mono"><b>@p.SoLuong</b> bản/cuộn</span>
+                                    <div class="nv-phu mono">@Tien(p.DonGia)/đv</div>
+                                </td>
+                                <td data-nhan="Người tạo">
+                                    <div class="nv-ten">@p.TenNguoiLap</div>
+                                </td>
+                                <td data-nhan="Trạng thái duyệt">
+                                    <span class="nhan-mau @Mau(p.TrangThai)">@p.TrangThai</span>
+                                </td>
+                                <td class="cot-hanh-dong" data-nhan="Thao tác">
+                                    @if (LaQuanLyChiNhanh() && p.TrangThai == "DA_DUYET")
+                                    {
+                                        <button class="nut-nho chinh" title="Xác nhận hàng đã về kho chi nhánh" @onclick="() => NhanHangAsync(p)">
+                                            @((MarkupString)Svg.DauTich(14)) Nhận đủ @p.SoLuong
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<TonKhoDto> _tonKho;
+    private List<PhieuNhapDto> _phieu;
+    private TaoPhieuNhapRequest _form = new() { SoLuong = 1 };
+    private string _loi;
+    private string _thongBao;
+
+    protected override async Task OnInitializedAsync() => await TaiAsync();
+
+    private async Task TaiAsync()
+    {
+        try
+        {
+            _tonKho = await Http.GetFromJsonAsync<List<TonKhoDto>>("api/quan-tri/kho") ?? new();
+            _phieu = await Http.GetFromJsonAsync<List<PhieuNhapDto>>("api/quan-tri/phieu-nhap") ?? new();
+
+            if (_form.MaVatTu == 0 && _tonKho.Count > 0)
+                _form.MaVatTu = _tonKho[0].MaVatTu;
+        }
+        catch
+        {
+            _loi = "Không tải được dữ liệu kho.";
+            _tonKho = new();
+            _phieu = new();
+        }
+    }
+
+    private bool LaQuanLyChiNhanh() =>
+        Phien.NguoiDung?.TenVaiTro == "BRANCH_ADMIN" ||
+        (Phien.NguoiDung?.TenVaiTro == "SUPER_ADMIN" && PhamVi.MaChiNhanh != null);
+
+    private bool LaCEO() => Phien.NguoiDung?.TenVaiTro == "SUPER_ADMIN";
+
+    private async Task TaoPhieuAsync()
+    {
+        _loi = null;
+        var r = await Http.PostAsJsonAsync("api/quan-tri/phieu-nhap", _form);
+
+        if (r.IsSuccessStatusCode)
+        {
+            _thongBao = (await r.Content.ReadFromJsonAsync<KetQuaDto>()).Message;
+            await TaiAsync();
+        }
+        else
+        {
+            _loi = (await r.Content.ReadFromJsonAsync<ApiError>()).Message;
+        }
+    }
+
+    private async Task NhanHangAsync(PhieuNhapDto p)
+    {
+        _loi = null;
+        var r = await Http.PostAsJsonAsync(
+            $"api/quan-tri/phieu-nhap/{p.MaPhieuNhap}/nhan-hang",
+            new NhanHangRequest { SoLuongThucNhan = p.SoLuong });
+
+        if (r.IsSuccessStatusCode)
+        {
+            _thongBao = "Đã nhập kho.";
+            await TaiAsync();
+        }
+        else
+        {
+            _loi = (await r.Content.ReadFromJsonAsync<ApiError>()).Message;
+        }
+    }
+
+    private string Mau(string s) => s == "DA_NHAP"
+        ? "nhan-xanh"
+        : s == "CHO_DUYET" ? "nhan-cam" : s == "TU_CHOI" ? "nhan-do" : "nhan-accent";
+
+    private static readonly System.Globalization.NumberFormatInfo KieuSo = new()
+    {
+        NumberGroupSeparator = ".",
+        NumberDecimalSeparator = ","
+    };
+
+    private string Tien(decimal s) => s.ToString("#,##0", KieuSo) + "₫";
+}

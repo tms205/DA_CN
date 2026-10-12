@@ -1,0 +1,611 @@
+@page "/ban-giao"
+@attribute [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
+@using Microsoft.AspNetCore.SignalR.Client
+@using PhotocopyShared.Dtos.DonHang
+@inject HttpClient Http
+@inject PhienDangNhap Phien
+@inject PhamViChiNhanh PhamVi
+@implements IAsyncDisposable
+
+<PageTitle>Bàn giao tại quầy · PhotocopyChain</PageTitle>
+
+@* F-18: đơn VietQR đã trả trước hoặc đơn COD thu tiền lúc bàn giao. *@
+<TieuDeTrang TieuDe="Bàn giao tại quầy" MoTa="@MoTa()" />
+
+<div class="than-trang khoi-doc">
+    @if (_loi != null)
+    {
+        <div class="o-loi">@((MarkupString)Svg.ChamThan())<span>@_loi</span></div>
+    }
+    @if (_thongBao != null)
+    {
+        <div class="o-thanh-cong the-rong"><span>@_thongBao</span></div>
+    }
+
+    <div class="the the-bang">
+        <div class="bang-tieu-de">
+            <div>
+                <h2>Đơn chờ bàn giao</h2>
+                <p class="bang-mo-ta">Đơn đã in xong, trạng thái thanh toán và thao tác bàn giao tại quầy.</p>
+            </div>
+            <span class="bang-dem">@(_ds == null ? 0 : LocDanhSach().Count) đơn</span>
+        </div>
+        <div class="bang-cong-cu">
+            <div class="o-nhap nho o-tim">
+                <span class="o-icon">@((MarkupString)Svg.KinhLup())</span>
+                <input placeholder="Tìm mã đơn, tên khách, SĐT…" @bind="_tuKhoa" @bind:event="oninput" />
+            </div>
+            <button class="nut-nho" @onclick="TaiTatCa">@((MarkupString)Svg.TaiLai()) Làm mới</button>
+        </div>
+        @if (_ds == null)
+        {
+            <div class="bang-trong">Đang tải danh sách đơn chờ khách lấy…</div>
+        }
+        else if (LocDanhSach().Count == 0)
+        {
+            <div class="bang-trong">Không có đơn nào đã in xong đang chờ khách tới lấy.</div>
+        }
+        else
+        {
+            <div class="bang-cuon">
+                <table role="table" class="bang">
+                    <thead>
+                        <tr>
+                            <th scope="col">Mã đơn</th>
+                            <th scope="col">Khách hàng</th>
+                            <th scope="col">Tài liệu</th>
+                            <th scope="col">Thanh toán</th>
+                            <th scope="col">In xong lúc</th>
+                            <th scope="col"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var don in LocDanhSach())
+                        {
+                            <tr>
+                                <td data-nhan="Mã đơn">
+                                    <div class="mono hd-ma">@don.MaDonHangHienThi</div>
+                                    @if (don.InHoaToc)
+                                    {
+                                        <span class="nhan-mau nhan-cam">@((MarkupString)Svg.TiaSet()) Hỏa tốc</span>
+                                    }
+                                </td>
+                                <td data-nhan="Khách hàng">
+                                    <div class="nv-ten">@don.TenKhachHang</div>
+                                    <div class="nv-phu">@don.SoDienThoaiKhach</div>
+                                </td>
+                                <td data-nhan="Tài liệu">
+                                    <div>@don.SoFile file · @don.TongSoTrang trang</div>
+                                    <div class="nv-phu">@don.QuyCach</div>
+                                </td>
+                                <td data-nhan="Thanh toán">
+                                    @if (don.PhuongThucThanhToan == "COD" || don.PhuongThucThanhToan == "TIEN_MAT")
+                                    {
+                                        <span class="nhan-mau nhan-cam">COD · thu khi giao</span>
+                                    }
+                                    else if (don.TrangThaiThanhToan == "DA_THANH_TOAN")
+                                    {
+                                        <span class="nhan-mau nhan-xanh">Đã chuyển khoản</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="nhan-mau nhan-do">Chưa thanh toán</span>
+                                    }
+                                </td>
+                                <td data-nhan="In xong lúc"><span class="chu-mo">@don.NgayDat.ToString("HH:mm dd/MM")</span></td>
+                                <td class="cot-hanh-dong" data-nhan="Thao tác">
+                                    <div class="bg-hanh-dong-phat-sinh">
+                                        <button class="nut-nho" disabled="@_dangGui" @onclick="() => MoInLaiAsync(don)">In lại do lỗi quầy</button>
+                                        <button class="nut-nho" disabled="@_dangGui" @onclick="() => MoBoSungAsync(don)">Khách mua thêm</button>
+                                    </div>
+                                    @if (don.PhuongThucThanhToan == "VIETQR" && don.TrangThaiThanhToan != "DA_THANH_TOAN")
+                                    {
+                                        <button class="nut-nho" disabled>Chưa thể bàn giao</button>
+                                    }
+                                    else if (_dangXacNhan == don.MaDonHang)
+                                    {
+                                        <div class="xac-nhan-o">
+                                            <span class="chu-mo">@(don.PhuongThucThanhToan == "COD" ? "Đã thu COD và giao tài liệu?" : "Giao tài liệu cho khách?")</span>
+                                            <button class="nut-nho chinh" disabled="@_dangGui" @onclick="() => BanGiaoAsync(don)">@(_dangGui ? "Đang xử lý…" : "Xác nhận")</button>
+                                            <button class="nut-nho" disabled="@_dangGui" @onclick="() => _dangXacNhan = null">Hủy</button>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <button class="nut-nho chinh" @onclick="() => MoXacNhan(don)">@((MarkupString)Svg.CapTap(13)) Bàn giao</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    @if (_donPhatSinh != null)
+    {
+        <div class="the the-rong bg-phat-sinh">
+            <div class="ca-dau">
+                <div>
+                    <h2 class="the-tieu-de nho">@(_cheDoPhatSinh == "IN_LAI_LOI_QUAY" ? "In lại miễn phí do lỗi quầy" : "Lập đơn khách mua thêm")</h2>
+                    <p class="the-mo-ta nho">
+                        Đơn gốc @_donPhatSinh.MaDonHangHienThi · @_donPhatSinh.TenKhachHang
+                    </p>
+                </div>
+                <button class="nut-dong" @onclick="DongPhatSinh">✕</button>
+            </div>
+
+            <div class="o-canh-bao @(_cheDoPhatSinh == "IN_LAI_LOI_QUAY" ? "bg-mien-phi" : "")">
+                <span>
+                    @(_cheDoPhatSinh == "IN_LAI_LOI_QUAY"
+                        ? "Chỉ dùng khi quầy in sai, lem mực, thiếu trang hoặc gia công lỗi. Khách trả thêm 0₫; vật tư in lại do cửa hàng chịu."
+                        : "Đây là yêu cầu mới của khách. Hệ thống tạo đơn COD riêng và giữ nguyên đơn gốc để đối soát doanh thu.")
+                </span>
+            </div>
+
+            <div class="bg-luoi-phat-sinh">
+                <label class="truong bg-truong-file">
+                    <span class="nhan">Tài liệu</span>
+                    <select class="ca-o-loc" value="@_maChiTietPhatSinh" @onchange="DoiDongPhatSinh">
+                        @foreach (DongInChiTietDto dong in _donPhatSinh.DongIn)
+                        {
+                            <option value="@dong.MaChiTiet">@dong.TenFile · @MoTaDongIn(dong)</option>
+                        }
+                    </select>
+                </label>
+                <label class="truong">
+                    <span class="nhan">Từ trang</span>
+                    <input class="ca-o-loc mono" type="number" min="@TrangNhoNhat" max="@TrangLonNhat" @bind="_tuTrangPhatSinh" />
+                </label>
+                <label class="truong">
+                    <span class="nhan">Đến trang</span>
+                    <input class="ca-o-loc mono" type="number" min="@TrangNhoNhat" max="@TrangLonNhat" @bind="_denTrangPhatSinh" />
+                </label>
+                <label class="truong">
+                    <span class="nhan">Số bản</span>
+                    <input class="ca-o-loc mono" type="number" min="1" max="@SoBanLonNhat" @bind="_soBanPhatSinh" />
+                </label>
+            </div>
+
+            @if (_cheDoPhatSinh == "BO_SUNG")
+            {
+                <div class="truong">
+                    <label class="nhan">Quy cách in mới</label>
+                    <select class="ca-o-loc" @bind="_maDichVuBoSung">
+                        @foreach (DichVuDto dichVu in _dsDichVu.Where(x => x.LoaiDichVu == "IN_AN"))
+                        {
+                            <option value="@dichVu.MaDichVu">@MoTaDichVu(dichVu) · @Tien(dichVu.DonGia)/trang</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="truong">
+                    <label class="nhan">Dịch vụ hoàn thiện đi kèm</label>
+                    <div class="thanh-loc bg-gia-cong">
+                        @foreach (DichVuDto dichVu in _dsDichVu.Where(x => x.LoaiDichVu == "GIA_CONG"))
+                        {
+                            <label class="hop-chon">
+                                <input type="checkbox" checked="@_dsGiaCongBoSung.Contains(dichVu.MaDichVu)"
+                                       @onchange="e => DoiGiaCongBoSung(dichVu, (bool)e.Value)" />
+                                <span class="o-vuong">✓</span>@dichVu.TenDichVu · @Tien(dichVu.DonGia)/bản
+                            </label>
+                        }
+                    </div>
+                </div>
+
+                <label class="truong">
+                    <span class="nhan">Ghi chú yêu cầu mới</span>
+                    <input class="ca-o-loc" maxlength="200" @bind="_ghiChuPhatSinh" placeholder="Ví dụ: chỉ in màu trang 1-15, bấm kim góc trái" />
+                </label>
+            }
+            else
+            {
+                <label class="truong">
+                    <span class="nhan">Lỗi của quầy <span class="chu-mo">(bắt buộc)</span></span>
+                    <input class="ca-o-loc" maxlength="200" @bind="_lyDoInLai" placeholder="Ví dụ: lem mực trang 3-5, in sai màu" />
+                </label>
+            }
+
+            <div class="bg-tom-tat-phat-sinh">
+                <div>
+                    <span class="nv-phu">Phạm vi xử lý</span>
+                    <b>@SoTrangPhatSinh trang × @_soBanPhatSinh bản</b>
+                </div>
+                <div>
+                    <span class="nv-phu">Khách cần trả thêm</span>
+                    <b class="mono hd-tong">@(_cheDoPhatSinh == "IN_LAI_LOI_QUAY" ? "0₫" : Tien(TienDuKienBoSung))</b>
+                </div>
+                <div class="xac-nhan-o">
+                    <button class="nut-nho" disabled="@_dangGui" @onclick="DongPhatSinh">Hủy</button>
+                    <button class="nut-nho chinh" disabled="@(_dangGui || !PhatSinhHopLe)" @onclick="TaoPhatSinhAsync">
+                        @(_dangGui ? "Đang tạo…" : _cheDoPhatSinh == "IN_LAI_LOI_QUAY" ? "Tạo việc in lại 0₫" : "Tạo đơn bổ sung COD")
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<HangDoiDonDto> _ds;      // các đơn DA_IN + TAI_QUAY (null = đang tải)
+    private string _tuKhoa = "";
+    private string _loi;
+    private string _thongBao;
+    private int? _dangXacNhan;            // đơn đang hỏi "Xác nhận / Hủy"
+    private bool _dangGui = false;
+
+    private DonHangChiTietDto _donPhatSinh;
+    private string _cheDoPhatSinh;
+    private int _maChiTietPhatSinh;
+    private int _tuTrangPhatSinh = 1;
+    private int _denTrangPhatSinh = 1;
+    private int _soBanPhatSinh = 1;
+    private int _maDichVuBoSung;
+    private string _lyDoInLai = "";
+    private string _ghiChuPhatSinh = "";
+    private List<DichVuDto> _dsDichVu = new();
+    private List<int> _dsGiaCongBoSung = new();
+
+    private HubConnection _ketNoi;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await TaiDichVuAsync();
+        await TaiTatCa();
+        await NoiRealtime();
+    }
+
+    private async Task TaiDichVuAsync()
+    {
+        try
+        {
+            int maChiNhanh = PhamVi.MaChiNhanh ?? Phien.NguoiDung?.MaChiNhanh ?? 0;
+            _dsDichVu = await Http.GetFromJsonAsync<List<DichVuDto>>("api/danh-muc/bang-gia?maChiNhanh=" + maChiNhanh) ?? new();
+            _maDichVuBoSung = _dsDichVu.FirstOrDefault(x => x.LoaiDichVu == "IN_AN")?.MaDichVu ?? 0;
+        }
+        catch
+        {
+            _dsDichVu = new();
+        }
+    }
+
+    private async Task TaiTatCa()
+    {
+        await TaiDanhSach();
+    }
+
+    // GET api/don-hang/hang-doi rồi lọc lấy đơn đã in xong + nhận tại quầy
+    private async Task TaiDanhSach()
+    {
+        try
+        {
+            var res = await Http.GetAsync("api/don-hang/hang-doi");
+            if (res.IsSuccessStatusCode)
+            {
+                var tatCa = await res.Content.ReadFromJsonAsync<List<HangDoiDonDto>>();
+                var choLay = new List<HangDoiDonDto>();
+                foreach (var don in tatCa)
+                {
+                    if (don.TrangThaiDonHang == "DA_IN" && don.HinhThucNhan == "TAI_QUAY") choLay.Add(don);
+                }
+                _ds = choLay;
+                _loi = null;
+            }
+            else
+            {
+                var loi = await res.Content.ReadFromJsonAsync<ApiError>();
+                _loi = loi.Message;
+                _ds = new List<HangDoiDonDto>();
+            }
+        }
+        catch
+        {
+            _loi = "Không kết nối được máy chủ API. Kiểm tra PhotocopyApi đã chạy chưa.";
+            _ds = new List<HangDoiDonDto>();
+        }
+    }
+
+    private void MoXacNhan(HangDoiDonDto don)
+    {
+        _loi = null;
+        _dangXacNhan = don.MaDonHang;
+    }
+
+    private async Task MoPhatSinhAsync(HangDoiDonDto don, string cheDo)
+    {
+        _loi = null;
+        _thongBao = null;
+        _dangXacNhan = null;
+        try
+        {
+            var res = await Http.GetAsync("api/don-hang/" + don.MaDonHang);
+            if (!res.IsSuccessStatusCode)
+            {
+                _loi = (await res.Content.ReadFromJsonAsync<ApiError>()).Message;
+                return;
+            }
+
+            _donPhatSinh = await res.Content.ReadFromJsonAsync<DonHangChiTietDto>();
+            _cheDoPhatSinh = cheDo;
+            _lyDoInLai = "";
+            _ghiChuPhatSinh = "";
+            _dsGiaCongBoSung.Clear();
+            DongInChiTietDto dongDau = _donPhatSinh.DongIn.FirstOrDefault();
+            if (dongDau != null)
+            {
+                _maChiTietPhatSinh = dongDau.MaChiTiet;
+                DatLaiPhamViTheoDong(dongDau);
+                if (_dsDichVu.Any(x => x.MaDichVu == dongDau.MaDichVu && x.LoaiDichVu == "IN_AN"))
+                    _maDichVuBoSung = dongDau.MaDichVu;
+            }
+        }
+        catch
+        {
+            _loi = "Không tải được chi tiết đơn để xử lý phát sinh.";
+        }
+    }
+
+    private Task MoInLaiAsync(HangDoiDonDto don) => MoPhatSinhAsync(don, "IN_LAI_LOI_QUAY");
+    private Task MoBoSungAsync(HangDoiDonDto don) => MoPhatSinhAsync(don, "BO_SUNG");
+
+    private void DoiDongPhatSinh(ChangeEventArgs e)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out int maChiTiet)) return;
+        _maChiTietPhatSinh = maChiTiet;
+        DongInChiTietDto dong = DongPhatSinhDangChon;
+        if (dong == null) return;
+        DatLaiPhamViTheoDong(dong);
+        if (_cheDoPhatSinh == "BO_SUNG" && _dsDichVu.Any(x => x.MaDichVu == dong.MaDichVu && x.LoaiDichVu == "IN_AN"))
+            _maDichVuBoSung = dong.MaDichVu;
+    }
+
+    private void DatLaiPhamViTheoDong(DongInChiTietDto dong)
+    {
+        if (_cheDoPhatSinh == "IN_LAI_LOI_QUAY")
+        {
+            _tuTrangPhatSinh = dong.TuTrang ?? 1;
+            _denTrangPhatSinh = dong.DenTrang ?? (_tuTrangPhatSinh + dong.SoTrang - 1);
+        }
+        else
+        {
+            _tuTrangPhatSinh = 1;
+            _denTrangPhatSinh = Math.Max(1, dong.TongSoTrangFile);
+        }
+        _soBanPhatSinh = Math.Max(1, dong.SoBan);
+    }
+
+    private void DoiGiaCongBoSung(DichVuDto dichVu, bool chon)
+    {
+        if (!chon)
+        {
+            _dsGiaCongBoSung.Remove(dichVu.MaDichVu);
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(dichVu.NhomGiaCong))
+        {
+            foreach (DichVuDto cu in _dsDichVu.Where(x => x.MaDichVu != dichVu.MaDichVu
+                         && string.Equals(x.NhomGiaCong, dichVu.NhomGiaCong, StringComparison.OrdinalIgnoreCase)))
+                _dsGiaCongBoSung.Remove(cu.MaDichVu);
+        }
+        if (!_dsGiaCongBoSung.Contains(dichVu.MaDichVu))
+            _dsGiaCongBoSung.Add(dichVu.MaDichVu);
+    }
+
+    private async Task TaoPhatSinhAsync()
+    {
+        if (_donPhatSinh == null || !PhatSinhHopLe) return;
+        _dangGui = true;
+        _loi = null;
+        _thongBao = null;
+        try
+        {
+            HttpResponseMessage res;
+            if (_cheDoPhatSinh == "IN_LAI_LOI_QUAY")
+            {
+                res = await Http.PostAsJsonAsync(
+                    $"api/don-hang/{_donPhatSinh.MaDonHang}/in-lai-tai-quay",
+                    new TaoInLaiTaiQuayRequest
+                    {
+                        MaChiTietGoc = _maChiTietPhatSinh,
+                        TuTrang = _tuTrangPhatSinh,
+                        DenTrang = _denTrangPhatSinh,
+                        SoBan = _soBanPhatSinh,
+                        LyDo = _lyDoInLai
+                    });
+            }
+            else
+            {
+                res = await Http.PostAsJsonAsync(
+                    $"api/don-hang/{_donPhatSinh.MaDonHang}/bo-sung-tai-quay",
+                    new TaoDonBoSungTaiQuayRequest
+                    {
+                        MaChiTietGoc = _maChiTietPhatSinh,
+                        TuTrang = _tuTrangPhatSinh,
+                        DenTrang = _denTrangPhatSinh,
+                        SoBan = _soBanPhatSinh,
+                        MaDichVu = _maDichVuBoSung,
+                        DsGiaCong = new List<int>(_dsGiaCongBoSung),
+                        GhiChu = _ghiChuPhatSinh
+                    });
+            }
+
+            if (res.IsSuccessStatusCode)
+            {
+                DonPhatSinhResponse ketQua = await res.Content.ReadFromJsonAsync<DonPhatSinhResponse>();
+                _thongBao = ketQua.Message + " Mở Hàng đợi đơn hàng để tiếp tục xử lý.";
+                DongPhatSinh();
+                await TaiTatCa();
+            }
+            else
+            {
+                _loi = (await res.Content.ReadFromJsonAsync<ApiError>()).Message;
+            }
+        }
+        catch
+        {
+            _loi = "Không tạo được yêu cầu phát sinh.";
+        }
+        _dangGui = false;
+    }
+
+    private void DongPhatSinh()
+    {
+        _donPhatSinh = null;
+        _cheDoPhatSinh = null;
+        _dsGiaCongBoSung.Clear();
+    }
+
+    private DongInChiTietDto DongPhatSinhDangChon =>
+        _donPhatSinh?.DongIn.FirstOrDefault(x => x.MaChiTiet == _maChiTietPhatSinh);
+
+    private int TrangNhoNhat => _cheDoPhatSinh == "IN_LAI_LOI_QUAY"
+        ? DongPhatSinhDangChon?.TuTrang ?? 1
+        : 1;
+
+    private int TrangLonNhat
+    {
+        get
+        {
+            DongInChiTietDto dong = DongPhatSinhDangChon;
+            if (dong == null) return 1;
+            return _cheDoPhatSinh == "IN_LAI_LOI_QUAY"
+                ? dong.DenTrang ?? ((dong.TuTrang ?? 1) + dong.SoTrang - 1)
+                : Math.Max(1, dong.TongSoTrangFile);
+        }
+    }
+
+    private int SoTrangPhatSinh => _denTrangPhatSinh >= _tuTrangPhatSinh
+        ? _denTrangPhatSinh - _tuTrangPhatSinh + 1
+        : 0;
+
+    private int SoBanLonNhat => _cheDoPhatSinh == "IN_LAI_LOI_QUAY"
+        ? Math.Max(1, DongPhatSinhDangChon?.SoBan ?? 1)
+        : 100;
+
+    private decimal TienDuKienBoSung
+    {
+        get
+        {
+            DichVuDto inAn = _dsDichVu.FirstOrDefault(x => x.MaDichVu == _maDichVuBoSung);
+            decimal tienIn = (inAn?.DonGia ?? 0) * SoTrangPhatSinh * _soBanPhatSinh;
+            decimal tienGiaCong = _dsDichVu.Where(x => _dsGiaCongBoSung.Contains(x.MaDichVu))
+                .Sum(x => x.DonGia) * _soBanPhatSinh;
+            return tienIn + tienGiaCong;
+        }
+    }
+
+    private bool PhatSinhHopLe =>
+        DongPhatSinhDangChon != null
+        && _tuTrangPhatSinh >= TrangNhoNhat
+        && _denTrangPhatSinh <= TrangLonNhat
+        && _denTrangPhatSinh >= _tuTrangPhatSinh
+        && _soBanPhatSinh >= 1
+        && _soBanPhatSinh <= SoBanLonNhat
+        && (_cheDoPhatSinh == "IN_LAI_LOI_QUAY"
+            ? (_lyDoInLai?.Trim().Length ?? 0) >= 5
+            : _maDichVuBoSung > 0);
+
+    private string MoTaDongIn(DongInChiTietDto dong)
+    {
+        int tu = dong.TuTrang ?? 1;
+        int den = dong.DenTrang ?? (tu + dong.SoTrang - 1);
+        return $"trang {tu}-{den} · {dong.TenDichVu}";
+    }
+
+    private string MoTaDichVu(DichVuDto dichVu)
+    {
+        return $"Khổ {dichVu.KhoGiay} · giấy {dichVu.LoaiGiay} · "
+            + (dichVu.MatIn == "2_MAT" ? "2 mặt" : "1 mặt") + " · "
+            + (dichVu.MauSac == "MAU" ? "In màu" : "Đen trắng");
+    }
+
+    // POST api/don-hang/{id}/giao-tai-quay — VietQR đã trả trước; COD thu tại bước này.
+    private async Task BanGiaoAsync(HangDoiDonDto don)
+    {
+        _loi = null;
+        _dangGui = true;
+
+        // Giữ câu lỗi trong biến riêng: TaiTatCa() ở dưới sẽ xóa _loi,
+        // nên phải gán lại SAU khi tải lại xong thì câu lỗi mới hiện được cho người dùng thấy.
+        string loiVuaGap = null;
+        try
+        {
+            var res = await Http.PostAsync("api/don-hang/" + don.MaDonHang + "/giao-tai-quay", null);
+            if (res.IsSuccessStatusCode)
+            {
+                _dangXacNhan = null;
+            }
+            else
+            {
+                var loi = await res.Content.ReadFromJsonAsync<ApiError>();
+                loiVuaGap = loi.Message;
+            }
+        }
+        catch
+        {
+            loiVuaGap = "Không kết nối được máy chủ API.";
+        }
+        _dangGui = false;
+
+        await TaiTatCa();
+        _loi = loiVuaGap;
+    }
+
+    private List<HangDoiDonDto> LocDanhSach()
+    {
+        var ketQua = new List<HangDoiDonDto>();
+        if (_ds == null) return ketQua;
+
+        string tuKhoa = _tuKhoa.Trim().ToLower();
+        foreach (var don in _ds)
+        {
+            string sdt = don.SoDienThoaiKhach ?? "";
+            if (tuKhoa == ""
+                || don.MaDonHangHienThi.ToLower().Contains(tuKhoa)
+                || don.TenKhachHang.ToLower().Contains(tuKhoa)
+                || sdt.Contains(tuKhoa))
+                ketQua.Add(don);
+        }
+        return ketQua;
+    }
+
+    private async Task NoiRealtime()
+    {
+        try
+        {
+            string diaChiHub = Http.BaseAddress + "hubs/cap-nhat?access_token=" + Uri.EscapeDataString(Phien.AccessToken);
+            _ketNoi = new HubConnectionBuilder().WithUrl(diaChiHub).WithAutomaticReconnect().Build();
+            _ketNoi.On<object>("OrderStatusChanged", async tin =>
+            {
+                await TaiTatCa();
+                StateHasChanged();
+            });
+            await _ketNoi.StartAsync();
+        }
+        catch
+        {
+            // không nối được thì vẫn bấm "Làm mới" được
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_ketNoi != null)
+            await _ketNoi.DisposeAsync();
+    }
+
+    private string MoTa()
+    {
+        string noi = PhamVi.MaChiNhanh != null ? "Chi nhánh đang chọn" : Phien.NguoiDung?.TenChiNhanh ?? "Toàn chuỗi";
+        int soDon = _ds == null ? 0 : _ds.Count;
+        return noi + " · " + soDon + " đơn đã in xong đang chờ khách tới lấy";
+    }
+
+    private static readonly System.Globalization.NumberFormatInfo KieuSoVietNam =
+        new() { NumberGroupSeparator = ".", NumberDecimalSeparator = "," };
+
+    private string Tien(decimal soTien) => soTien.ToString("#,##0", KieuSoVietNam) + "₫";
+
+}

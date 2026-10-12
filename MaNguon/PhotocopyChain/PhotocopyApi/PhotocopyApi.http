@@ -1,0 +1,38 @@
+@Api = http://localhost:5268
+
+### Đăng nhập Web quản trị (SUPER_ADMIN / BRANCH_ADMIN / STAFF) — mật khẩu demo: Demo@123
+# @name dangNhapWeb
+POST {{Api}}/api/auth/admin/login
+Content-Type: application/json
+
+{ "taiKhoan": "qlcn1@photocopy.vn", "matKhau": "Demo@123", "ghiNho": true }
+
+### Đăng nhập App (CUSTOMER / SHIPPER)
+# @name dangNhapApp
+POST {{Api}}/api/auth/login
+Content-Type: application/json
+
+{ "taiKhoan": "sv1@huit.edu.vn", "matKhau": "Demo@123", "ghiNho": true }
+
+### Hồ sơ người đang đăng nhập
+GET {{Api}}/api/auth/me
+Authorization: Bearer {{dangNhapApp.response.body.accessToken}}
+
+### Danh mục
+GET {{Api}}/api/danh-muc/chi-nhanh
+
+###
+GET {{Api}}/api/danh-muc/bang-gia
+
+### Báo giá tạm tính (đổi maFileIn thành file vừa tải lên)
+POST {{Api}}/api/bao-gia
+Authorization: Bearer {{dangNhapApp.response.body.accessToken}}
+Content-Type: application/json
+
+{
+  "maChiNhanh": 1,
+  "hinhThucNhan": "TAI_QUAY",
+  "inGap": false,
+  "maCodeKhuyenMai": "MUATHI2026",
+  "fileIn": [ { "maFileIn": 1, "maDichVu": 1, "soBanIn": 2, "dsGiaCong": [ 13, 15 ] } ]
+}

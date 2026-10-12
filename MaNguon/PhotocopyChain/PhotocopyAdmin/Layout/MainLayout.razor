@@ -1,0 +1,281 @@
+@inherits LayoutComponentBase
+@inject PhienDangNhap Phien
+@inject PhamViChiNhanh PhamVi
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+@* AppShell dùng chung: sidebar desktop, sidebar thu gọn và drawer trên màn hình nhỏ. *@
+<div class="@LopKhung">
+    <button type="button" class="man-che" aria-label="Đóng menu điều hướng" @onclick="DongMenu"></button>
+
+    <aside id="menu-chinh" class="thanh-ben" aria-label="Điều hướng chính">
+        <div class="tb-logo">
+            <div class="tb-logo-icon">@((MarkupString)Svg.MayIn(19))</div>
+            <div class="tb-logo-chu">
+                <div class="tb-logo-ten">PhotocopyChain</div>
+                <div class="tb-logo-phu">Quản trị chuỗi chi nhánh</div>
+            </div>
+            <button type="button" class="tb-dong-menu" title="Đóng menu" aria-label="Đóng menu" @onclick="DongMenu">×</button>
+        </div>
+
+        <div class="tb-chi-nhanh">
+            <span class="tb-trang-thai" aria-hidden="true"></span>
+            <div class="tb-chi-nhanh-chu">
+                <div class="tb-chi-nhanh-ten">@TenPhamVi</div>
+                <div class="tb-chi-nhanh-dc">@DiaChiPhamVi</div>
+            </div>
+        </div>
+
+        @* Menu: mỗi mục chỉ hiện với vai trò dùng được nó.
+           Ẩn menu chỉ để gọn giao diện — API vẫn tự kiểm quyền trên từng request. *@
+        <nav class="tb-menu">
+            <section class="tb-nhom" aria-labelledby="nhom-van-hanh">
+                <button type="button" id="nhom-van-hanh" class="tb-nhom-tieu-de"
+                        aria-expanded="@(_cacNhomDangMo.Contains("van-hanh") ? "true" : "false")" aria-controls="menu-van-hanh"
+                        @onclick='() => DoiNhom("van-hanh")'>
+                    @((MarkupString)Svg.DanhSach(20))
+                    <span>Vận hành</span>
+                    <span class="tb-nhom-mui-ten" aria-hidden="true"></span>
+                </button>
+                <div id="menu-van-hanh" class="tb-nhom-noi-dung @(_cacNhomDangMo.Contains("van-hanh") ? "" : "dong")">
+                    <NavLink class="tb-muc" href="" Match="NavLinkMatch.All" title="Hàng đợi đơn hàng" @onclick="DongMenu">@((MarkupString)Svg.DanhSach()) <span>Hàng đợi đơn</span></NavLink>
+                    @if (VaiTroLa("BRANCH_ADMIN") || VaiTroLa("STAFF") || CeoDangXemChiNhanh())
+                    {
+                        <NavLink class="tb-muc" href="lap-don-tai-quay" title="Lập đơn tại quầy" @onclick="DongMenu">@((MarkupString)Svg.HoaDon()) <span>Lập đơn tại quầy</span></NavLink>
+                        <NavLink class="tb-muc" href="ban-giao" title="Bàn giao tại quầy" @onclick="DongMenu">@((MarkupString)Svg.CapTap()) <span>Bàn giao tại quầy</span></NavLink>
+                    }
+                    <NavLink class="tb-muc" href="kho-file" title="Kho file in" @onclick="DongMenu">@((MarkupString)Svg.TaiLieu()) <span>Kho file in</span></NavLink>
+                </div>
+            </section>
+
+            <section class="tb-nhom" aria-labelledby="nhom-ca-tien">
+                <button type="button" id="nhom-ca-tien" class="tb-nhom-tieu-de"
+                        aria-expanded="@(_cacNhomDangMo.Contains("ca-tien") ? "true" : "false")" aria-controls="menu-ca-tien"
+                        @onclick='() => DoiNhom("ca-tien")'>
+                    @((MarkupString)Svg.DongHo(20))
+                    <span>Ca &amp; tiền</span>
+                    <span class="tb-nhom-mui-ten" aria-hidden="true"></span>
+                </button>
+                <div id="menu-ca-tien" class="tb-nhom-noi-dung @(_cacNhomDangMo.Contains("ca-tien") ? "" : "dong")">
+                    <NavLink class="tb-muc" href="ca-lam-viec" title="Ca làm việc & két tiền" @onclick="DongMenu">@((MarkupString)Svg.DongHo()) <span>Ca làm việc &amp; két tiền</span></NavLink>
+                    @if (VaiTroLa("SUPER_ADMIN") || VaiTroLa("BRANCH_ADMIN") || VaiTroLa("STAFF"))
+                    {
+                        <NavLink class="tb-muc" href="don-hang-trong-ca" title="Lịch sử đơn theo ca" @onclick="DongMenu">@((MarkupString)Svg.HoaDon()) <span>Lịch sử đơn theo ca</span></NavLink>
+                    }
+                </div>
+            </section>
+
+            <section class="tb-nhom" aria-labelledby="nhom-quan-ly">
+                <button type="button" id="nhom-quan-ly" class="tb-nhom-tieu-de"
+                        aria-expanded="@(_cacNhomDangMo.Contains("quan-ly") ? "true" : "false")" aria-controls="menu-quan-ly"
+                        @onclick='() => DoiNhom("quan-ly")'>
+                    @((MarkupString)Svg.CuaHang(20))
+                    <span>Quản lý</span>
+                    <span class="tb-nhom-mui-ten" aria-hidden="true"></span>
+                </button>
+                <div id="menu-quan-ly" class="tb-nhom-noi-dung @(_cacNhomDangMo.Contains("quan-ly") ? "" : "dong")">
+                    @if (LaQuanLy())
+                    {
+                        <NavLink class="tb-muc" href="kho-vat-tu" title="Kho vật tư" @onclick="DongMenu">@((MarkupString)Svg.LopKho()) <span>Kho vật tư</span></NavLink>
+                    }
+                    <NavLink class="tb-muc" href="bang-gia" title="Bảng giá in ấn" @onclick="DongMenu">@((MarkupString)Svg.BieuDoCot()) <span>Bảng giá in ấn</span></NavLink>
+                    @if (VaiTroLa("SUPER_ADMIN"))
+                    {
+                        <NavLink class="tb-muc" href="khuyen-mai" title="Quản lý khuyến mãi" @onclick="DongMenu">@((MarkupString)Svg.DauTich(16)) <span>Khuyến mãi</span></NavLink>
+                    }
+                    @if (LaQuanLy())
+                    {
+                        <NavLink class="tb-muc" href="nhan-vien" title="Nhân viên" @onclick="DongMenu">@((MarkupString)Svg.NguoiDung()) <span>Nhân viên</span></NavLink>
+                        <NavLink class="tb-muc" href="danh-gia" title="Đánh giá khách hàng" @onclick="DongMenu">@((MarkupString)Svg.DauTich(16)) <span>Đánh giá khách hàng</span></NavLink>
+                    }
+                    @if (VaiTroLa("SUPER_ADMIN"))
+                    {
+                        <NavLink class="tb-muc" href="phe-duyet" title="Phê duyệt" @onclick="DongMenu">@((MarkupString)Svg.DuyetHoSo()) <span>Phê duyệt</span></NavLink>
+                    }
+                    @if (LaQuanLy())
+                    {
+                        <NavLink class="tb-muc" href="bao-cao" title="Báo cáo doanh thu" @onclick="DongMenu">@((MarkupString)Svg.BieuDoDuong()) <span>Báo cáo doanh thu</span></NavLink>
+                        <NavLink class="tb-muc" href="quan-tri" title="Chi nhánh & máy in" @onclick="DongMenu">@((MarkupString)Svg.CuaHang()) <span>Chi nhánh &amp; máy in</span></NavLink>
+                    }
+                </div>
+            </section>
+        </nav>
+
+        <div class="tb-gian"></div>
+
+        <div class="tb-nguoi-dung">
+            @* F-03: bấm vào tên / ảnh đại diện để mở Thông tin cá nhân *@
+            <NavLink class="tb-nd-lien-ket" href="thong-tin-ca-nhan" title="Thông tin cá nhân & đổi mật khẩu">
+                <div class="tb-avatar">@VietTat(ND?.HoTen)</div>
+                <div class="tb-nd-chu">
+                    <div class="tb-nd-ten">@ND?.HoTen</div>
+                    <div class="tb-nd-vai-tro">@(ND == null ? "" : VaiTro.TenHienThi(ND.TenVaiTro)) · Hồ sơ</div>
+                </div>
+            </NavLink>
+            <button class="tb-dang-xuat" title="Đăng xuất" @onclick="DangXuat">@((MarkupString)Svg.DangXuat())</button>
+        </div>
+    </aside>
+
+    <section class="vung-lam-viec">
+        <header class="thanh-tren">
+            <div class="tt-trai">
+                <button type="button" class="tt-menu tt-menu-desktop" title="Thu gọn hoặc mở rộng menu"
+                        aria-label="Thu gọn hoặc mở rộng menu" aria-controls="menu-chinh"
+                        aria-expanded="@(!_menuThuGon)" @onclick="ThuGonMenu">
+                    @((MarkupString)Svg.DanhSach(20))
+                </button>
+                <button type="button" class="tt-menu tt-menu-mobile" aria-label="Mở menu điều hướng"
+                        aria-controls="menu-chinh" aria-expanded="@_menuMo" @onclick="MoDongMenu">
+                    @((MarkupString)Svg.DanhSach(20))
+                </button>
+                <div class="tt-ngu-canh">
+                    <span>Hệ thống vận hành</span>
+                    <strong>@TenPhamVi</strong>
+                </div>
+            </div>
+
+            <div class="tt-pham-vi">
+                <span class="tt-pham-vi-icon">@((MarkupString)Svg.CuaHang(16))</span>
+                @if (VaiTroLa(VaiTro.SuperAdmin))
+                {
+                    <select value="@GiaTriPhamVi" @onchange="DoiPhamViAsync" aria-label="Chọn phạm vi chi nhánh">
+                        <option value="">Tổng quan tất cả chi nhánh</option>
+                        @foreach (ChiNhanhDto chiNhanh in _dsChiNhanh)
+                        {
+                            <option value="@chiNhanh.MaChiNhanh">@chiNhanh.TenChiNhanh</option>
+                        }
+                    </select>
+                }
+                else
+                {
+                    <span class="tt-pham-vi-ten">@TenPhamVi</span>
+                }
+            </div>
+        </header>
+
+        <main class="noi-dung">
+            @Body
+        </main>
+    </section>
+</div>
+
+@code {
+    // Nhận trạng thái đăng nhập từ Blazor: sửa hồ sơ xong thì layout tự vẽ lại → tên ở sidebar đổi ngay
+    [CascadingParameter] private Task<AuthenticationState> TrangThaiDangNhap { get; set; }
+
+    // Người đang đăng nhập
+    private NguoiDungDto ND => Phien.NguoiDung;
+    private List<ChiNhanhDto> _dsChiNhanh = new();
+    private bool _menuMo;
+    private bool _menuThuGon;
+    private HashSet<string> _cacNhomDangMo = new();
+
+    private string GiaTriPhamVi => PhamVi.MaChiNhanh?.ToString() ?? "";
+
+    private string LopKhung => $"khung{(_menuMo ? " menu-dang-mo" : "")}{(_menuThuGon ? " menu-thu-gon" : "")}";
+
+    private ChiNhanhDto ChiNhanhDangChon => _dsChiNhanh
+        .FirstOrDefault(x => x.MaChiNhanh == PhamVi.MaChiNhanh);
+
+    private string TenPhamVi => VaiTroLa(VaiTro.SuperAdmin)
+        ? ChiNhanhDangChon?.TenChiNhanh ?? "Tổng quan tất cả"
+        : ND?.TenChiNhanh ?? "Toàn chuỗi";
+
+    private string DiaChiPhamVi => VaiTroLa(VaiTro.SuperAdmin)
+        ? ChiNhanhDangChon?.DiaChi ?? "Dữ liệu toàn hệ thống"
+        : ND?.DiaChiChiNhanh ?? "Tất cả chi nhánh";
+
+    protected override async Task OnInitializedAsync()
+    {
+        MoNhomCuaTrang();
+        await PhamVi.KhoiTaoAsync();
+        await TrangThaiDangNhap;
+        if (!VaiTroLa(VaiTro.SuperAdmin)) return;
+
+        try
+        {
+            _dsChiNhanh = await Http.GetFromJsonAsync<List<ChiNhanhDto>>("api/danh-muc/chi-nhanh") ?? new();
+            if (PhamVi.MaChiNhanh != null && ChiNhanhDangChon == null)
+                await PhamVi.ChonAsync(null);
+        }
+        catch
+        {
+            _dsChiNhanh = new();
+        }
+    }
+
+    private bool VaiTroLa(string vaiTro)
+    {
+        return ND != null && ND.TenVaiTro == vaiTro;
+    }
+
+    // Super Admin hoặc Quản lý chi nhánh
+    private bool LaQuanLy()
+    {
+        return VaiTroLa("SUPER_ADMIN") || VaiTroLa("BRANCH_ADMIN");
+    }
+
+    private bool CeoDangXemChiNhanh()
+    {
+        return VaiTroLa(VaiTro.SuperAdmin) && PhamVi.MaChiNhanh != null;
+    }
+
+    private async Task DoiPhamViAsync(ChangeEventArgs e)
+    {
+        int? maChiNhanh = int.TryParse(e.Value?.ToString(), out int ma) ? ma : null;
+        await PhamVi.ChonAsync(maChiNhanh);
+        DongMenu();
+        Nav.NavigateTo(Nav.Uri, forceLoad: true);
+    }
+
+    private void MoDongMenu()
+    {
+        _menuMo = !_menuMo;
+    }
+
+    private void ThuGonMenu()
+    {
+        _menuThuGon = !_menuThuGon;
+        if (!_menuThuGon) MoNhomCuaTrang();
+    }
+
+    private void DoiNhom(string nhom)
+    {
+        // Mỗi nhóm mở/đóng riêng, không ảnh hưởng đến các nhóm còn lại.
+        if (!_cacNhomDangMo.Remove(nhom)) _cacNhomDangMo.Add(nhom);
+    }
+
+    // Mở đúng nhóm khi truy cập trực tiếp hoặc mở rộng sidebar từ chế độ biểu tượng.
+    private void MoNhomCuaTrang()
+    {
+        string duongDan = Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].Trim('/');
+        if (duongDan == "ca-lam-viec" || duongDan == "don-hang-trong-ca")
+            _cacNhomDangMo.Add("ca-tien");
+        else if (duongDan == "kho-vat-tu" || duongDan == "bang-gia" || duongDan == "khuyen-mai"
+                 || duongDan == "nhan-vien" || duongDan == "danh-gia" || duongDan == "phe-duyet"
+                 || duongDan == "bao-cao" || duongDan == "quan-tri")
+            _cacNhomDangMo.Add("quan-ly");
+        else
+            _cacNhomDangMo.Add("van-hanh");
+    }
+
+    private void DongMenu()
+    {
+        _menuMo = false;
+    }
+
+    // "Trần Thị Quản" → "TQ" (chữ trong ô ảnh đại diện)
+    private string VietTat(string hoTen)
+    {
+        if (string.IsNullOrWhiteSpace(hoTen)) return "?";
+        string[] tu = hoTen.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (tu.Length == 1) return tu[0].Substring(0, 1).ToUpper();
+        return (tu[tu.Length - 2].Substring(0, 1) + tu[tu.Length - 1].Substring(0, 1)).ToUpper();
+    }
+
+    private async Task DangXuat()
+    {
+        await Phien.DangXuat();
+        Nav.NavigateTo("dang-nhap", replace: true);
+    }
+}

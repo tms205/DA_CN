@@ -1,0 +1,277 @@
+@page "/thong-tin-ca-nhan"
+@using System.ComponentModel.DataAnnotations
+@inject HttpClient Http
+@inject PhienDangNhap Phien
+
+<PageTitle>Thông tin cá nhân · PhotocopyChain</PageTitle>
+
+@* F-03 + F-04 phía Web: mọi vai trò Web tự xem / sửa hồ sơ và đổi mật khẩu của chính mình. *@
+<TieuDeTrang TieuDe="Thông tin cá nhân" MoTa="Cập nhật hồ sơ và đổi mật khẩu đăng nhập của bạn" />
+
+<div class="than-trang">
+    <div class="luoi-hai-cot">
+        <section class="the">
+            <div class="hs-dau">
+                <div class="avatar-lon">@VietTat(_nd?.HoTen)</div>
+                <div>
+                    <div class="hs-ten">@_nd?.HoTen</div>
+                    <div class="hs-phu">
+                        @(_nd == null ? "" : VaiTro.TenHienThi(_nd.TenVaiTro)) · @(_nd?.TenChiNhanh ?? "Toàn chuỗi")
+                    </div>
+                </div>
+            </div>
+
+            <h2 class="the-tieu-de nho">Hồ sơ</h2>
+            @if (_loiHoSo != null)
+            {
+                <div class="o-loi">@((MarkupString)Svg.ChamThan())<span>@_loiHoSo</span></div>
+            }
+            @if (_tbHoSo != null)
+            {
+                <div class="o-thanh-cong">@((MarkupString)Svg.DauTich(15))<span>@_tbHoSo</span></div>
+            }
+
+            <EditForm Model="_hoSo" OnValidSubmit="LuuHoSoAsync" class="dn-form">
+                <DataAnnotationsValidator />
+                <div class="truong">
+                    <label class="nhan" for="ho-ten">Họ và tên</label>
+                    <div class="o-nhap">
+                        <span class="o-icon">@((MarkupString)Svg.NguoiMot())</span>
+                        <InputText id="ho-ten" @bind-Value="_hoSo.HoTen" autocomplete="name" />
+                    </div>
+                    <ValidationMessage For="() => _hoSo.HoTen" class="loi-truong" />
+                </div>
+                <div class="truong">
+                    <label class="nhan" for="sdt">Số điện thoại</label>
+                    <div class="o-nhap">
+                        <span class="o-icon">@((MarkupString)Svg.DienThoai())</span>
+                        <InputText id="sdt" @bind-Value="_hoSo.SoDienThoai" placeholder="0901234567" inputmode="tel" maxlength="10" />
+                    </div>
+                    <ValidationMessage For="() => _hoSo.SoDienThoai" class="loi-truong" />
+                    <span class="goi-y">Dùng được để đăng nhập thay cho email.</span>
+                </div>
+                <div class="truong">
+                    <label class="nhan" for="email">Email đăng nhập</label>
+                    <div class="o-nhap chi-doc">
+                        <span class="o-icon">@((MarkupString)Svg.Thu())</span>
+                        <input id="email" value="@_nd?.Email" readonly />
+                        <span class="o-icon">@((MarkupString)Svg.Khoa(15))</span>
+                    </div>
+                    <span class="goi-y">Email là tên đăng nhập nên không tự đổi được — liên hệ Super Admin nếu cần.</span>
+                </div>
+
+                <dl class="bang-thong-tin gon">
+                    <dt>Vai trò</dt>
+                    <dd><span class="mono">@_nd?.TenVaiTro</span></dd>
+                    <dt>Chi nhánh công tác</dt>
+                    <dd>@(_nd?.TenChiNhanh ?? "Không thuộc chi nhánh nào (toàn chuỗi)")</dd>
+                    <dt>Phiên hết hạn lúc</dt>
+                    <dd>@Phien.HetHanLuc?.ToLocalTime().ToString("HH:mm dd/MM/yyyy")</dd>
+                </dl>
+
+                <button type="submit" class="nut-chinh" disabled="@_dangLuuHoSo">@(_dangLuuHoSo ? "Đang lưu…" : "Lưu thay đổi")</button>
+            </EditForm>
+        </section>
+
+        <section class="the">
+            <h2 class="the-tieu-de nho">Đổi mật khẩu</h2>
+            <p class="the-mo-ta nho">Nếu vừa được cấp mật khẩu tạm, hãy đổi ngay sang mật khẩu của riêng bạn.</p>
+
+            @if (_loiMk != null)
+            {
+                <div class="o-loi">@((MarkupString)Svg.ChamThan())<span>@_loiMk</span></div>
+            }
+            @if (_tbMk != null)
+            {
+                <div class="o-thanh-cong">@((MarkupString)Svg.DauTich(15))<span>@_tbMk</span></div>
+            }
+
+            <EditForm Model="_mk" OnValidSubmit="DoiMatKhauAsync" class="dn-form">
+                <DataAnnotationsValidator />
+                <div class="truong">
+                    <label class="nhan" for="mk-cu">Mật khẩu hiện tại</label>
+                    <div class="o-nhap">
+                        <span class="o-icon">@((MarkupString)Svg.Khoa(18))</span>
+                        <InputText id="mk-cu" type="@(_hienMk ? "text" : "password")" @bind-Value="_mk.MatKhauCu" autocomplete="current-password" />
+                    </div>
+                    <ValidationMessage For="() => _mk.MatKhauCu" class="loi-truong" />
+                </div>
+                <div class="truong">
+                    <label class="nhan" for="mk-moi">Mật khẩu mới</label>
+                    <div class="o-nhap">
+                        <span class="o-icon">@((MarkupString)Svg.Khoa(18))</span>
+                        @* @bind:event="oninput": gõ tới đâu cập nhật tới đó để 3 dòng quy tắc bên dưới sáng lên ngay *@
+                        <input id="mk-moi" type="@(_hienMk ? "text" : "password")" @bind="_mk.MatKhauMoi" @bind:event="oninput"
+                               autocomplete="new-password" />
+                        <button type="button" class="o-nut-mat" title="@(_hienMk ? "Ẩn mật khẩu" : "Hiện mật khẩu")" @onclick="DoiHienMatKhau">
+                            @((MarkupString)(_hienMk ? Svg.MatGach() : Svg.Mat()))
+                        </button>
+                    </div>
+                    <ValidationMessage For="() => _mk.MatKhauMoi" class="loi-truong" />
+                </div>
+                <ul class="ds-quy-tac">
+                    <li class="@(_mk.MatKhauMoi.Length >= 8 ? "dat" : "")">@((MarkupString)Svg.DauTich(12)) Tối thiểu 8 ký tự</li>
+                    <li class="@(CoChuHoa(_mk.MatKhauMoi) ? "dat" : "")">@((MarkupString)Svg.DauTich(12)) Có ít nhất 1 chữ hoa</li>
+                    <li class="@(CoChuSo(_mk.MatKhauMoi) ? "dat" : "")">@((MarkupString)Svg.DauTich(12)) Có ít nhất 1 chữ số</li>
+                </ul>
+                <div class="truong">
+                    <label class="nhan" for="mk-lai">Nhập lại mật khẩu mới</label>
+                    <div class="o-nhap">
+                        <span class="o-icon">@((MarkupString)Svg.Khoa(18))</span>
+                        <InputText id="mk-lai" type="@(_hienMk ? "text" : "password")" @bind-Value="_mk.NhapLai" autocomplete="new-password" />
+                    </div>
+                    <ValidationMessage For="() => _mk.NhapLai" class="loi-truong" />
+                </div>
+                <button type="submit" class="nut-chinh" disabled="@_dangDoiMk">@(_dangDoiMk ? "Đang đổi…" : "Đổi mật khẩu")</button>
+            </EditForm>
+        </section>
+    </div>
+</div>
+
+@code {
+    // Form đổi mật khẩu có thêm ô "Nhập lại" nên tự khai class riêng; [Compare] kiểm 2 ô giống nhau
+    private class DoiMatKhauForm
+    {
+        [Required(ErrorMessage = "Vui lòng nhập mật khẩu hiện tại.")]
+        public string MatKhauCu { get; set; } = "";
+
+        [Required(ErrorMessage = "Vui lòng nhập mật khẩu mới.")]
+        [RegularExpression(QuyTacMatKhau.BieuThuc, ErrorMessage = QuyTacMatKhau.ThongBao)]
+        public string MatKhauMoi { get; set; } = "";
+
+        [Required(ErrorMessage = "Vui lòng nhập lại mật khẩu mới.")]
+        [Compare("MatKhauMoi", ErrorMessage = "Mật khẩu nhập lại không khớp.")]
+        public string NhapLai { get; set; } = "";
+    }
+
+    private NguoiDungDto _nd;                                    // hồ sơ đang xem
+    private CapNhatHoSoRequest _hoSo = new CapNhatHoSoRequest(); // form hồ sơ
+    private DoiMatKhauForm _mk = new DoiMatKhauForm();           // form đổi mật khẩu
+    private bool _dangLuuHoSo = false;
+    private bool _dangDoiMk = false;
+    private bool _hienMk = false;
+    private string _loiHoSo, _tbHoSo, _loiMk, _tbMk;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Hiện ngay thông tin đang có trong phiên, rồi đọc bản mới nhất từ CSDL
+        _nd = Phien.NguoiDung;
+        DoVaoForm();
+        try
+        {
+            var res = await Http.GetAsync("api/auth/me");
+            if (res.IsSuccessStatusCode)
+            {
+                _nd = await res.Content.ReadFromJsonAsync<NguoiDungDto>();
+                DoVaoForm();
+            }
+            else
+            {
+                var loi = await res.Content.ReadFromJsonAsync<ApiError>();
+                _loiHoSo = loi.Message;
+            }
+        }
+        catch
+        {
+            _loiHoSo = "Không kết nối được máy chủ API. Kiểm tra PhotocopyApi đã chạy chưa.";
+        }
+    }
+
+    private void DoVaoForm()
+    {
+        _hoSo.HoTen = _nd?.HoTen ?? "";
+        _hoSo.SoDienThoai = _nd?.SoDienThoai;
+    }
+
+    // PUT api/auth/me — lưu họ tên, số điện thoại
+    private async Task LuuHoSoAsync()
+    {
+        _loiHoSo = null;
+        _tbHoSo = null;
+        _dangLuuHoSo = true;
+
+        _hoSo.HoTen = _hoSo.HoTen.Trim();
+        if (string.IsNullOrWhiteSpace(_hoSo.SoDienThoai))
+            _hoSo.SoDienThoai = null;
+        else
+            _hoSo.SoDienThoai = _hoSo.SoDienThoai.Trim();
+
+        try
+        {
+            var res = await Http.PutAsJsonAsync("api/auth/me", _hoSo);
+            if (res.IsSuccessStatusCode)
+            {
+                _nd = await res.Content.ReadFromJsonAsync<NguoiDungDto>();
+                await Phien.CapNhatNguoiDung(_nd);   // sidebar đổi tên ngay
+                _tbHoSo = "Đã lưu thông tin cá nhân.";
+            }
+            else
+            {
+                var loi = await res.Content.ReadFromJsonAsync<ApiError>();
+                _loiHoSo = loi.Message;
+            }
+        }
+        catch
+        {
+            _loiHoSo = "Không kết nối được máy chủ API. Kiểm tra PhotocopyApi đã chạy chưa.";
+        }
+        _dangLuuHoSo = false;
+    }
+
+    // PUT api/auth/me/password
+    private async Task DoiMatKhauAsync()
+    {
+        _loiMk = null;
+        _tbMk = null;
+        _dangDoiMk = true;
+        try
+        {
+            var yeuCau = new DoiMatKhauRequest { MatKhauCu = _mk.MatKhauCu, MatKhauMoi = _mk.MatKhauMoi };
+            var res = await Http.PutAsJsonAsync("api/auth/me/password", yeuCau);
+            if (res.IsSuccessStatusCode)
+            {
+                var kq = await res.Content.ReadFromJsonAsync<KetQuaDto>();
+                _tbMk = kq.Message + " Lần đăng nhập sau dùng mật khẩu mới.";
+                _mk = new DoiMatKhauForm();   // xóa trắng 3 ô
+            }
+            else
+            {
+                var loi = await res.Content.ReadFromJsonAsync<ApiError>();
+                _loiMk = loi.Message;
+            }
+        }
+        catch
+        {
+            _loiMk = "Không kết nối được máy chủ API. Kiểm tra PhotocopyApi đã chạy chưa.";
+        }
+        _dangDoiMk = false;
+    }
+
+    private void DoiHienMatKhau()
+    {
+        _hienMk = !_hienMk;
+    }
+
+    private bool CoChuHoa(string chuoi)
+    {
+        foreach (char c in chuoi)
+            if (char.IsUpper(c)) return true;
+        return false;
+    }
+
+    private bool CoChuSo(string chuoi)
+    {
+        foreach (char c in chuoi)
+            if (char.IsDigit(c)) return true;
+        return false;
+    }
+
+    // "Trần Thị Quản" → "TQ"
+    private string VietTat(string hoTen)
+    {
+        if (string.IsNullOrWhiteSpace(hoTen)) return "?";
+        string[] tu = hoTen.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (tu.Length == 1) return tu[0].Substring(0, 1).ToUpper();
+        return (tu[tu.Length - 2].Substring(0, 1) + tu[tu.Length - 1].Substring(0, 1)).ToUpper();
+    }
+}

@@ -1,0 +1,266 @@
+@page "/bang-gia"
+@inject HttpClient Http
+@inject PhienDangNhap Phien
+@inject PhamViChiNhanh PhamVi
+
+<PageTitle>Bảng giá · PhotocopyChain</PageTitle>
+
+<TieuDeTrang TieuDe="Dịch vụ & bảng giá" MoTa="@MoTaPhamVi()" />
+
+<div class="than-trang khoi-doc">
+    @if (_loi != null)
+    {
+        <div class="o-loi">
+            @((MarkupString)Svg.ChamThan())
+            <span>@_loi</span>
+        </div>
+    }
+    @if (_thongBao != null)
+    {
+        <div class="o-thanh-cong the-rong">
+            @((MarkupString)Svg.DauTich(16))
+            <span>@_thongBao</span>
+        </div>
+    }
+
+    @if (LaSuperAdmin() && PhamVi.MaChiNhanh == null)
+    {
+        <div class="o-canh-bao">
+            <span class="o-cb-icon">@((MarkupString)Svg.ThongTin())</span>
+            <div>
+                <div class="o-cb-tieu-de">Phạm vi xem toàn hệ thống</div>
+                <div class="o-cb-noi-dung">Bạn đang xem bảng giá tổng hợp của tất cả chi nhánh. Để thêm dịch vụ mới hoặc chỉnh sửa giá, vui lòng chọn một chi nhánh cụ thể từ thanh menu bên trên.</div>
+            </div>
+        </div>
+    }
+
+    @if (CoTheSua())
+    {
+        <div class="the the-rong">
+            <h2 class="the-tieu-de nho">@(_dangSua == null ? "Thêm dịch vụ / quy cách mới" : "Chỉnh sửa dịch vụ #" + _dangSua.MaDichVu)</h2>
+            <div class="ca-loc-luoi">
+                <div class="truong">
+                    <label class="nhan">Tên dịch vụ</label>
+                    <input class="ca-o-loc" placeholder="VD: In A4 đen trắng 1 mặt" @bind="_form.TenDichVu" />
+                </div>
+                <div class="truong">
+                    <label class="nhan">Nhóm dịch vụ</label>
+                    <select class="ca-o-loc" @bind="_form.LoaiDichVu">
+                        <option value="IN_AN">In ấn tài liệu</option>
+                        <option value="GIA_CONG">Hoàn thiện / gia công</option>
+                    </select>
+                </div>
+                <div class="truong">
+                    <label class="nhan">Khổ giấy</label>
+                    <select class="ca-o-loc" @bind="_form.KhoGiay">
+                        <option value="">Không phân biệt</option>
+                        <option value="A4">Khổ A4</option>
+                        <option value="A3">Khổ A3</option>
+                    </select>
+                </div>
+                <div class="truong">
+                    <label class="nhan">Mặt in</label>
+                    <select class="ca-o-loc" @bind="_form.MatIn">
+                        <option value="">Không phân biệt</option>
+                        <option value="1_MAT">In 1 mặt</option>
+                        <option value="2_MAT">In 2 mặt</option>
+                    </select>
+                </div>
+                <div class="truong">
+                    <label class="nhan">Màu sắc</label>
+                    <select class="ca-o-loc" @bind="_form.MauSac">
+                        <option value="">Không phân biệt</option>
+                        <option value="DEN_TRANG">Đen trắng</option>
+                        <option value="MAU">In màu</option>
+                    </select>
+                </div>
+                <div class="truong">
+                    <label class="nhan">Đơn giá (₫)</label>
+                    <input class="ca-o-loc mono" type="number" min="0" step="50" @bind="_form.DonGia" />
+                </div>
+            </div>
+            <div class="xac-nhan-o">
+                <button class="nut-chinh" style="min-width: 120px;" @onclick="LuuAsync">Lưu dịch vụ</button>
+                @if (_dangSua != null)
+                {
+                    <button class="nut-phu" @onclick="BoSua">Hủy chỉnh sửa</button>
+                }
+            </div>
+        </div>
+    }
+
+    <div class="the the-bang">
+        <div class="bang-tieu-de">
+            <div>
+                <h2>Bảng giá niêm yết</h2>
+                <p class="bang-mo-ta">Giá dịch vụ áp dụng trong phạm vi chi nhánh đang chọn.</p>
+            </div>
+            <span class="bang-dem">@(_ds?.Count ?? 0) dịch vụ</span>
+        </div>
+        @if (_ds == null)
+        {
+            <div class="bang-trong">Đang tải bảng giá dịch vụ…</div>
+        }
+        else
+        {
+            <div class="bang-cuon">
+                <table role="table" class="bang">
+                    <thead>
+                        <tr>
+                            <th scope="col">Chi nhánh</th>
+                            <th scope="col">Tên dịch vụ</th>
+                            <th scope="col">Phân loại</th>
+                            <th scope="col">Quy cách áp dụng</th>
+                            <th scope="col">Đơn giá</th>
+                            <th scope="col">Trạng thái</th>
+                            <th scope="col" class="cot-hanh-dong">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (DichVuQuanTriDto dv in _ds)
+                        {
+                            <tr>
+                                <td data-nhan="Chi nhánh"><b>@dv.TenChiNhanh</b></td>
+                                <td data-nhan="Tên dịch vụ">
+                                    <b>@dv.TenDichVu</b>
+                                    <div class="nv-phu">Mã DV: #@dv.MaDichVu</div>
+                                </td>
+                                <td data-nhan="Phân loại">
+                                    <span class="nhan-mau @(dv.LoaiDichVu == "IN_AN" ? "nhan-accent" : "nhan-xam")">@TenLoaiDichVu(dv.LoaiDichVu)</span>
+                                </td>
+                                <td data-nhan="Quy cách áp dụng">
+                                    <div>@ThongTinApDung(dv)</div>
+                                    @if (dv.LoaiDichVu == "GIA_CONG")
+                                    {
+                                        <div class="nv-phu">@QuyTacKetHop(dv)</div>
+                                    }
+                                </td>
+                                <td class="mono" data-nhan="Đơn giá">
+                                    <b style="font-size: 17px;">@Tien(dv.DonGia)</b>
+                                    <div class="nv-phu">@(dv.LoaiDichVu == "IN_AN" ? "mỗi trang" : "mỗi bản")</div>
+                                </td>
+                                <td data-nhan="Trạng thái">
+                                    <span class="nhan-mau @(dv.TrangThai == "HIEN" ? "nhan-xanh" : "nhan-xam")">@TenTrangThai(dv.TrangThai)</span>
+                                </td>
+                                <td class="cot-hanh-dong" data-nhan="Thao tác">
+                                    @if (CoTheSua())
+                                    {
+                                        <button class="nut-nho" title="Sửa thông tin dịch vụ này" @onclick="() => Sua(dv)">Sửa giá</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<DichVuQuanTriDto> _ds;
+    private DichVuQuanTriDto _dangSua;
+    private LuuDichVuRequest _form = Moi();
+    private string _loi;
+    private string _thongBao;
+
+    protected override async Task OnInitializedAsync() => await TaiAsync();
+
+    private async Task TaiAsync()
+    {
+        try
+        {
+            _ds = await Http.GetFromJsonAsync<List<DichVuQuanTriDto>>("api/quan-tri/dich-vu") ?? new();
+        }
+        catch
+        {
+            _loi = "Không tải được bảng giá.";
+            _ds = new();
+        }
+    }
+
+    private bool LaSuperAdmin() => Phien.NguoiDung?.TenVaiTro == "SUPER_ADMIN";
+    private bool CoTheSua() => LaSuperAdmin() && PhamVi.MaChiNhanh != null;
+
+    private string MoTaPhamVi() => PhamVi.MaChiNhanh == null && LaSuperAdmin()
+        ? "So sánh giá in và dịch vụ hoàn thiện giữa tất cả chi nhánh"
+        : "Giá in và dịch vụ hoàn thiện tại chi nhánh đang xem";
+
+    private void Sua(DichVuQuanTriDto d)
+    {
+        _dangSua = d;
+        _form = new LuuDichVuRequest
+        {
+            TenDichVu = d.TenDichVu,
+            LoaiDichVu = d.LoaiDichVu,
+            KhoGiay = d.KhoGiay,
+            LoaiGiay = d.LoaiGiay,
+            MatIn = d.MatIn,
+            MauSac = d.MauSac,
+            NhomGiaCong = d.NhomGiaCong,
+            DonGia = d.DonGia,
+            MaVatTu = d.MaVatTu,
+            TrangThai = d.TrangThai
+        };
+    }
+
+    private void BoSua()
+    {
+        _dangSua = null;
+        _form = Moi();
+    }
+
+    private async Task LuuAsync()
+    {
+        _loi = null;
+        _thongBao = null;
+
+        var res = _dangSua == null
+            ? await Http.PostAsJsonAsync("api/quan-tri/dich-vu", _form)
+            : await Http.PutAsJsonAsync("api/quan-tri/dich-vu/" + _dangSua.MaDichVu, _form);
+
+        if (res.IsSuccessStatusCode)
+        {
+            _thongBao = _dangSua == null ? "Đã thêm dịch vụ." : "Đã cập nhật bảng giá.";
+            BoSua();
+            await TaiAsync();
+        }
+        else
+        {
+            _loi = (await res.Content.ReadFromJsonAsync<ApiError>()).Message;
+        }
+    }
+
+    private static LuuDichVuRequest Moi() => new()
+    {
+        LoaiDichVu = "IN_AN",
+        LoaiGiay = "70GSM",
+        TrangThai = "HIEN"
+    };
+
+    private static string TenLoaiDichVu(string loai) => loai == "IN_AN" ? "In ấn" : "Hoàn thiện bản in";
+    private static string TenTrangThai(string trangThai) => trangThai == "HIEN" ? "Đang bán" : "Ngừng bán";
+
+    private static string ThongTinApDung(DichVuQuanTriDto d)
+    {
+        if (d.LoaiDichVu == "GIA_CONG")
+            return "Thực hiện sau khi in";
+
+        return $"Khổ {d.KhoGiay} · Giấy {d.LoaiGiay?.ToLowerInvariant()} · {TenMatIn(d.MatIn)} · {TenMauSac(d.MauSac)}";
+    }
+
+    private static string QuyTacKetHop(DichVuQuanTriDto d) => d.NhomGiaCong == "DONG_GAY"
+        ? "Chỉ chọn một kiểu đóng gáy cho mỗi bản in"
+        : "Có thể chọn kèm dịch vụ hoàn thiện khác";
+
+    private static string TenMatIn(string matIn) => matIn == "2_MAT" ? "2 mặt" : "1 mặt";
+    private static string TenMauSac(string mauSac) => mauSac == "MAU" ? "In màu" : "Đen trắng";
+
+    private static readonly System.Globalization.NumberFormatInfo KieuSo = new()
+    {
+        NumberGroupSeparator = ".",
+        NumberDecimalSeparator = ","
+    };
+
+    private string Tien(decimal so) => so.ToString("#,##0", KieuSo) + "₫";
+}

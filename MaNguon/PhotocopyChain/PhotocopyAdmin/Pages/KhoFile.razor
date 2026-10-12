@@ -1,0 +1,92 @@
+@page "/kho-file"
+@inject HttpClient Http
+<PageTitle>Kho file in · PhotocopyChain</PageTitle>
+
+<TieuDeTrang TieuDe="Kho file in" MoTa="Theo dõi file PDF đang lưu trữ và file đã xóa sau khi hoàn tất đơn hàng" />
+
+<div class="than-trang khoi-doc">
+    @if (_loi != null)
+    {
+        <div class="o-loi">
+            @((MarkupString)Svg.ChamThan())
+            <span>@_loi</span>
+        </div>
+    }
+
+    <div class="the the-bang">
+        <div class="bang-tieu-de">
+            <div>
+                <h2>Danh sách tài liệu đã tiếp nhận</h2>
+                <p class="bang-mo-ta">Tra cứu tài liệu, đơn hàng và thời hạn lưu trữ file.</p>
+            </div>
+            <span class="bang-dem">@(_ds?.Count ?? 0) file</span>
+        </div>
+
+        @if (_ds == null)
+        {
+            <div class="bang-trong">Đang tải kho file in…</div>
+        }
+        else if (_ds.Count == 0)
+        {
+            <div class="bang-trong">Chưa có file nào trong phạm vi quản lý.</div>
+        }
+        else
+        {
+            <div class="bang-cuon">
+                <table role="table" class="bang">
+                    <thead>
+                        <tr>
+                            <th scope="col">Mã file</th>
+                            <th scope="col">Tên tài liệu</th>
+                            <th scope="col">Khách hàng</th>
+                            <th scope="col">Số trang</th>
+                            <th scope="col">Đang dùng</th>
+                            <th scope="col">Ngày tải lên</th>
+                            <th scope="col">Trạng thái</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (KhoFileDto f in _ds)
+                        {
+                            <tr>
+                                <td class="mono" data-nhan="Mã file">#@f.MaFile</td>
+                                <td data-nhan="Tên tài liệu">
+                                    <div class="hd-file" title="@f.TenFile">
+                                        @((MarkupString)Svg.TaiLieu(16))
+                                        <b class="hd-file-ten">@f.TenFile</b>
+                                    </div>
+                                    <div class="nv-phu">@(string.IsNullOrEmpty(f.DinhDang) ? "PDF" : f.DinhDang.ToUpper()) · @DungLuong(f.DungLuong)</div>
+                                </td>
+                                <td data-nhan="Khách hàng">
+                                    <div class="nv-ten">@f.TenKhachHang</div>
+                                </td>
+                                <td class="mono" data-nhan="Số trang"><b>@f.SoTrang</b> trang</td>
+                                <td data-nhan="Đang dùng">
+                                    <span class="nhan-mau @(f.SoDonDangDung > 0 ? "nhan-accent" : "nhan-xam")">@f.SoDonDangDung đơn</span>
+                                </td>
+                                <td data-nhan="Ngày tải lên">
+                                    <span class="chu-mo">@f.NgayTaiLen.ToString("HH:mm dd/MM/yyyy")</span>
+                                </td>
+                                <td data-nhan="Trạng thái">
+                                    @if (f.TrangThai == "SAN_SANG")
+                                    {
+                                        <span class="nhan-mau nhan-xanh">Còn trên máy chủ</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="nhan-mau nhan-xam">Đã xóa nội dung</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+@code{
+    private List<KhoFileDto> _ds;private string _loi;
+    protected override async Task OnInitializedAsync(){try{_ds=await Http.GetFromJsonAsync<List<KhoFileDto>>("api/quan-tri/file-in")??new();}catch{_loi="Không tải được kho file.";_ds=new();}}
+    private string DungLuong(int? b)=>b==null?"—":b<1024*1024?Math.Round(b.Value/1024m,1)+" KB":Math.Round(b.Value/1024m/1024m,1)+" MB";
+}

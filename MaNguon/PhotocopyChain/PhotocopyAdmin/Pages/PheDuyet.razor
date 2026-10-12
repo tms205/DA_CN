@@ -1,0 +1,148 @@
+@page "/phe-duyet"
+@attribute [Authorize(Roles = "SUPER_ADMIN")]
+@inject HttpClient Http
+
+<PageTitle>Phê duyệt · PhotocopyChain</PageTitle>
+
+<TieuDeTrang TieuDe="Phê duyệt" MoTa="Kiểm tra và phê duyệt phiếu nhập vật tư và xác nhận hoàn tiền các đơn đã hủy" />
+
+<div class="than-trang khoi-doc">
+    @if (_loi != null)
+    {
+        <div class="o-loi">
+            @((MarkupString)Svg.ChamThan())
+            <span>@_loi</span>
+        </div>
+    }
+    @if (_thongBao != null)
+    {
+        <div class="o-thanh-cong the-rong">
+            @((MarkupString)Svg.DauTich(16))
+            <span>@_thongBao</span>
+        </div>
+    }
+
+    <div class="the the-bang">
+        <div class="bang-tieu-de">
+            <div>
+                <h2>Phiếu nhập vật tư chờ duyệt</h2>
+                <p class="bang-mo-ta">Kiểm tra các đề nghị nhập kho trước khi phê duyệt.</p>
+            </div>
+            <span class="bang-dem">@(_phieu?.Count(x => x.TrangThai == "CHO_DUYET") ?? 0) phiếu</span>
+        </div>
+        @if (_phieu == null)
+        {
+            <div class="bang-trong">Đang tải danh sách phiếu nhập…</div>
+        }
+        else if (!_phieu.Any(x => x.TrangThai == "CHO_DUYET"))
+        {
+            <div class="bang-trong">Không có phiếu nhập nào đang chờ duyệt.</div>
+        }
+        else
+        {
+            <div class="bang-cuon">
+                <table role="table" class="bang">
+                    <thead>
+                        <tr>
+                            <th scope="col">Mã phiếu</th>
+                            <th scope="col">Chi nhánh</th>
+                            <th scope="col">Vật tư & Nhà cung cấp</th>
+                            <th scope="col">Số lượng</th>
+                            <th scope="col">Thành tiền</th>
+                            <th scope="col">Người đề xuất</th>
+                            <th scope="col" class="cot-hanh-dong">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (PhieuNhapDto p in _phieu.Where(x => x.TrangThai == "CHO_DUYET"))
+                        {
+                            <tr>
+                                <td class="mono" data-nhan="Mã phiếu"><b>PN@p.MaPhieuNhap.ToString("0000")</b></td>
+                                <td data-nhan="Chi nhánh">@p.TenChiNhanh</td>
+                                <td data-nhan="Vật tư & Nhà cung cấp">
+                                    <b>@p.TenVatTu</b>
+                                    <div class="nv-phu">NCC: @p.NhaCungCap · Đơn giá @Tien(p.DonGia)</div>
+                                </td>
+                                <td class="mono" data-nhan="Số lượng"><b>@p.SoLuong</b></td>
+                                <td class="mono hd-tong" data-nhan="Thành tiền">@Tien(p.SoLuong * p.DonGia)</td>
+                                <td data-nhan="Người đề xuất">
+                                    <div class="nv-ten">@p.TenNguoiLap</div>
+                                </td>
+                                <td class="cot-hanh-dong" data-nhan="Thao tác">
+                                    <div style="display: flex; gap: 8px;">
+                                        <button class="nut-nho chinh" title="Duyệt phiếu nhập" @onclick="() => DuyetAsync(p, true)">Duyệt</button>
+                                        <button class="nut-nho nguy-hiem" title="Từ chối phiếu nhập" @onclick="() => DuyetAsync(p, false)">Từ chối</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    <div class="the the-bang">
+        <div class="bang-tieu-de">
+            <div>
+                <h2>Đơn hàng chờ xác nhận hoàn tiền</h2>
+                <p class="bang-mo-ta">Kiểm tra giao dịch và xác nhận hoàn tiền theo từng đơn.</p>
+            </div>
+            <span class="bang-dem">@(_hoanTien?.Count ?? 0) đơn</span>
+        </div>
+        @if (_hoanTien == null)
+        {
+            <div class="bang-trong">Đang tải danh sách đơn hoàn tiền…</div>
+        }
+        else if (_hoanTien.Count == 0)
+        {
+            <div class="bang-trong">Không có đơn hàng nào chờ hoàn tiền.</div>
+        }
+        else
+        {
+            <div class="bang-cuon">
+                <table role="table" class="bang">
+                    <thead>
+                        <tr>
+                            <th scope="col">Mã đơn hàng</th>
+                            <th scope="col">Khách hàng & SĐT</th>
+                            <th scope="col">Chi nhánh</th>
+                            <th scope="col">Số tiền hoàn</th>
+                            <th scope="col">Lý do hủy đơn</th>
+                            <th scope="col" class="cot-hanh-dong">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (HoanTienChoDuyetDto d in _hoanTien)
+                        {
+                            <tr>
+                                <td class="mono hd-ma" data-nhan="Mã đơn hàng">@d.MaDonHangHienThi</td>
+                                <td data-nhan="Khách hàng & SĐT">
+                                    <div class="nv-ten">@d.TenKhachHang</div>
+                                    <div class="nv-phu">@d.SoDienThoai</div>
+                                </td>
+                                <td data-nhan="Chi nhánh">@d.TenChiNhanh</td>
+                                <td class="mono hd-tong" data-nhan="Số tiền hoàn">@Tien(d.SoTien)</td>
+                                <td data-nhan="Lý do hủy đơn">
+                                    <span class="chu-mo">@(string.IsNullOrEmpty(d.GhiChu) ? "Hủy đơn" : d.GhiChu)</span>
+                                </td>
+                                <td class="cot-hanh-dong" data-nhan="Thao tác">
+                                    <button class="nut-nho chinh" title="Xác nhận đã chuyển khoản hoàn tiền" @onclick="() => HoanTienAsync(d)">Đã chuyển hoàn</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@code{
+    private List<PhieuNhapDto> _phieu; private List<HoanTienChoDuyetDto> _hoanTien; private string _loi; private string _thongBao;
+    protected override async Task OnInitializedAsync()=>await TaiAsync();
+    private async Task TaiAsync(){try{_phieu=await Http.GetFromJsonAsync<List<PhieuNhapDto>>("api/quan-tri/phieu-nhap")??new();_hoanTien=await Http.GetFromJsonAsync<List<HoanTienChoDuyetDto>>("api/quan-tri/hoan-tien")??new();}catch{_loi="Không tải được danh sách phê duyệt.";_phieu=new();_hoanTien=new();}}
+    private async Task DuyetAsync(PhieuNhapDto p,bool dongY){var r=await Http.PostAsJsonAsync($"api/quan-tri/phieu-nhap/{p.MaPhieuNhap}/duyet",new DuyetPhieuNhapRequest{DongY=dongY});if(r.IsSuccessStatusCode){_thongBao=dongY?"Đã duyệt phiếu nhập.":"Đã từ chối phiếu nhập.";await TaiAsync();}else _loi=(await r.Content.ReadFromJsonAsync<ApiError>()).Message;}
+    private async Task HoanTienAsync(HoanTienChoDuyetDto d){var r=await Http.PostAsync($"api/don-hang/{d.MaDonHang}/hoan-tien",null);if(r.IsSuccessStatusCode){_thongBao="Đã xác nhận hoàn tiền "+d.MaDonHangHienThi+".";await TaiAsync();}else _loi=(await r.Content.ReadFromJsonAsync<ApiError>()).Message;}
+    private static readonly System.Globalization.NumberFormatInfo KieuSo=new(){NumberGroupSeparator=".",NumberDecimalSeparator=","};private string Tien(decimal s)=>s.ToString("#,##0",KieuSo)+"₫";
+}

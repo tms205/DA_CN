@@ -1,0 +1,275 @@
+@page "/khuyen-mai"
+@attribute [Authorize(Roles = "SUPER_ADMIN")]
+@inject HttpClient Http
+@inject PhamViChiNhanh PhamVi
+
+<PageTitle>Quản lý khuyến mãi · PhotocopyChain</PageTitle>
+
+<TieuDeTrang TieuDe="Quản lý khuyến mãi" MoTa="@MoTaPhamVi()" />
+
+<div class="than-trang khoi-doc">
+    @if (_loi != null)
+    {
+        <div class="o-loi">
+            @((MarkupString)Svg.ChamThan())
+            <span>@_loi</span>
+        </div>
+    }
+    @if (_thongBao != null)
+    {
+        <div class="o-thanh-cong the-rong">
+            @((MarkupString)Svg.DauTich(16))
+            <span>@_thongBao</span>
+        </div>
+    }
+
+    @if (!CoTheSua())
+    {
+        <div class="o-canh-bao">
+            <span class="o-cb-icon">@((MarkupString)Svg.ThongTin())</span>
+            <div>
+                <div class="o-cb-tieu-de">Phạm vi xem toàn hệ thống</div>
+                <div class="o-cb-noi-dung">Bạn đang xem danh sách khuyến mãi của tất cả chi nhánh. Hãy chọn một chi nhánh cụ thể từ thanh menu trên cùng để thêm mới hoặc chỉnh sửa mã ưu đãi.</div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="the the-rong">
+            <h2 class="the-tieu-de nho">@(_dangSua == null ? "Tạo mã khuyến mãi mới" : "Chỉnh sửa khuyến mãi #" + _dangSua.MaKhuyenMai)</h2>
+            <div class="ca-loc-luoi">
+                <div class="truong">
+                    <label class="nhan">Mã code ưu đãi</label>
+                    <input class="ca-o-loc mono" placeholder="VD: INAN20" @bind="_form.MaCode" />
+                </div>
+                <div class="truong">
+                    <label class="nhan">Tên chương trình khuyến mãi</label>
+                    <input class="ca-o-loc" placeholder="VD: Giảm 20% đầu năm học" @bind="_form.TenKhuyenMai" />
+                </div>
+                <div class="truong">
+                    <label class="nhan">% giảm giá</label>
+                    <input class="ca-o-loc" type="number" min="1" max="100" @bind="_form.PhanTramGiam" />
+                </div>
+                <div class="truong">
+                    <label class="nhan">Số tiền giảm tối đa (₫)</label>
+                    <input class="ca-o-loc mono" type="number" min="0" step="1000" @bind="_form.GiamToiDa" />
+                </div>
+                <div class="truong">
+                    <label class="nhan">Đơn hàng tối thiểu (₫)</label>
+                    <input class="ca-o-loc mono" type="number" min="0" step="1000" @bind="_form.DonToiThieu" />
+                </div>
+                <div class="truong">
+                    <label class="nhan">Số lượng mã phát hành</label>
+                    <input class="ca-o-loc" type="number" min="0" @bind="_form.SoLuong" />
+                </div>
+                <div class="truong">
+                    <label class="nhan">Ngày bắt đầu</label>
+                    <input class="ca-o-loc" type="date" @bind="_form.NgayBatDau" />
+                </div>
+                <div class="truong">
+                    <label class="nhan">Ngày kết thúc</label>
+                    <input class="ca-o-loc" type="date" @bind="_form.NgayKetThuc" />
+                </div>
+                <div class="truong">
+                    <label class="nhan">Trạng thái áp dụng</label>
+                    <select class="ca-o-loc" @bind="_form.TrangThai">
+                        <option value="HOAT_DONG">Đang hoạt động</option>
+                        <option value="TAM_DUNG">Tạm dừng áp dụng</option>
+                    </select>
+                </div>
+            </div>
+            <div class="xac-nhan-o">
+                <button class="nut-chinh" style="min-width: 130px;" @onclick="LuuAsync">Lưu khuyến mãi</button>
+                @if (_dangSua != null)
+                {
+                    <button class="nut-phu" @onclick="BoSua">Hủy chỉnh sửa</button>
+                }
+            </div>
+        </div>
+    }
+
+    <div class="the the-bang">
+        <div class="bang-tieu-de">
+            <div>
+                <h2>Danh sách chương trình khuyến mãi</h2>
+                <p class="bang-mo-ta">Mã ưu đãi, thời gian hiệu lực và phạm vi áp dụng.</p>
+            </div>
+            <span class="bang-dem">@(_ds?.Count ?? 0) mã</span>
+        </div>
+        @if (_ds == null)
+        {
+            <div class="bang-trong">Đang tải danh sách khuyến mãi…</div>
+        }
+        else
+        {
+            <div class="bang-cuon">
+                <table role="table" class="bang">
+                    <thead>
+                        <tr>
+                            <th scope="col">Chi nhánh</th>
+                            <th scope="col">Mã voucher</th>
+                            <th scope="col">Tên chương trình</th>
+                            <th scope="col">Mức ưu đãi</th>
+                            <th scope="col">Thời hạn áp dụng</th>
+                            <th scope="col">Đã dùng / Tổng</th>
+                            <th scope="col">Trạng thái</th>
+                            <th scope="col" class="cot-hanh-dong">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (KhuyenMaiQuanTriDto km in _ds)
+                        {
+                            <tr>
+                                <td data-nhan="Chi nhánh"><b>@km.TenChiNhanh</b></td>
+                                <td class="mono hd-ma" data-nhan="Mã voucher">@km.MaCode</td>
+                                <td data-nhan="Tên chương trình">
+                                    <b>@km.TenKhuyenMai</b>
+                                    <div class="nv-phu">Đơn tối thiểu: @Tien(km.DonToiThieu)</div>
+                                </td>
+                                <td data-nhan="Mức ưu đãi">
+                                    <b style="font-size: 17px; color: var(--accent);">@km.PhanTramGiam%</b>
+                                    <div class="nv-phu">Tối đa: @Tien(km.GiamToiDa ?? 0)</div>
+                                </td>
+                                <td data-nhan="Thời hạn áp dụng">
+                                    <span class="chu-mo">@km.NgayBatDau?.ToString("dd/MM/yyyy") – @km.NgayKetThuc?.ToString("dd/MM/yyyy")</span>
+                                </td>
+                                <td class="mono" data-nhan="Đã dùng / Tổng">
+                                    <b>@km.DaDung</b> / @km.SoLuong
+                                </td>
+                                <td data-nhan="Trạng thái">
+                                    <span class="nhan-mau @(km.TrangThai == "HOAT_DONG" ? "nhan-xanh" : "nhan-xam")">@TenTrangThai(km.TrangThai)</span>
+                                </td>
+                                <td class="cot-hanh-dong" data-nhan="Thao tác">
+                                    @if (CoTheSua())
+                                    {
+                                        <div style="display: flex; gap: 6px;">
+                                            <button class="nut-nho" title="Sửa thông tin mã" @onclick="() => Sua(km)">Sửa</button>
+                                            <button class="nut-nho" title="Bật/Tắt trạng thái hoạt động" @onclick="() => DoiTrangThaiAsync(km)">
+                                                @(km.TrangThai == "HOAT_DONG" ? "Tạm dừng" : "Kích hoạt")
+                                            </button>
+                                        </div>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<KhuyenMaiQuanTriDto> _ds;
+    private KhuyenMaiQuanTriDto _dangSua;
+    private LuuKhuyenMaiRequest _form = Moi();
+    private string _loi;
+    private string _thongBao;
+
+    protected override async Task OnInitializedAsync() => await TaiAsync();
+
+    private async Task TaiAsync()
+    {
+        try
+        {
+            _ds = await Http.GetFromJsonAsync<List<KhuyenMaiQuanTriDto>>("api/quan-tri/khuyen-mai") ?? new();
+        }
+        catch
+        {
+            _loi = "Không tải được danh sách khuyến mãi.";
+            _ds = new();
+        }
+    }
+
+    private bool CoTheSua() => PhamVi.MaChiNhanh != null;
+
+    private void Sua(KhuyenMaiQuanTriDto km)
+    {
+        _dangSua = km;
+        _form = TaoYeuCau(km, km.TrangThai);
+    }
+
+    private void BoSua()
+    {
+        _dangSua = null;
+        _form = Moi();
+    }
+
+    private async Task LuuAsync()
+    {
+        _loi = null;
+        _thongBao = null;
+
+        var res = _dangSua == null
+            ? await Http.PostAsJsonAsync("api/quan-tri/khuyen-mai", _form)
+            : await Http.PutAsJsonAsync("api/quan-tri/khuyen-mai/" + _dangSua.MaKhuyenMai, _form);
+
+        if (res.IsSuccessStatusCode)
+        {
+            _thongBao = _dangSua == null ? "Đã thêm khuyến mãi." : "Đã cập nhật khuyến mãi.";
+            BoSua();
+            await TaiAsync();
+        }
+        else
+        {
+            _loi = (await res.Content.ReadFromJsonAsync<ApiError>())?.Message;
+        }
+    }
+
+    private async Task DoiTrangThaiAsync(KhuyenMaiQuanTriDto km)
+    {
+        _loi = null;
+        _thongBao = null;
+        string trangThaiMoi = km.TrangThai == "HOAT_DONG" ? "TAM_DUNG" : "HOAT_DONG";
+
+        var res = await Http.PutAsJsonAsync(
+            "api/quan-tri/khuyen-mai/" + km.MaKhuyenMai,
+            TaoYeuCau(km, trangThaiMoi));
+
+        if (res.IsSuccessStatusCode)
+        {
+            _thongBao = "Đã cập nhật trạng thái khuyến mãi.";
+            await TaiAsync();
+        }
+        else
+        {
+            _loi = (await res.Content.ReadFromJsonAsync<ApiError>())?.Message;
+        }
+    }
+
+    private static LuuKhuyenMaiRequest TaoYeuCau(KhuyenMaiQuanTriDto km, string trangThai) => new()
+    {
+        MaCode = km.MaCode,
+        TenKhuyenMai = km.TenKhuyenMai,
+        PhanTramGiam = km.PhanTramGiam,
+        GiamToiDa = km.GiamToiDa,
+        DonToiThieu = km.DonToiThieu,
+        NgayBatDau = km.NgayBatDau ?? DateTime.Today,
+        NgayKetThuc = km.NgayKetThuc ?? DateTime.Today,
+        SoLuong = km.SoLuong,
+        TrangThai = trangThai
+    };
+
+    private static LuuKhuyenMaiRequest Moi() => new()
+    {
+        PhanTramGiam = 10,
+        SoLuong = 100,
+        NgayBatDau = DateTime.Today,
+        NgayKetThuc = DateTime.Today.AddMonths(1),
+        TrangThai = "HOAT_DONG"
+    };
+
+    private string MoTaPhamVi() => CoTheSua()
+        ? "Thêm, sửa và bật tắt khuyến mãi tại chi nhánh đang chọn"
+        : "Theo dõi khuyến mãi của tất cả chi nhánh";
+
+    private static string TenTrangThai(string trangThai) => trangThai == "HOAT_DONG" ? "Hoạt động" : "Tạm dừng";
+
+    private static readonly System.Globalization.NumberFormatInfo KieuSo = new()
+    {
+        NumberGroupSeparator = ".",
+        NumberDecimalSeparator = ","
+    };
+
+    private string Tien(decimal so) => so.ToString("#,##0", KieuSo) + "₫";
+}

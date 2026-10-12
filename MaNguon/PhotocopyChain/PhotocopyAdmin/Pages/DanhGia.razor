@@ -1,0 +1,92 @@
+@page "/danh-gia"
+@attribute [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN")]
+@inject HttpClient Http
+<PageTitle>Đánh giá · PhotocopyChain</PageTitle>
+
+<TieuDeTrang TieuDe="Đánh giá khách hàng" MoTa="Phản hồi và mức độ hài lòng của khách hàng sau khi nhận tài liệu" />
+
+<div class="than-trang khoi-doc">
+    @if (_loi != null)
+    {
+        <div class="o-loi">
+            @((MarkupString)Svg.ChamThan())
+            <span>@_loi</span>
+        </div>
+    }
+
+    <div class="the the-bang">
+        <div class="bang-tieu-de">
+            <div>
+                <h2>Danh sách phản hồi từ khách hàng</h2>
+                <p class="bang-mo-ta">Theo dõi mức độ hài lòng và xử lý phản hồi.</p>
+            </div>
+            <span class="bang-dem">@(_ds?.Count ?? 0) đánh giá</span>
+        </div>
+
+        @if (_ds == null)
+        {
+            <div class="bang-trong">Đang tải danh sách đánh giá…</div>
+        }
+        else if (_ds.Count == 0)
+        {
+            <div class="bang-trong">Chưa có đánh giá nào từ khách hàng.</div>
+        }
+        else
+        {
+            <div class="bang-cuon">
+                <table role="table" class="bang">
+                    <thead>
+                        <tr>
+                            <th scope="col">Mã đơn</th>
+                            <th scope="col">Khách hàng</th>
+                            <th scope="col">Chi nhánh</th>
+                            <th scope="col">Điểm đánh giá</th>
+                            <th scope="col">Nhận xét của khách</th>
+                            <th scope="col">Thời gian</th>
+                            <th scope="col" class="cot-hanh-dong">Trạng thái / Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (DanhGiaDto d in _ds)
+                        {
+                            <tr>
+                                <td class="mono hd-ma" data-nhan="Mã đơn">@d.MaDonHangHienThi</td>
+                                <td data-nhan="Khách hàng">
+                                    <div class="nv-ten">@d.TenKhachHang</div>
+                                </td>
+                                <td data-nhan="Chi nhánh">@d.TenChiNhanh</td>
+                                <td data-nhan="Điểm đánh giá">
+                                    <span style="color: #D97706; font-size: 17px; letter-spacing: 2px;">@Sao(d.SoSao)</span>
+                                    <span class="nv-phu" style="margin-left: 4px;">(@d.SoSao/5)</span>
+                                </td>
+                                <td data-nhan="Nhận xét của khách">
+                                    <div style="max-width: 380px; line-height: 1.5;">@(string.IsNullOrEmpty(d.NhanXet) ? "—" : d.NhanXet)</div>
+                                </td>
+                                <td data-nhan="Thời gian">
+                                    <span class="chu-mo">@d.NgayDanhGia.ToString("dd/MM/yyyy HH:mm")</span>
+                                </td>
+                                <td class="cot-hanh-dong" data-nhan="Trạng thái / Thao tác">
+                                    @if (d.TrangThai == "HIEN")
+                                    {
+                                        <button class="nut-nho" title="Ẩn đánh giá này khỏi hiển thị công khai" @onclick="() => AnAsync(d)">Ẩn đánh giá</button>
+                                    }
+                                    else
+                                    {
+                                        <span class="nhan-mau nhan-xam">Đã ẩn</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+@code{
+    private List<DanhGiaDto> _ds;private string _loi;
+    protected override async Task OnInitializedAsync()=>await TaiAsync();
+    private async Task TaiAsync(){try{_ds=await Http.GetFromJsonAsync<List<DanhGiaDto>>("api/don-hang/danh-gia")??new();}catch{_loi="Không tải được đánh giá.";_ds=new();}}
+    private async Task AnAsync(DanhGiaDto d){var r=await Http.PutAsync($"api/don-hang/danh-gia/{d.MaDanhGia}/an",null);if(r.IsSuccessStatusCode)await TaiAsync();else _loi=(await r.Content.ReadFromJsonAsync<ApiError>()).Message;}
+    private string Sao(int n)=>new string('★',n)+new string('☆',5-n);
+}

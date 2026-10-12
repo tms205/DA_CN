@@ -1,0 +1,580 @@
+@page "/ca-lam-viec"
+@attribute [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
+@using PhotocopyShared.Dtos.DonHang
+@inject HttpClient Http
+@inject PhienDangNhap Phien
+@inject PhamViChiNhanh PhamVi
+
+<PageTitle>Ca làm việc &amp; két tiền · PhotocopyChain</PageTitle>
+
+@* F-24B: mở ca / đóng ca đếm tiền / quản lý xác nhận lệch két.
+   Tiệm chạy 3 ca 4 tiếng (09:00–13:00, 13:00–17:00, 17:00–21:00) nhưng hệ thống không ép giờ —
+   STAFF đăng nhập tự mở ca riêng 200.000đ, hết ca thì đếm tiền rồi bấm Đóng ca.
+   Người trực ca không được tự xác nhận ca của chính mình. *@
+<TieuDeTrang TieuDe="Ca làm việc & két tiền" MoTa="@MoTa()" />
+
+<div class="than-trang khoi-doc">
+    @if (_loi != null)
+    {
+        <div class="o-loi">@((MarkupString)Svg.ChamThan())<span>@_loi</span></div>
+    }
+    @if (_thongBao != null)
+    {
+        <div class="o-thanh-cong the-rong">@((MarkupString)Svg.DauTich(16))<span>@_thongBao</span></div>
+    }
+
+    @if (CeoDangXemToanChuoi())
+    {
+        <div class="the">
+            <h2 class="the-tieu-de nho">Tổng quan ca toàn chuỗi</h2>
+            <p class="the-mo-ta nho">Chọn một chi nhánh ở thanh bên để mở ca và thao tác tại quầy. Bên dưới vẫn hiển thị các ca gần đây và ca chờ xác nhận của toàn chuỗi.</p>
+        </div>
+    }
+    else if (_dangTai)
+    {
+        <div class="the"><p class="the-mo-ta">Đang tải ca làm việc…</p></div>
+    }
+    else if (_ca == null)
+    {
+        @* ---- Chưa mở ca ---- *@
+        <div class="the ca-the">
+            <h2 class="the-tieu-de nho">Mở ca làm việc</h2>
+            <p class="the-mo-ta nho">
+                Nhân viên đăng nhập được tự mở ca riêng, mặc định 200.000đ. Nếu vừa đóng ca, có thể mở ca mới tại đây.
+                Đếm số tiền lẻ đang có sẵn trong két rồi nhập vào đây. Đơn đặt trên ứng dụng đều đã chuyển khoản trước;
+                ca làm việc dùng để giữ tiền COD thu khi <b>bàn giao tài liệu cho khách</b>.
+            </p>
+            <div class="truong ca-o-tien">
+                <label class="nhan">Tiền đầu ca (₫)</label>
+                <div class="o-nhap">
+                    <span class="o-icon">@((MarkupString)Svg.TienMat(16))</span>
+                    <input type="number" min="0" step="1000" class="mono" @bind="_tienDauCa" />
+                </div>
+            </div>
+            <button class="nut-chinh" disabled="@_dangGui" @onclick="MoCaAsync">@(_dangGui ? "Đang mở ca…" : "Mở ca")</button>
+        </div>
+    }
+    else
+    {
+        @* ---- Đang trong ca ---- *@
+        <div class="the ca-the">
+            <div class="ca-dau">
+                <div>
+                    <h2 class="the-tieu-de nho">Ca đang mở</h2>
+                    <div class="nv-phu">@_ca.TenNhanVien · @_ca.TenChiNhanh · mở lúc @_ca.GioMoCa.ToString("HH:mm dd/MM")</div>
+                </div>
+                <span class="nhan-mau nhan-xanh">@((MarkupString)Svg.DongHo(13)) Đang mở</span>
+            </div>
+
+            <div class="ca-so-lieu">
+                <div class="ca-o">
+                    <div class="ca-o-nhan">Tiền đầu ca</div>
+                    <div class="ca-o-so mono">@Tien(_ca.TienDauCa)</div>
+                </div>
+                <div class="ca-o">
+                    <div class="ca-o-nhan">Tổng COD đã thu</div>
+                    <div class="ca-o-so mono">@Tien(_ca.DoanhThuTrongCa)</div>
+                    <div class="nv-phu">@_ca.SoDonDaThu đơn</div>
+                </div>
+                <div class="ca-o ca-o-vietqr">
+                    <div class="ca-o-nhan">Tổng chuyển khoản VietQR</div>
+                    <div class="ca-o-so mono">@Tien(_ca.DoanhThuVietQr)</div>
+                    <div class="nv-phu">@_ca.SoDonVietQr đơn · không vào két</div>
+                </div>
+                <div class="ca-o ca-o-chinh">
+                    <div class="ca-o-nhan">Két phải có</div>
+                    <div class="ca-o-so mono">@Tien(_ca.TienDauCa + _ca.DoanhThuTrongCa)</div>
+                </div>
+            </div>
+
+            <div class="nv-phu ca-chu-thich">
+                VietQR chỉ dùng để đối chiếu doanh thu. Tiền chuyển khoản vào tài khoản nên không cộng vào két phải có.
+            </div>
+
+            <h3 class="hd-muc">Đóng ca — đếm tiền trong két</h3>
+            <div class="truong ca-o-tien">
+                <label class="nhan">Số tiền đếm được (₫)</label>
+                <div class="o-nhap">
+                    <span class="o-icon">@((MarkupString)Svg.TienMat(16))</span>
+                    <input type="number" min="0" step="1000" class="mono" @bind="_tienDemDuoc" @bind:event="oninput" />
+                </div>
+            </div>
+
+            @* Xem trước phần lệch để nhân viên biết trước khi bấm *@
+            @if (_tienDemDuoc > 0)
+            {
+                decimal lech = _tienDemDuoc - (_ca.TienDauCa + _ca.DoanhThuTrongCa);
+                @if (lech == 0)
+                {
+                    <div class="o-thanh-cong">@((MarkupString)Svg.DauTich(16))<span>Khớp két.</span></div>
+                }
+                else if (lech < 0)
+                {
+                    <div class="o-canh-bao">
+                        <span class="o-cb-icon">@((MarkupString)Svg.CanhBao())</span>
+                        <div>
+                            <div class="o-cb-tieu-de">Thiếu @Tien(-lech)</div>
+                            <div class="o-cb-noi-dung">Quản lý sẽ trừ khoản đã chi cho tiệm, phần còn lại nhân viên bù ngay khi xác nhận ca.</div>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="o-canh-bao">
+                        <span class="o-cb-icon">@((MarkupString)Svg.ThongTin())</span>
+                        <div>
+                            <div class="o-cb-tieu-de">Thừa @Tien(lech)</div>
+                            <div class="o-cb-noi-dung">Phần thừa nộp về tiệm khi quản lý xác nhận ca.</div>
+                        </div>
+                    </div>
+                }
+            }
+
+            <button class="nut-chinh" disabled="@_dangGui" @onclick="DongCaAsync">@(_dangGui ? "Đang đóng ca…" : "Đóng ca")</button>
+        </div>
+    }
+
+    @* ---- Các ca gần đây của chi nhánh ---- *@
+    <div class="the the-bang">
+        <div class="bang-tieu-de">
+            <div>
+                <h2>@(LaNhanVienStaff() ? "Ca của tôi trong 7 ngày gần đây" : "Ca toàn chi nhánh trong 7 ngày gần đây")</h2>
+                <p class="bang-mo-ta">Theo dõi tiền đầu ca, giao dịch và đối chiếu cuối ca · 5 ca mỗi trang.</p>
+            </div>
+            <span class="bang-dem">@(_dsCa?.Count ?? 0) ca</span>
+        </div>
+        @if (_dsCa == null)
+        {
+            <div class="bang-trong">Đang tải…</div>
+        }
+        else if (_dsCa.Count == 0)
+        {
+            <div class="bang-trong">Chưa có ca nào.</div>
+        }
+        else
+        {
+            <div class="bang-cuon">
+                <table role="table" class="bang">
+                    <thead>
+                        <tr>
+                            <th scope="col">Nhân viên</th>
+                            <th scope="col">Giờ mở / đóng</th>
+                            <th scope="col">Đầu ca</th>
+                            <th scope="col">COD đã thu</th>
+                            <th scope="col">VietQR</th>
+                            <th scope="col">Đếm cuối ca</th>
+                            <th scope="col">Lệch</th>
+                            <th scope="col">Trạng thái</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var ca in CaTrangHienTai())
+                        {
+                            <tr>
+                                <td data-nhan="Nhân viên"><div class="nv-ten">@ca.TenNhanVien</div></td>
+                                <td data-nhan="Giờ mở / đóng">
+                                    <div>@ca.GioMoCa.ToString("HH:mm dd/MM")</div>
+                                    <div class="nv-phu">@(ca.GioDongCa == null ? "chưa đóng" : ca.GioDongCa.Value.ToString("HH:mm dd/MM"))</div>
+                                </td>
+                                <td class="mono" data-nhan="Đầu ca">@Tien(ca.TienDauCa)</td>
+                                <td data-nhan="COD đã thu"><div class="mono">@Tien(ca.DoanhThuTrongCa)</div><div class="nv-phu">@ca.SoDonDaThu đơn</div></td>
+                                <td data-nhan="VietQR"><div class="mono">@Tien(ca.DoanhThuVietQr)</div><div class="nv-phu">@ca.SoDonVietQr đơn</div></td>
+                                <td class="mono" data-nhan="Đếm cuối ca">@(TienKiemDem(ca) == null ? "—" : Tien(TienKiemDem(ca).Value))</td>
+                                <td data-nhan="Lệch">@((MarkupString)ChuLech(ca))</td>
+                                <td data-nhan="Trạng thái"><span class="nhan-mau @MauTrangThaiCa(ca.TrangThai)">@TenTrangThaiCa(ca)</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="ca-phan-trang">
+                <span>Trang @_trangCa / @TongTrangCa · @_dsCa.Count ca</span>
+                <div class="ca-nut-trang">
+                    <button class="nut-nho" disabled="@(_trangCa == 1)" @onclick="TrangCaTruoc">← Trước</button>
+                    <button class="nut-nho" disabled="@(_trangCa == TongTrangCa)" @onclick="TrangCaSau">Sau →</button>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (LaQuanLyChiNhanh())
+    {
+        <div class="the the-bang">
+            <div class="bang-tieu-de">
+                <div>
+                    <h2>Ca chờ quản lý xác nhận</h2>
+                    <p class="bang-mo-ta">Đối chiếu kết quả kiểm đếm và xử lý chênh lệch cuối ca.</p>
+                </div>
+                <span class="bang-dem">@(_dsChoXacNhan?.Count ?? 0) ca</span>
+            </div>
+            @if (_dsChoXacNhan == null) { <div class="bang-trong">Đang tải…</div> }
+            else if (_dsChoXacNhan.Count == 0) { <div class="bang-trong">Không có ca nào chờ xác nhận.</div> }
+            else
+            {
+                <div class="bang-cuon"><table role="table" class="bang"><thead><tr><th scope="col">Nhân viên</th><th scope="col">Thời gian</th><th scope="col">Két theo hệ thống</th><th scope="col">Việc cần làm</th><th scope="col"></th></tr></thead><tbody>
+                @foreach (CaLamViecDto ca in _dsChoXacNhan)
+                {
+                    <tr><td data-nhan="Nhân viên"><b>@ca.TenNhanVien</b></td><td data-nhan="Thời gian">@ca.GioMoCa.ToString("HH:mm") – @ca.GioDongCa?.ToString("HH:mm dd/MM")</td><td class="mono" data-nhan="Két theo hệ thống"><b>@Tien(ca.TienDauCa + ca.DoanhThuTrongCa)</b></td><td data-nhan="Việc cần làm">Kiểm đếm tiền thực tế trong két</td><td data-nhan="Thao tác"><button class="nut-nho chinh" @onclick="() => ChonXacNhan(ca)">Kiểm tra &amp; xác nhận</button></td></tr>
+                }
+                </tbody></table></div>
+            }
+        </div>
+
+        @if (_caXacNhan != null)
+        {
+            <div class="the ca-the">
+                <div class="ca-dau">
+                    <div>
+                        <h2 class="the-tieu-de nho">Kiểm tra ca của @_caXacNhan.TenNhanVien</h2>
+                        <div class="nv-phu">Két theo hệ thống phải có <b class="mono">@Tien(TienPhaiCo(_caXacNhan))</b></div>
+                    </div>
+                    <button class="nut-dong" title="Đóng" @onclick="BoChonXacNhan">✕</button>
+                </div>
+
+                @if (!_dangXuLyLech)
+                {
+                    <div class="ca-cau-hoi">
+                        <b>Số tiền quản lý trực tiếp kiểm đếm có khớp không?</b>
+                        <span>Hãy đếm tiền thực tế trong két rồi mới chọn. Không dùng số tiền nhân viên đã khai để xác nhận thay.</span>
+                    </div>
+                    <div class="ca-lua-chon">
+                        <button class="ca-nut-ket-qua khop" disabled="@_dangGui" @onclick="XacNhanKhopAsync">
+                            <b>@((MarkupString)Svg.DauTich(18)) Khớp tiền</b>
+                            <span>Xác nhận và đóng ca ngay</span>
+                        </button>
+                        <button class="ca-nut-ket-qua lech" disabled="@_dangGui" @onclick="BatDauXuLyLech">
+                            <b>@((MarkupString)Svg.CanhBao()) Có chênh lệch</b>
+                            <span>Nhập số tiền quản lý đếm được</span>
+                        </button>
+                    </div>
+                }
+                else
+                {
+                    <div class="o-canh-bao">
+                        <span class="o-cb-icon">@((MarkupString)Svg.ThongTin())</span>
+                        <div>
+                            <div class="o-cb-tieu-de">Ghi nhận theo số quản lý kiểm đếm</div>
+                            <div class="o-cb-noi-dung">Số nhân viên tự khai vẫn được lưu để đối chiếu; kết quả chốt ca dùng số tiền quản lý trực tiếp đếm.</div>
+                        </div>
+                    </div>
+                    <div class="ca-loc-luoi ca-xu-ly-lech">
+                        <div class="truong"><label class="nhan">Quản lý đếm được (₫)</label><input class="ca-o-loc mono" type="number" min="0" step="1000" @bind="TienQuanLyDemNhap" @bind:event="oninput" /></div>
+                        @if (_tienQuanLyDem != null)
+                        {
+                            decimal lechQuanLy = _tienQuanLyDem.Value - TienPhaiCo(_caXacNhan);
+                            <div class="truong ca-ket-qua-dem">
+                                <label class="nhan">Kết quả kiểm đếm</label>
+                                <span class="nhan-mau @(lechQuanLy < 0 ? "nhan-do" : lechQuanLy > 0 ? "nhan-cam" : "nhan-xanh")">@(lechQuanLy < 0 ? "Thiếu " + Tien(-lechQuanLy) : lechQuanLy > 0 ? "Thừa " + Tien(lechQuanLy) : "Khớp tiền")</span>
+                            </div>
+                            @if (lechQuanLy < 0)
+                            {
+                                <div class="truong"><label class="nhan">Tiền đã chi cho tiệm</label><input class="ca-o-loc mono" type="number" min="0" @bind="_tienChi" /></div>
+                                <div class="truong"><label class="nhan">Nhân viên bù</label><input class="ca-o-loc mono" type="number" min="0" @bind="_tienBu" /></div>
+                                <div class="truong ca-ghi-chu-lech"><label class="nhan">Ghi chú khoản chi</label><input class="ca-o-loc" placeholder="Ví dụ: mua băng keo cho tiệm" @bind="_ghiChuXacNhan" /></div>
+                            }
+                        }
+                    </div>
+                    <div class="xac-nhan-o"><button class="nut-nho chinh" disabled="@(_dangGui || _tienQuanLyDem == null)" @onclick="XacNhanLechAsync">@(_dangGui ? "Đang xác nhận…" : "Xác nhận đóng ca")</button><button class="nut-nho" disabled="@_dangGui" @onclick="QuayLaiChonKetQua">Quay lại</button></div>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private CaLamViecDto _ca;            // ca đang mở của nv
+    private List<CaLamViecDto> _dsCa;    // STAFF: ca của mình; quản lý: ca của chi nhánh
+    private const int SoCaMoiTrang = 5;
+    private int _trangCa = 1;
+    private decimal _tienDauCa = 200000;
+    private decimal _tienDemDuoc = 0;
+    private bool _dangTai = true;
+    private bool _dangGui = false;
+    private string _loi;
+    private string _thongBao;
+    private List<CaLamViecDto> _dsChoXacNhan;
+    private CaLamViecDto _caXacNhan;
+    private bool _dangXuLyLech;
+    private decimal? _tienQuanLyDem;
+    private decimal _tienChi;
+    private decimal _tienBu;
+    private string _ghiChuXacNhan;
+
+    private decimal? TienQuanLyDemNhap
+    {
+        get => _tienQuanLyDem;
+        set
+        {
+            _tienQuanLyDem = value;
+            if (_caXacNhan == null || value == null) return;
+            decimal thieu = TienPhaiCo(_caXacNhan) - value.Value;
+            _tienChi = 0;
+            _tienBu = thieu > 0 ? thieu : 0;
+            _ghiChuXacNhan = "";
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await TaiTatCa();
+    }
+
+    private async Task TaiTatCa()
+    {
+        _dangTai = true;
+        if (!CeoDangXemToanChuoi())
+        {
+            await TaiCaDangMo();
+        }
+        await TaiDanhSachCa();
+        if (LaQuanLyChiNhanh()) await TaiCaChoXacNhan();
+        _dangTai = false;
+    }
+
+    private async Task TaiCaChoXacNhan()
+    {
+        try { _dsChoXacNhan = await Http.GetFromJsonAsync<List<CaLamViecDto>>("api/ca/cho-xac-nhan") ?? new(); }
+        catch { _dsChoXacNhan = new(); }
+    }
+
+    private bool LaQuanLyChiNhanh() => Phien.NguoiDung?.TenVaiTro == "BRANCH_ADMIN" || Phien.NguoiDung?.TenVaiTro == "SUPER_ADMIN";
+    private bool LaNhanVienStaff() => Phien.NguoiDung?.TenVaiTro == "STAFF";
+    private bool CeoDangXemToanChuoi() => Phien.NguoiDung?.TenVaiTro == "SUPER_ADMIN" && PhamVi.MaChiNhanh == null;
+
+    private void ChonXacNhan(CaLamViecDto ca)
+    {
+        _caXacNhan = ca;
+        _dangXuLyLech = false;
+        _tienQuanLyDem = null;
+        _tienChi = 0;
+        _tienBu = 0;
+        _ghiChuXacNhan = "";
+    }
+
+    private void BoChonXacNhan()
+    {
+        if (_dangGui) return;
+        _caXacNhan = null;
+        _dangXuLyLech = false;
+        _tienQuanLyDem = null;
+    }
+
+    private void BatDauXuLyLech()
+    {
+        _dangXuLyLech = true;
+        _tienQuanLyDem = null;
+        _tienChi = 0;
+        _tienBu = 0;
+        _ghiChuXacNhan = "";
+    }
+
+    private void QuayLaiChonKetQua()
+    {
+        _dangXuLyLech = false;
+        _tienQuanLyDem = null;
+        _tienChi = 0;
+        _tienBu = 0;
+        _ghiChuXacNhan = "";
+    }
+
+    private async Task XacNhanKhopAsync()
+    {
+        if (_caXacNhan == null) return;
+        await GuiXacNhanCaAsync(TienPhaiCo(_caXacNhan), 0, 0, null);
+    }
+
+    private async Task XacNhanLechAsync()
+    {
+        if (_caXacNhan == null || _tienQuanLyDem == null) return;
+        await GuiXacNhanCaAsync(_tienQuanLyDem.Value, _tienChi, _tienBu, _ghiChuXacNhan);
+    }
+
+    private async Task GuiXacNhanCaAsync(decimal tienQuanLyDem, decimal tienChi, decimal tienBu, string ghiChu)
+    {
+        _loi = null; _thongBao = null;
+        _dangGui = true;
+        var res = await Http.PostAsJsonAsync("api/ca/" + _caXacNhan.MaCa + "/xac-nhan",
+            new XacNhanCaRequest { TienQuanLyDemCuoiCa = tienQuanLyDem, TienChi = tienChi, TienBu = tienBu, GhiChu = ghiChu });
+        if (res.IsSuccessStatusCode)
+        {
+            _thongBao = "Đã kiểm đếm và xác nhận ca của " + _caXacNhan.TenNhanVien + ".";
+            _caXacNhan = null;
+            _dangXuLyLech = false;
+            _tienQuanLyDem = null;
+            await TaiTatCa();
+        }
+        else
+        {
+            var loi = await res.Content.ReadFromJsonAsync<ApiError>();
+            _loi = loi.Message;
+        }
+        _dangGui = false;
+    }
+
+    // GET api/ca/dang-mo — trả 204 nếu chưa mở ca nào
+    private async Task TaiCaDangMo()
+    {
+        try
+        {
+            var res = await Http.GetAsync("api/ca/dang-mo");
+            if (res.StatusCode == System.Net.HttpStatusCode.OK)
+            {
+                _ca = await res.Content.ReadFromJsonAsync<CaLamViecDto>();
+                // Gợi ý sẵn số tiền đúng để nhân viên chỉ việc sửa nếu lệch
+                if (_tienDemDuoc == 0) _tienDemDuoc = _ca.TienDauCa + _ca.DoanhThuTrongCa;
+            }
+            else
+            {
+                _ca = null;
+            }
+        }
+        catch
+        {
+            _loi = "Không kết nối được máy chủ API. Kiểm tra PhotocopyApi đã chạy chưa.";
+            _ca = null;
+        }
+    }
+
+    // GET api/ca
+    private async Task TaiDanhSachCa()
+    {
+        try
+        {
+            var res = await Http.GetAsync("api/ca");
+            if (res.IsSuccessStatusCode)
+                _dsCa = await res.Content.ReadFromJsonAsync<List<CaLamViecDto>>();
+            else
+                _dsCa = new List<CaLamViecDto>();
+            if (_trangCa > TongTrangCa) _trangCa = TongTrangCa;
+        }
+        catch
+        {
+            _dsCa = new List<CaLamViecDto>();
+        }
+    }
+
+    // POST api/ca/mo
+    private async Task MoCaAsync()
+    {
+        _loi = null;
+        _thongBao = null;
+        _dangGui = true;
+        try
+        {
+            var res = await Http.PostAsJsonAsync("api/ca/mo", new MoCaRequest { TienDauCa = _tienDauCa });
+            if (res.IsSuccessStatusCode)
+            {
+                _thongBao = "Đã mở ca, giờ có thể tiếp nhận đơn và thu COD khi bàn giao.";
+                _tienDemDuoc = 0;
+            }
+            else
+            {
+                var loi = await res.Content.ReadFromJsonAsync<ApiError>();
+                _loi = loi.Message;
+            }
+        }
+        catch
+        {
+            _loi = "Không kết nối được máy chủ API.";
+        }
+        _dangGui = false;
+        await TaiTatCa();
+    }
+
+    // POST api/ca/dong — STAFF chờ xác nhận; BRANCH_ADMIN đóng xong ngay.
+    private async Task DongCaAsync()
+    {
+        _loi = null;
+        _thongBao = null;
+        _dangGui = true;
+        try
+        {
+            var res = await Http.PostAsJsonAsync("api/ca/dong", new DongCaRequest { TongDoanhThuCuoiCa = _tienDemDuoc });
+            if (res.IsSuccessStatusCode)
+            {
+                var ketQua = await res.Content.ReadFromJsonAsync<KetQuaDto>();
+                _thongBao = ketQua.Message;
+                _tienDemDuoc = 0;
+            }
+            else
+            {
+                var loi = await res.Content.ReadFromJsonAsync<ApiError>();
+                _loi = loi.Message;
+            }
+        }
+        catch
+        {
+            _loi = "Không kết nối được máy chủ API.";
+        }
+        _dangGui = false;
+        await TaiTatCa();
+    }
+
+    // ---------------------------------------------------------------- Hàm phụ cho giao diện
+
+    private int TongTrangCa => _dsCa == null || _dsCa.Count == 0
+        ? 1
+        : (int)Math.Ceiling(_dsCa.Count / (decimal)SoCaMoiTrang);
+
+    private IEnumerable<CaLamViecDto> CaTrangHienTai() => (_dsCa ?? new List<CaLamViecDto>())
+        .Skip((_trangCa - 1) * SoCaMoiTrang)
+        .Take(SoCaMoiTrang);
+
+    private void TrangCaTruoc()
+    {
+        if (_trangCa > 1) _trangCa--;
+    }
+
+    private void TrangCaSau()
+    {
+        if (_trangCa < TongTrangCa) _trangCa++;
+    }
+
+    private string MoTa()
+    {
+        string noi = PhamVi.MaChiNhanh != null ? "Chi nhánh đang chọn" : Phien.NguoiDung?.TenChiNhanh ?? "Toàn chuỗi";
+        return noi + " · 3 ca mỗi ngày: 09:00–13:00 · 13:00–17:00 · 17:00–21:00";
+    }
+
+    private string ChuLech(CaLamViecDto ca)
+    {
+        decimal? tienKiemDem = TienKiemDem(ca);
+        if (tienKiemDem == null) return "<span class=\"chu-mo\">—</span>";
+
+        decimal lech = tienKiemDem.Value - TienPhaiCo(ca);
+        if (lech == 0) return "<span class=\"nhan-mau nhan-xanh\">Khớp</span>";
+        if (lech < 0) return "<span class=\"nhan-mau nhan-do\">Thiếu " + Tien(-lech) + "</span>";
+        return "<span class=\"nhan-mau nhan-cam\">Thừa " + Tien(lech) + "</span>";
+    }
+
+    private string TenTrangThaiCa(CaLamViecDto ca)
+    {
+        if (ca.TrangThai == "DANG_MO") return "Đang mở";
+        if (ca.TrangThai == "CHO_XAC_NHAN") return "Chờ quản lý xác nhận";
+        return string.IsNullOrWhiteSpace(ca.TenNguoiXacNhan) ? "Đã đóng" : "Đã xác nhận";
+    }
+
+    private string MauTrangThaiCa(string trangThai)
+    {
+        if (trangThai == "DANG_MO") return "nhan-accent";
+        if (trangThai == "CHO_XAC_NHAN") return "nhan-cam";
+        return "nhan-xanh";
+    }
+
+    private static decimal TienPhaiCo(CaLamViecDto ca) => ca.TienDauCa + ca.DoanhThuTrongCa;
+
+    // Sau khi quản lý đã duyệt, bảng lịch sử phải dùng số quản lý kiểm đếm;
+    // lúc còn chờ duyệt thì vẫn giữ số nhân viên khai để phục vụ đối chiếu/audit.
+    private static decimal? TienKiemDem(CaLamViecDto ca) => ca.TienQuanLyDemCuoiCa ?? ca.TongDoanhThuCuoiCa;
+
+    // Blazor WebAssembly chỉ tải sẵn vài ngôn ngữ, KHÔNG có vi-VN — để mặc định thì ra "20,500".
+    // Nên tự khai dấu phân cách hàng nghìn là dấu chấm cho đúng kiểu Việt Nam.
+    private static readonly System.Globalization.NumberFormatInfo KieuSoVietNam =
+        new System.Globalization.NumberFormatInfo { NumberGroupSeparator = ".", NumberDecimalSeparator = "," };
+
+    // 20500 → "20.500₫"
+    private string Tien(decimal soTien)
+    {
+        return soTien.ToString("#,##0", KieuSoVietNam) + "₫";
+    }
+}

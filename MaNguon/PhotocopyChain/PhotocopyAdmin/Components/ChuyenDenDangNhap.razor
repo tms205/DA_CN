@@ -1,0 +1,10 @@
+@inject NavigationManager Nav
+
+@code {
+    protected override void OnInitialized()
+    {
+        var dangMo = Nav.ToBaseRelativePath(Nav.Uri);
+        var url = string.IsNullOrEmpty(dangMo) ? "dang-nhap" : $"dang-nhap?returnUrl={Uri.EscapeDataString(dangMo)}";
+        Nav.NavigateTo(url, replace: true);
+    }
+}

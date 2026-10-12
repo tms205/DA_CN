@@ -1,0 +1,407 @@
+@page "/don-hang-trong-ca"
+@attribute [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
+@using Microsoft.AspNetCore.SignalR.Client
+@using PhotocopyShared.Dtos.DonHang
+@inject HttpClient Http
+@inject PhienDangNhap Phien
+@inject PhamViChiNhanh PhamVi
+@implements IAsyncDisposable
+
+<PageTitle>Lịch sử đơn hàng theo ca · PhotocopyChain</PageTitle>
+
+<TieuDeTrang TieuDe="Lịch sử đơn hàng theo ca" MoTa="@MoTa()">
+    <button class="nut-nho" disabled="@_dangTai" @onclick="TaiTatCa">
+        @((MarkupString)Svg.TaiLai()) Làm mới
+    </button>
+</TieuDeTrang>
+
+<div class="than-trang khoi-doc">
+    @if (_loi != null)
+    {
+        <div class="o-loi">@((MarkupString)Svg.ChamThan())<span>@_loi</span></div>
+    }
+
+    <div class="the ca-bo-loc">
+        <div class="ca-loc-luoi @(LaStaff ? "ca-loc-staff" : "")">
+            <label class="truong">
+                <span class="nhan">Từ ngày</span>
+                <input class="ca-o-loc mono" inputmode="numeric" maxlength="10"
+                       placeholder="dd/MM/yyyy" @bind="_tuNgayText" />
+            </label>
+            <label class="truong">
+                <span class="nhan">Đến ngày</span>
+                <input class="ca-o-loc mono" inputmode="numeric" maxlength="10"
+                       placeholder="dd/MM/yyyy" @bind="_denNgayText" />
+            </label>
+            <label class="truong ca-loc-tim">
+                <span class="nhan">Mã đơn hoặc khách hàng</span>
+                <input class="ca-o-loc" placeholder="VD: DH00006 hoặc Nguyễn Văn…" @bind="_tuKhoa" />
+            </label>
+            @if (!LaStaff)
+            {
+                <label class="truong">
+                    <span class="nhan">Nhân viên tiếp nhận</span>
+                    <select class="ca-o-loc" @bind="_maNhanVien">
+                        <option value="">Tất cả nhân viên</option>
+                        @foreach (var nhanVien in DanhSachNhanVien())
+                        {
+                            <option value="@nhanVien.MaNhanVien">@nhanVien.TenNhanVien</option>
+                        }
+                    </select>
+                </label>
+            }
+            <label class="truong">
+                <span class="nhan">Thanh toán</span>
+                <select class="ca-o-loc" @bind="_phuongThuc">
+                    <option value="">Tất cả</option>
+                    <option value="VIETQR">VietQR</option>
+                    <option value="COD">COD · trả khi nhận</option>
+                </select>
+            </label>
+            <label class="truong">
+                <span class="nhan">Trạng thái đơn</span>
+                <select class="ca-o-loc" @bind="_trangThai">
+                    <option value="">Tất cả</option>
+                    <option value="CHO_XAC_NHAN">Chờ tiếp nhận</option>
+                    <option value="DA_XAC_NHAN">Đã tiếp nhận</option>
+                    <option value="DANG_IN">Đang in</option>
+                    <option value="DA_IN">Đã in xong</option>
+                    <option value="DANG_GIAO">Đang giao</option>
+                    <option value="DA_GIAO">Đã giao</option>
+                    <option value="HOAN_THANH">Hoàn thành</option>
+                    <option value="DA_HUY">Đã hủy</option>
+                </select>
+            </label>
+        </div>
+
+        <div class="ca-loc-hanh-dong">
+            <span class="nv-phu">
+                @(LaStaff
+                    ? "Chỉ hiển thị đơn do chính bạn tiếp nhận · mặc định 30 ngày gần nhất."
+                    : "Mặc định hiển thị lịch sử 30 ngày gần nhất.")
+            </span>
+            <div>
+                <button class="nut-nho" disabled="@_dangTai" @onclick="DatLaiBoLoc">Đặt lại</button>
+                <button class="nut-nho chinh" disabled="@_dangTai" @onclick="ApDungBoLoc">
+                    @(_dangTai ? "Đang tải…" : "Tra cứu")
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="the the-bang">
+        <div class="bang-tieu-de ca-thanh-don">
+            <div>
+                <h2>Kết quả đơn hàng theo ca</h2>
+                <div class="bang-mo-ta">@MoTaKhoangNgay() · mỗi đơn một dòng · @SoDongMoiTrang dòng mỗi trang</div>
+            </div>
+            <div class="ca-ket-qua-tom-tat">
+                <span class="nhan-mau nhan-xanh">@(_dsDonTrongCa?.Count ?? 0) đơn</span>
+                <b class="mono">@Tien((_dsDonTrongCa ?? new List<DonHangTrongCaDto>()).Sum(x => x.SoTien))</b>
+            </div>
+        </div>
+
+        @if (_dangTai)
+        {
+            <div class="bang-trong">Đang tải lịch sử đơn hàng…</div>
+        }
+        else if (_dsDonTrongCa == null || _dsDonTrongCa.Count == 0)
+        {
+            <div class="bang-trong">Không có đơn nào khớp với bộ lọc này.</div>
+        }
+        else
+        {
+            <div class="bang-cuon">
+                <table role="table" class="bang">
+                    <thead>
+                        <tr>
+                            <th scope="col">Mã đơn</th>
+                            <th scope="col">Khách hàng</th>
+                            <th scope="col">@(LaStaff ? "Ca làm việc" : "Nhân viên / ca")</th>
+                            <th scope="col">Thanh toán</th>
+                            <th scope="col">Thời gian</th>
+                            <th scope="col">Số tiền</th>
+                            <th scope="col">Trạng thái đơn</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var don in DonCuaTrangHienTai())
+                        {
+                            <tr>
+                                <td class="mono" data-nhan="Mã đơn"><b>@don.MaDonHangHienThi</b></td>
+                                <td data-nhan="Khách hàng">@don.TenKhachHang</td>
+                                <td data-nhan="@(LaStaff ? "Ca làm việc" : "Nhân viên / ca")">
+                                    @if (!LaStaff)
+                                    {
+                                        <b>@don.TenNhanVien</b>
+                                    }
+                                    <div class="@(LaStaff ? "" : "nv-phu")">Ca #@don.MaCa · mở @don.GioMoCa.ToString("HH:mm dd/MM")</div>
+                                    @if (LaSuperAdmin)
+                                    {
+                                        <div class="nv-phu">@don.TenChiNhanh</div>
+                                    }
+                                </td>
+                                <td data-nhan="Thanh toán">
+                                    <span class="nhan-mau @(don.PhuongThuc == "VIETQR" ? "nhan-xanh" : "nhan-accent")">
+                                        @(don.PhuongThuc == "VIETQR" ? "VietQR" : "COD · trả khi nhận")
+                                    </span>
+                                </td>
+                                <td data-nhan="Thời gian">
+                                    <b>@don.NgayThanhToan.ToString("HH:mm")</b>
+                                    <div class="nv-phu">@don.NgayThanhToan.ToString("dd/MM/yyyy")</div>
+                                </td>
+                                <td class="mono" data-nhan="Số tiền"><b>@Tien(don.SoTien)</b></td>
+                                <td data-nhan="Trạng thái đơn"><span class="nhan-mau @MauTrangThaiDon(don.TrangThaiDonHang)">@TenTrangThaiDon(don.TrangThaiDonHang)</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="ca-phan-trang">
+                <span>Trang @_trangDon / @TongTrangDon · @_dsDonTrongCa.Count đơn</span>
+                <div class="ca-nut-trang">
+                    <button class="nut-nho" disabled="@(_trangDon == 1)" @onclick="TrangDonTruoc">← Trước</button>
+                    <button class="nut-nho" disabled="@(_trangDon == TongTrangDon)" @onclick="TrangDonSau">Sau →</button>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<DonHangTrongCaDto> _tatCaDon = new();
+    private List<DonHangTrongCaDto> _dsDonTrongCa = new();
+    private const int SoDongMoiTrang = 5;
+    private int _trangDon = 1;
+    private bool _dangTai = true;
+    private string _loi;
+    private HubConnection _ketNoi;
+
+    private string _tuNgayText = DateTime.Today.AddDays(-30).ToString("dd/MM/yyyy");
+    private string _denNgayText = DateTime.Today.ToString("dd/MM/yyyy");
+    private string _tuKhoa = "";
+    private string _maNhanVien = "";
+    private string _phuongThuc = "";
+    private string _trangThai = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await TaiTatCa();
+        await NoiRealtime();
+    }
+
+    private async Task TaiTatCa()
+    {
+        _dangTai = true;
+        _loi = null;
+
+        if (!ThuNgay(out DateTime tuNgay, out DateTime denNgay))
+        {
+            _dangTai = false;
+            return;
+        }
+
+        try
+        {
+            string url = "api/ca/don-hang/lich-su?tuNgay=" + tuNgay.ToString("yyyy-MM-dd")
+                + "&denNgay=" + denNgay.ToString("yyyy-MM-dd");
+            var res = await Http.GetAsync(url);
+
+            if (res.IsSuccessStatusCode)
+                _tatCaDon = await res.Content.ReadFromJsonAsync<List<DonHangTrongCaDto>>() ?? new();
+            else
+            {
+                _tatCaDon = new();
+                _loi = "Không tải được lịch sử đơn hàng trong khoảng ngày đã chọn.";
+            }
+        }
+        catch
+        {
+            _tatCaDon = new();
+            _loi = "Không kết nối được máy chủ API.";
+        }
+
+        LocDuLieu();
+        _dangTai = false;
+    }
+
+    private async Task ApDungBoLoc()
+    {
+        _trangDon = 1;
+        await TaiTatCa();
+    }
+
+    private async Task DatLaiBoLoc()
+    {
+        _tuNgayText = DateTime.Today.AddDays(-30).ToString("dd/MM/yyyy");
+        _denNgayText = DateTime.Today.ToString("dd/MM/yyyy");
+        _tuKhoa = "";
+        _maNhanVien = "";
+        _phuongThuc = "";
+        _trangThai = "";
+        _trangDon = 1;
+        await TaiTatCa();
+    }
+
+    private bool ThuNgay(out DateTime tuNgay, out DateTime denNgay)
+    {
+        bool tuNgayHopLe = DateTime.TryParseExact(_tuNgayText, "dd/MM/yyyy",
+            System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out tuNgay);
+        bool denNgayHopLe = DateTime.TryParseExact(_denNgayText, "dd/MM/yyyy",
+            System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out denNgay);
+
+        if (!tuNgayHopLe || !denNgayHopLe)
+        {
+            _loi = "Ngày phải nhập đúng định dạng dd/MM/yyyy, ví dụ 21/09/2026.";
+            return false;
+        }
+
+        if (tuNgay > denNgay)
+        {
+            _loi = "Từ ngày không được lớn hơn đến ngày.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private void LocDuLieu()
+    {
+        IEnumerable<DonHangTrongCaDto> ketQua = _tatCaDon;
+        string tuKhoa = (_tuKhoa ?? "").Trim();
+
+        if (tuKhoa.Length > 0)
+        {
+            ketQua = ketQua.Where(x =>
+                x.MaDonHangHienThi.Contains(tuKhoa, StringComparison.OrdinalIgnoreCase)
+                || x.TenKhachHang.Contains(tuKhoa, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (int.TryParse(_maNhanVien, out int maNhanVien))
+            ketQua = ketQua.Where(x => x.MaNhanVien == maNhanVien);
+
+        if (!string.IsNullOrWhiteSpace(_phuongThuc))
+            ketQua = ketQua.Where(x => x.PhuongThuc == _phuongThuc);
+
+        if (!string.IsNullOrWhiteSpace(_trangThai))
+            ketQua = ketQua.Where(x => x.TrangThaiDonHang == _trangThai);
+
+        _dsDonTrongCa = ketQua
+            .OrderByDescending(x => x.NgayThanhToan)
+            .ThenByDescending(x => x.MaDonHang)
+            .ToList();
+        if (_trangDon > TongTrangDon) _trangDon = TongTrangDon;
+    }
+
+    private IEnumerable<DonHangTrongCaDto> DanhSachNhanVien()
+    {
+        return _tatCaDon
+            .GroupBy(x => x.MaNhanVien)
+            .Select(x => x.First())
+            .OrderBy(x => x.TenNhanVien);
+    }
+
+    private int TongTrangDon => _dsDonTrongCa.Count == 0
+        ? 1
+        : (int)Math.Ceiling(_dsDonTrongCa.Count / (decimal)SoDongMoiTrang);
+
+    private IEnumerable<DonHangTrongCaDto> DonCuaTrangHienTai()
+    {
+        return _dsDonTrongCa.Skip((_trangDon - 1) * SoDongMoiTrang).Take(SoDongMoiTrang);
+    }
+
+    private void TrangDonTruoc()
+    {
+        if (_trangDon > 1) _trangDon--;
+    }
+
+    private void TrangDonSau()
+    {
+        if (_trangDon < TongTrangDon) _trangDon++;
+    }
+
+    private string TenTrangThaiDon(string trangThai)
+    {
+        if (trangThai == "CHO_XAC_NHAN") return "Chờ tiếp nhận";
+        if (trangThai == "DA_XAC_NHAN") return "Đã tiếp nhận";
+        if (trangThai == "DANG_IN") return "Đang in";
+        if (trangThai == "DA_IN") return "Đã in xong";
+        if (trangThai == "DANG_GIAO") return "Đang giao";
+        if (trangThai == "DA_GIAO") return "Đã giao";
+        if (trangThai == "GIAO_THAT_BAI") return "Giao thất bại";
+        if (trangThai == "HOAN_THANH") return "Hoàn thành";
+        if (trangThai == "DA_HUY") return "Đã hủy";
+        return trangThai.Replace('_', ' ').ToLower();
+    }
+
+    private string MauTrangThaiDon(string trangThai)
+    {
+        if (trangThai == "HOAN_THANH" || trangThai == "DA_GIAO") return "nhan-xanh";
+        if (trangThai == "DA_HUY" || trangThai == "GIAO_THAT_BAI") return "nhan-do";
+        if (trangThai == "CHO_XAC_NHAN" || trangThai == "DA_XAC_NHAN") return "nhan-cam";
+        if (trangThai == "DANG_IN" || trangThai == "DA_IN" || trangThai == "DANG_GIAO") return "nhan-accent";
+        return "nhan-xam";
+    }
+
+    private string MoTaKhoangNgay()
+    {
+        if (!ThuNgay(out DateTime tuNgay, out DateTime denNgay)) return "Khoảng ngày chưa hợp lệ";
+        return "Từ " + tuNgay.ToString("dd/MM/yyyy") + " đến " + denNgay.ToString("dd/MM/yyyy");
+    }
+
+    private string MoTa()
+    {
+        if (LaStaff)
+            return (Phien.NguoiDung?.TenChiNhanh ?? "Chi nhánh") + " · các đơn do chính bạn tiếp nhận";
+        string noi = PhamVi.MaChiNhanh != null ? "Chi nhánh đang chọn" : Phien.NguoiDung?.TenChiNhanh ?? "Toàn chuỗi";
+        return noi + " · tra cứu đơn đã thanh toán theo nhân viên và ca làm việc";
+    }
+
+    private bool LaStaff => Phien.NguoiDung?.TenVaiTro == "STAFF";
+    private bool LaSuperAdmin => Phien.NguoiDung?.TenVaiTro == "SUPER_ADMIN";
+
+    private async Task NoiRealtime()
+    {
+        try
+        {
+            string diaChiHub = Http.BaseAddress + "hubs/cap-nhat?access_token=" + Uri.EscapeDataString(Phien.AccessToken);
+            _ketNoi = new HubConnectionBuilder().WithUrl(diaChiHub).WithAutomaticReconnect().Build();
+            _ketNoi.On<TinCapNhatCa>("OrderCreated", async tin => await NhanTinMoi());
+            _ketNoi.On<TinCapNhatCa>("PaymentConfirmed", async tin => await NhanTinMoi());
+            _ketNoi.On<TinCapNhatCa>("OrderStatusChanged", async tin => await NhanTinMoi());
+            await _ketNoi.StartAsync();
+        }
+        catch
+        {
+            // Mất real-time thì nút Làm mới vẫn dùng được.
+        }
+    }
+
+    private async Task NhanTinMoi()
+    {
+        _trangDon = 1;
+        await TaiTatCa();
+        StateHasChanged();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_ketNoi != null) await _ketNoi.DisposeAsync();
+    }
+
+    public class TinCapNhatCa
+    {
+        public int MaDonHang { get; set; }
+    }
+
+    private static readonly System.Globalization.NumberFormatInfo KieuSoVietNam =
+        new System.Globalization.NumberFormatInfo { NumberGroupSeparator = ".", NumberDecimalSeparator = "," };
+
+    private string Tien(decimal soTien)
+    {
+        return soTien.ToString("#,##0", KieuSoVietNam) + "₫";
+    }
+}

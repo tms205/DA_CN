@@ -1,0 +1,171 @@
+@page "/dang-nhap"
+@layout TrongLayout
+@attribute [AllowAnonymous]
+@inject HttpClient Http
+@inject PhienDangNhap Phien
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Đăng nhập · PhotocopyChain</PageTitle>
+
+@* Bố cục thẻ đăng nhập giữa màn hình theo Gentelella, giữ màu thương hiệu. *@
+<main class="dn-trang">
+    <section class="dn-form-khung" aria-labelledby="dn-tieu-de">
+        <div class="dn-form-thuong-hieu">
+            <div class="dn-form-logo">@((MarkupString)Svg.MayIn(19))</div>
+            <div><strong>PhotocopyChain</strong><span>Quản trị chuỗi chi nhánh</span></div>
+        </div>
+        <div class="dn-tieu-de">
+            <h1 id="dn-tieu-de">Chào mừng trở lại</h1>
+            <p>Đăng nhập bằng tài khoản nhân sự được cấp.</p>
+        </div>
+
+        @if (_loi != null)
+        {
+            <div class="o-loi">@((MarkupString)Svg.ChamThan())<span>@_loi</span></div>
+        }
+
+        <EditForm Model="_form" OnValidSubmit="DangNhapAsync" class="dn-form">
+            <DataAnnotationsValidator />
+
+            <div class="truong">
+                <label class="nhan" for="tai-khoan">Email hoặc số điện thoại</label>
+                <div class="o-nhap">
+                    <span class="o-icon">@((MarkupString)Svg.Thu())</span>
+                    <InputText id="tai-khoan" @bind-Value="_form.TaiKhoan" placeholder="ten@photocopy.vn" autocomplete="username" />
+                    @if (TaiKhoanHopLe())
+                    {
+                        <span class="o-dung">@((MarkupString)Svg.DauTich())</span>
+                    }
+                </div>
+                <ValidationMessage For="() => _form.TaiKhoan" class="loi-truong" />
+            </div>
+
+            <div class="truong">
+                <label class="nhan" for="mat-khau">Mật khẩu</label>
+                <div class="o-nhap">
+                    <span class="o-icon">@((MarkupString)Svg.Khoa(18))</span>
+                    <InputText id="mat-khau" type="@(_hienMatKhau ? "text" : "password")" @bind-Value="_form.MatKhau"
+                               placeholder="••••••••" autocomplete="current-password" />
+                    <button type="button" class="o-nut-mat" title="@(_hienMatKhau ? "Ẩn mật khẩu" : "Hiện mật khẩu")"
+                            @onclick="DoiHienMatKhau">
+                        @((MarkupString)(_hienMatKhau ? Svg.MatGach() : Svg.Mat()))
+                    </button>
+                </div>
+                <ValidationMessage For="() => _form.MatKhau" class="loi-truong" />
+            </div>
+
+            <div class="dn-hang">
+                <label class="hop-chon">
+                    <InputCheckbox @bind-Value="_form.GhiNho" />
+                    <span class="o-vuong">@((MarkupString)Svg.DauTich(11))</span>
+                    Ghi nhớ trong 8 giờ
+                </label>
+                <a href="quen-mat-khau" class="lien-ket">Quên mật khẩu?</a>
+            </div>
+
+            <button type="submit" class="nut-chinh" disabled="@_dangGui">
+                @if (_dangGui)
+                {
+                    <span>Đang đăng nhập…</span>
+                }
+                else
+                {
+                    <span>Đăng nhập</span>
+                    @((MarkupString)Svg.MuiTenPhai())
+                }
+            </button>
+        </EditForm>
+
+        <div class="dn-hoac"><span></span>hoặc<span></span></div>
+
+        <button type="button" class="nut-phu" @onclick="GoogleChuaHoTro">
+            @((MarkupString)Svg.Google)
+            <span>Google công vụ</span>
+        </button>
+
+        <details class="dn-chinh-sach">
+            <summary>@((MarkupString)Svg.Khoa(14)) Chính sách đăng nhập</summary>
+            <p>Sai mật khẩu quá 5 lần liên tiếp sẽ khóa tạm tài khoản 15 phút. Tài khoản đang bị khóa bị từ chối đăng nhập.</p>
+        </details>
+
+        <div class="dn-ho-tro">Cần hỗ trợ truy cập? <strong>Liên hệ quản trị viên</strong></div>
+    </section>
+
+    <p class="dn-chan">Khách hàng và Shipper sử dụng <strong>PhotocopyChain App</strong></p>
+</main>
+
+@code {
+    // Trang nào đòi đăng nhập thì chuyển về đây kèm ?returnUrl=... — đăng nhập xong quay lại đúng trang đó
+    [SupplyParameterFromQuery] public string ReturnUrl { get; set; }
+
+    // Dữ liệu 2 ô nhập. DangNhapRequest có sẵn [Required] nên EditForm tự báo "Vui lòng nhập..."
+    private DangNhapRequest _form = new DangNhapRequest { GhiNho = true };
+    private string _loi;              // câu lỗi hiện trong hộp đỏ
+    private bool _dangGui = false;    // đang chờ API trả lời thì khóa nút
+    private bool _hienMatKhau = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Đã đăng nhập rồi thì không cần ở lại màn này
+        await Phien.GetAuthenticationStateAsync();
+        if (Phien.NguoiDung != null)
+            Nav.NavigateTo(DiemDen(), replace: true);
+    }
+
+    // Bấm nút Đăng nhập (chỉ chạy khi 2 ô đã nhập đủ)
+    private async Task DangNhapAsync()
+    {
+        _loi = null;
+        _dangGui = true;
+        try
+        {
+            // Web gọi /api/auth/admin/login — API tự từ chối Khách hàng và Shipper
+            var res = await Http.PostAsJsonAsync("api/auth/admin/login", _form);
+            if (res.IsSuccessStatusCode)
+            {
+                var ketQua = await res.Content.ReadFromJsonAsync<DangNhapResponse>();
+                await Phien.DangNhap(ketQua, _form.GhiNho);
+                Nav.NavigateTo(DiemDen(), replace: true);
+            }
+            else
+            {
+                // API luôn trả lỗi dạng { "message": "..." }
+                var loi = await res.Content.ReadFromJsonAsync<ApiError>();
+                _loi = loi.Message;
+            }
+        }
+        catch
+        {
+            _loi = "Không kết nối được máy chủ API. Kiểm tra PhotocopyApi đã chạy chưa.";
+        }
+        _dangGui = false;
+    }
+
+    // Hiện dấu tích xanh khi ô tài khoản trông giống email hoặc số điện thoại 10 số
+    private bool TaiKhoanHopLe()
+    {
+        string tk = _form.TaiKhoan.Trim();
+        bool laEmail = System.Text.RegularExpressions.Regex.IsMatch(tk, @"^[^@\s]+@[^@\s]+\.[^@\s]+$");
+        bool laSdt = System.Text.RegularExpressions.Regex.IsMatch(tk, @"^0\d{9}$");
+        return laEmail || laSdt;
+    }
+
+    private void DoiHienMatKhau()
+    {
+        _hienMatKhau = !_hienMatKhau;
+    }
+
+    // Chỉ quay về đường dẫn trong web mình — chặn returnUrl trỏ sang trang web khác (lừa đảo)
+    private string DiemDen()
+    {
+        if (string.IsNullOrEmpty(ReturnUrl)) return "";
+        if (ReturnUrl.Contains("://") || ReturnUrl.StartsWith("//") || ReturnUrl.StartsWith("dang-nhap")) return "";
+        return ReturnUrl;
+    }
+
+    private void GoogleChuaHoTro()
+    {
+        Snackbar.Add("Đăng nhập bằng Google công vụ chưa được bật ở phiên bản này.", Severity.Info);
+    }
+}

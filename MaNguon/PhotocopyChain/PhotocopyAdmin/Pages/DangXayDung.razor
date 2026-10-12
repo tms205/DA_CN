@@ -1,0 +1,40 @@
+@inject NavigationManager Nav
+
+@* Chỗ giữ chỗ cho các mục menu chưa làm — mỗi đường dẫn ghi rõ tuần dự kiến trong MaNguon/README.md. *@
+<PageTitle>@TenMuc() · PhotocopyChain</PageTitle>
+
+<TieuDeTrang TieuDe="@TenMuc()" MoTa="Chức năng đang xây dựng" />
+
+<div class="than-trang">
+    <div class="the">
+        <h2 class="the-tieu-de">Đang xây dựng</h2>
+        <p class="the-mo-ta">Màn <b>@TenMuc()</b> dự kiến hoàn thành ở <b>@TuanDuKien()</b> theo kế hoạch trong <span class="mono">MaNguon/README.md</span>.</p>
+    </div>
+</div>
+
+@code {
+    // Đường dẫn đang mở, vd "ban-giao"
+    private string DuongDan()
+    {
+        return Nav.ToBaseRelativePath(Nav.Uri).Split('?')[0];
+    }
+
+    private string TenMuc()
+    {
+        string dd = DuongDan();
+        if (dd == "kho-file") return "Kho file in";
+        if (dd == "doi-soat-cod") return "Đối soát COD";
+        if (dd == "kho-vat-tu") return "Kho vật tư";
+        if (dd == "bang-gia") return "Bảng giá in ấn";
+        if (dd == "phe-duyet") return "Phê duyệt";
+        if (dd == "bao-cao") return "Báo cáo doanh thu";
+        return "Chức năng";
+    }
+
+    private string TuanDuKien()
+    {
+        string dd = DuongDan();
+        if (dd == "kho-file") return "Tuần 3 (nếu kịp)";
+        return "Tuần 3";
+    }
+}

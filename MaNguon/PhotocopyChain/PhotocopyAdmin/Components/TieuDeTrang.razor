@@ -1,0 +1,18 @@
+@* Thanh tiêu đề trắng cao 62px ở đầu mỗi trang (Figma HangDoiDon). *@
+<header class="tieu-de-trang">
+    <div class="tdt-chu">
+        <h1>@TieuDe</h1>
+        @if (!string.IsNullOrEmpty(MoTa))
+        {
+            <p>@MoTa</p>
+        }
+    </div>
+    <div class="tdt-gian"></div>
+    @ChildContent
+</header>
+
+@code {
+    [Parameter, EditorRequired] public string TieuDe { get; set; } = "";
+    [Parameter] public string MoTa { get; set; }
+    [Parameter] public RenderFragment ChildContent { get; set; }
+}

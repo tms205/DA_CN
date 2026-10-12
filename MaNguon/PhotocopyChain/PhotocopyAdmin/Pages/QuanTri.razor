@@ -1,0 +1,360 @@
+@page "/quan-tri"
+@attribute [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN")]
+@inject HttpClient Http
+@inject PhienDangNhap Phien
+
+<PageTitle>Chi nhánh & máy in · PhotocopyChain</PageTitle>
+
+<TieuDeTrang TieuDe="Chi nhánh & máy in" MoTa="Quản lý mạng lưới chi nhánh, thiết bị in ấn và danh mục khách hàng toàn hệ thống" />
+
+<div class="than-trang khoi-doc">
+    @if (_loi != null)
+    {
+        <div class="o-loi">
+            @((MarkupString)Svg.ChamThan())
+            <span>@_loi</span>
+        </div>
+    }
+    @if (_thongBao != null)
+    {
+        <div class="o-thanh-cong the-rong">
+            @((MarkupString)Svg.DauTich(16))
+            <span>@_thongBao</span>
+        </div>
+    }
+
+    <div class="the the-bang">
+        <div class="bang-tieu-de">
+            <div>
+                <h2>Mạng lưới chi nhánh & vùng phục vụ</h2>
+                <p class="bang-mo-ta">Danh sách cơ sở và khu vực phục vụ trong chuỗi.</p>
+            </div>
+            <span class="bang-dem">@(_chiNhanh?.Count ?? 0) chi nhánh</span>
+        </div>
+        @if (_chiNhanh != null)
+        {
+            <div class="bang-cuon">
+                <table role="table" class="bang">
+                    <thead>
+                        <tr>
+                            <th scope="col">Chi nhánh</th>
+                            <th scope="col">Hotline liên hệ</th>
+                            <th scope="col">Thời gian mở cửa</th>
+                            <th scope="col">Bán kính giao hàng</th>
+                            <th scope="col">Trạng thái hoạt động</th>
+                            <th scope="col" class="cot-hanh-dong">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (ChiNhanhQuanTriDto c in _chiNhanh)
+                        {
+                            <tr>
+                                <td data-nhan="Chi nhánh">
+                                    <b>@c.TenChiNhanh</b>
+                                    <div class="nv-phu">@c.DiaChi</div>
+                                </td>
+                                <td data-nhan="Hotline liên hệ">
+                                    <span class="mono">@c.SoDienThoai</span>
+                                </td>
+                                <td data-nhan="Thời gian mở cửa">@Gio(c.GioMoCua) – @Gio(c.GioDongCua)</td>
+                                <td class="mono" data-nhan="Bán kính giao hàng">
+                                    <b>@c.BanKinhGiao</b> km
+                                </td>
+                                <td data-nhan="Trạng thái hoạt động">
+                                    <span class="nhan-mau @(c.TrangThai == "HOAT_DONG" ? "nhan-xanh" : "nhan-xam")">
+                                        @(c.TrangThai == "HOAT_DONG" ? "Đang hoạt động" : "Tạm ngưng")
+                                    </span>
+                                </td>
+                                <td class="cot-hanh-dong" data-nhan="Thao tác">
+                                    @if (LaSuper())
+                                    {
+                                        <button class="nut-nho" title="Sửa thông tin chi nhánh" @onclick="() => ChonChiNhanh(c)">Sửa chi nhánh</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    @if (_suaChiNhanh != null)
+    {
+        <div class="the the-rong">
+            <div class="ca-dau">
+                <h2 class="the-tieu-de nho">Cập nhật thông tin chi nhánh: @_suaChiNhanh.TenChiNhanh</h2>
+                <button class="nut-dong" title="Đóng" @onclick="() => _suaChiNhanh = null">✕</button>
+            </div>
+            <div class="ca-loc-luoi">
+                <div class="truong">
+                    <label class="nhan">Tên chi nhánh</label>
+                    <input class="ca-o-loc" @bind="_suaChiNhanh.TenChiNhanh" />
+                </div>
+                <div class="truong">
+                    <label class="nhan">Điện thoại hotline</label>
+                    <input class="ca-o-loc mono" @bind="_suaChiNhanh.SoDienThoai" />
+                </div>
+                <div class="truong">
+                    <label class="nhan">Bán kính giao nhận tối đa (km)</label>
+                    <input class="ca-o-loc" type="number" step="0.5" min="0" @bind="_suaChiNhanh.BanKinhGiao" />
+                </div>
+                <div class="truong">
+                    <label class="nhan">Trạng thái vận hành</label>
+                    <select class="ca-o-loc" @bind="_suaChiNhanh.TrangThai">
+                        <option value="HOAT_DONG">Đang hoạt động</option>
+                        <option value="TAM_NGUNG">Tạm ngưng nhận đơn</option>
+                    </select>
+                </div>
+            </div>
+            <div class="truong" style="margin-top: 12px;">
+                <label class="nhan">Địa chỉ chi nhánh</label>
+                <div class="o-nhap">
+                    <input @bind="_suaChiNhanh.DiaChi" />
+                </div>
+            </div>
+            <div class="xac-nhan-o" style="margin-top: 16px;">
+                <button class="nut-chinh" @onclick="LuuChiNhanhAsync">Lưu thay đổi</button>
+                <button class="nut-phu" @onclick="() => _suaChiNhanh = null">Hủy</button>
+            </div>
+        </div>
+    }
+
+    <div class="the the-bang">
+        <div class="bang-tieu-de">
+            <div>
+                <h2>Hệ thống máy in</h2>
+                <p class="bang-mo-ta">Thiết bị, chi nhánh quản lý và trạng thái máy in.</p>
+            </div>
+            <span class="bang-dem">@(_mayIn?.Count ?? 0) thiết bị</span>
+        </div>
+        @if (_mayIn != null)
+        {
+            <div class="bang-cuon">
+                <table role="table" class="bang">
+                    <thead>
+                        <tr>
+                            <th scope="col">Tên thiết bị</th>
+                            <th scope="col">Chi nhánh</th>
+                            <th scope="col">Thông số kỹ thuật</th>
+                            <th scope="col">Tốc độ in</th>
+                            <th scope="col">Chỉ số trang in</th>
+                            <th scope="col">Trạng thái máy</th>
+                            <th scope="col" class="cot-hanh-dong">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (MayInQuanTriDto m in _mayIn)
+                        {
+                            <tr>
+                                <td data-nhan="Tên thiết bị">
+                                    <b>@m.TenMay</b>
+                                </td>
+                                <td data-nhan="Chi nhánh">@m.TenChiNhanh</td>
+                                <td data-nhan="Thông số kỹ thuật">
+                                    <div>@m.KhoGiay · @(m.InMau ? "In màu" : "Đen trắng") · @(m.In2Mat ? "2 mặt" : "1 mặt")</div>
+                                </td>
+                                <td data-nhan="Tốc độ in">
+                                    <span class="mono"><b>@m.TocDo</b> trang/phút</span>
+                                </td>
+                                <td data-nhan="Chỉ số trang in">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <input class="ca-o-loc mono" style="width: 120px; height: 38px;" type="number" min="0" @bind="m.SoTrangDaIn" />
+                                        <button class="nut-nho" title="Lưu số counter hiện tại" @onclick="() => LuuChiSoMayAsync(m)">Lưu số</button>
+                                    </div>
+                                </td>
+                                <td data-nhan="Trạng thái máy">
+                                    <span class="nhan-mau @MauMay(m.TrangThai)">@m.TrangThai</span>
+                                </td>
+                                <td class="cot-hanh-dong" data-nhan="Thao tác">
+                                    @if (m.TrangThai == "HOAT_DONG")
+                                    {
+                                        <button class="nut-nho nguy-hiem" title="Chuyển máy sang trạng thái bảo trì" @onclick="() => DoiTrangThaiMayAsync(m)">Bảo trì</button>
+                                    }
+                                    else
+                                    {
+                                        <button class="nut-nho" title="Mở lại máy để sẵn sàng in" @onclick="() => DoiTrangThaiMayAsync(m)">Mở lại</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    @if (LaSuper())
+    {
+        <div class="the the-bang">
+            <div class="bang-tieu-de">
+                <div>
+                    <h2>Danh mục khách hàng</h2>
+                    <p class="bang-mo-ta">Thông tin liên hệ và tài khoản khách hàng.</p>
+                </div>
+                <span class="bang-dem">@(_khach?.Count ?? 0) tài khoản</span>
+            </div>
+            @if (_khach != null)
+            {
+                <div class="bang-cuon">
+                    <table role="table" class="bang">
+                        <thead>
+                            <tr>
+                                <th scope="col">Khách hàng</th>
+                                <th scope="col">Số điện thoại</th>
+                                <th scope="col">Tổng đơn</th>
+                                <th scope="col">Tổng chi tiêu</th>
+                                <th scope="col">Trạng thái tài khoản</th>
+                                <th scope="col" class="cot-hanh-dong">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (KhachHangQuanTriDto k in _khach)
+                            {
+                                <tr>
+                                    <td data-nhan="Khách hàng">
+                                        <b>@k.HoTen</b>
+                                        <div class="nv-phu">@k.Email</div>
+                                    </td>
+                                    <td class="mono" data-nhan="Số điện thoại">@k.SoDienThoai</td>
+                                    <td class="mono" data-nhan="Tổng đơn"><b>@k.SoDon</b> đơn</td>
+                                    <td class="mono hd-tong" data-nhan="Tổng chi tiêu">@Tien(k.TongChiTieu)</td>
+                                    <td data-nhan="Trạng thái tài khoản">
+                                        <span class="nhan-mau @(k.TrangThai == "HOAT_DONG" ? "nhan-xanh" : "nhan-do")">
+                                            @(k.TrangThai == "HOAT_DONG" ? "Hoạt động" : "Bị khóa")
+                                        </span>
+                                    </td>
+                                    <td class="cot-hanh-dong" data-nhan="Thao tác">
+                                        @if (k.TrangThai == "KHOA")
+                                        {
+                                            <button class="nut-nho" title="Mở khóa tài khoản khách hàng" @onclick="() => DoiKhachAsync(k)">Mở khóa</button>
+                                        }
+                                        else
+                                        {
+                                            <button class="nut-nho nguy-hiem" title="Khóa tài khoản khách hàng" @onclick="() => DoiKhachAsync(k)">Khóa</button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<ChiNhanhQuanTriDto> _chiNhanh;
+    private List<MayInQuanTriDto> _mayIn;
+    private List<KhachHangQuanTriDto> _khach;
+    private ChiNhanhQuanTriDto _suaChiNhanh;
+    private string _loi;
+    private string _thongBao;
+
+    protected override async Task OnInitializedAsync() => await TaiAsync();
+
+    private bool LaSuper() => Phien.NguoiDung?.TenVaiTro == "SUPER_ADMIN";
+
+    private async Task TaiAsync()
+    {
+        try
+        {
+            _chiNhanh = await Http.GetFromJsonAsync<List<ChiNhanhQuanTriDto>>("api/quan-tri/chi-nhanh") ?? new();
+            _mayIn = await Http.GetFromJsonAsync<List<MayInQuanTriDto>>("api/quan-tri/may-in") ?? new();
+            if (LaSuper())
+                _khach = await Http.GetFromJsonAsync<List<KhachHangQuanTriDto>>("api/quan-tri/khach-hang") ?? new();
+        }
+        catch
+        {
+            _loi = "Không tải được dữ liệu quản trị.";
+        }
+    }
+
+    private void ChonChiNhanh(ChiNhanhQuanTriDto c)
+    {
+        _suaChiNhanh = new()
+        {
+            MaChiNhanh = c.MaChiNhanh,
+            TenChiNhanh = c.TenChiNhanh,
+            DiaChi = c.DiaChi,
+            SoDienThoai = c.SoDienThoai,
+            ViDo = c.ViDo,
+            KinhDo = c.KinhDo,
+            GioMoCua = c.GioMoCua,
+            GioDongCua = c.GioDongCua,
+            BanKinhGiao = c.BanKinhGiao,
+            TrangThai = c.TrangThai
+        };
+    }
+
+    private async Task LuuChiNhanhAsync()
+    {
+        var r = await Http.PutAsJsonAsync("api/quan-tri/chi-nhanh/" + _suaChiNhanh.MaChiNhanh, _suaChiNhanh);
+        if (r.IsSuccessStatusCode)
+        {
+            _thongBao = "Đã cập nhật chi nhánh.";
+            _suaChiNhanh = null;
+            await TaiAsync();
+        }
+        else
+        {
+            _loi = (await r.Content.ReadFromJsonAsync<ApiError>()).Message;
+        }
+    }
+
+    private async Task DoiMayAsync(MayInQuanTriDto m, string tt)
+    {
+        var r = await Http.PutAsJsonAsync(
+            "api/quan-tri/may-in/" + m.MaMayIn,
+            new CapNhatMayInRequest
+            {
+                TrangThai = tt,
+                SoTrangDaIn = m.SoTrangDaIn
+            });
+
+        if (r.IsSuccessStatusCode)
+            await TaiAsync();
+        else
+            _loi = (await r.Content.ReadFromJsonAsync<ApiError>()).Message;
+    }
+
+    private async Task LuuChiSoMayAsync(MayInQuanTriDto m)
+    {
+        await DoiMayAsync(m, m.TrangThai);
+        _thongBao = _loi == null ? "Đã lưu chỉ số trang của máy in." : null;
+    }
+
+    private async Task DoiTrangThaiMayAsync(MayInQuanTriDto m)
+    {
+        await DoiMayAsync(m, m.TrangThai == "HOAT_DONG" ? "BAO_TRI" : "HOAT_DONG");
+    }
+
+    private async Task DoiKhachAsync(KhachHangQuanTriDto k)
+    {
+        var r = await Http.PutAsJsonAsync(
+            "api/quan-tri/khach-hang/" + k.MaNguoiDung + "/trang-thai",
+            new CapNhatTrangThaiRequest
+            {
+                TrangThai = k.TrangThai == "KHOA" ? "HOAT_DONG" : "KHOA"
+            });
+
+        if (r.IsSuccessStatusCode)
+            await TaiAsync();
+        else
+            _loi = (await r.Content.ReadFromJsonAsync<ApiError>()).Message;
+    }
+
+    private string MauMay(string s) => s == "HOAT_DONG"
+        ? "nhan-xanh"
+        : s == "HONG" ? "nhan-do" : "nhan-cam";
+
+    private static readonly System.Globalization.NumberFormatInfo KieuSo = new()
+    {
+        NumberGroupSeparator = ".",
+        NumberDecimalSeparator = ","
+    };
+
+    private string Tien(decimal s) => s.ToString("#,##0", KieuSo) + "₫";
+    private string Gio(TimeSpan gio) => gio.ToString(@"hh\:mm");
+}

@@ -1,0 +1,308 @@
+@page "/quen-mat-khau"
+@layout TrongLayout
+@attribute [AllowAnonymous]
+@implements IDisposable
+@inject HttpClient Http
+
+<PageTitle>Quên mật khẩu · PhotocopyChain</PageTitle>
+
+<main class="qmk-trang">
+    <section class="dn-form-khung" aria-labelledby="qmk-tieu-de" aria-busy="@_dangGui">
+        <a href="dang-nhap" class="qmk-quay-lai">@((MarkupString)Svg.MuiTenTrai()) Quay lại đăng nhập</a>
+        <div class="dn-tieu-de">
+            <h1 id="qmk-tieu-de" tabindex="-1" @ref="_tieuDe">@TieuDe()</h1>
+            <p>@MoTa()</p>
+        </div>
+
+        @if (!_xong)
+        {
+            <ol class="qmk-cac-buoc" aria-label="Các bước khôi phục mật khẩu">
+                @for (int i = 1; i <= 3; i++)
+                {
+                    <li class="@(i == _buoc ? "hien-tai" : i < _buoc ? "da-xong" : "")" aria-current="@(i == _buoc ? "step" : null)">
+                        <span>@i</span>@(i == 1 ? "Email" : i == 2 ? "Xác minh" : "Mật khẩu")
+                    </li>
+                }
+            </ol>
+        }
+        @if (_loi != null)
+        {
+            <div class="o-loi" role="alert">@((MarkupString)Svg.ChamThan())<span>@_loi</span></div>
+        }
+        @if (_thongBao != null)
+        {
+            <div class="o-thanh-cong" role="status">@((MarkupString)Svg.DauTich(15))<span>@_thongBao</span></div>
+        }
+
+        @if (_xong)
+        {
+            <a href="dang-nhap" class="nut-chinh">Đăng nhập @((MarkupString)Svg.MuiTenPhai())</a>
+        }
+        else if (_buoc == 1)
+        {
+            <EditForm Model="_email" OnValidSubmit="GuiOtpAsync" class="dn-form">
+                <DataAnnotationsValidator />
+                <div class="truong">
+                    <label class="nhan" for="email">Email</label>
+                    <div class="o-nhap">
+                        <span class="o-icon">@((MarkupString)Svg.Thu())</span>
+                        <input id="email" @bind="_email.Email" @bind:event="oninput" placeholder="ten@photocopy.vn"
+                               autocomplete="username" inputmode="email" disabled="@_dangGui" />
+                    </div>
+                    <ValidationMessage For="() => _email.Email" class="loi-truong" />
+                </div>
+                <button type="submit" class="nut-chinh" disabled="@_dangGui">@(_dangGui ? "Đang gửi…" : "Gửi mã xác thực")</button>
+            </EditForm>
+            <div class="o-canh-bao">
+                <span class="o-cb-icon">@((MarkupString)Svg.ThongTin(15))</span>
+                <div>
+                    <div class="o-cb-tieu-de">Xác thực bằng email đã đăng ký</div>
+                    <div class="o-cb-noi-dung">
+                        CEO, quản lý và nhân viên đều có thể nhận mã qua email của tài khoản đang hoạt động.
+                        Mã dùng một lần, hết hạn sau 10 phút; gửi lại sau 60 giây.
+                    </div>
+                </div>
+            </div>
+        }
+        else if (_buoc == 2)
+        {
+            <p class="qmk-email">Email nhận mã: <strong>@_otp.Email</strong></p>
+            <EditForm Model="_otp" OnValidSubmit="XacMinhAsync" class="dn-form">
+                <DataAnnotationsValidator />
+                <div class="truong">
+                    <label class="nhan" for="otp">Mã OTP 6 số</label>
+                    <div class="qmk-otp">
+                        <input id="otp" @ref="_oOtp" type="text" inputmode="numeric" autocomplete="one-time-code"
+                               maxlength="6" spellcheck="false" aria-describedby="otp-goi-y"
+                               @bind:get="_otp.MaOtp" @bind:set="NhapOtp" @bind:event="oninput" disabled="@_dangGui" />
+                        <div class="qmk-otp-so" aria-hidden="true">
+                            @for (int i = 0; i < 6; i++)
+                            {
+                                <span class="@(i == Math.Min(_otp.MaOtp.Length, 5) ? "dang-nhap" : "")">@(i < _otp.MaOtp.Length ? _otp.MaOtp[i].ToString() : "")</span>
+                            }
+                        </div>
+                    </div>
+                    <small id="otp-goi-y" class="qmk-goi-y">Nhập từng số hoặc dán cả mã từ email. Mã có hiệu lực 10 phút.</small>
+                    <ValidationMessage For="() => _otp.MaOtp" class="loi-truong" />
+                </div>
+                <button type="submit" class="nut-chinh" disabled="@(_dangGui || _otp.MaOtp.Length != 6)">@(_dangGui ? "Đang xác minh…" : "Xác minh mã OTP")</button>
+                <div class="qmk-hanh-dong">
+                    <button type="button" class="lien-ket" @onclick="DoiEmail" disabled="@_dangGui">Đổi email</button>
+                    <button type="button" class="lien-ket qmk-gui-lai" @onclick="GuiOtpAsync" disabled="@(_dangGui || GiayChoGuiLai > 0)">
+                        @(GiayChoGuiLai > 0 ? $"Gửi lại sau {GiayChoGuiLai}s" : "Gửi lại mã")
+                    </button>
+                </div>
+            </EditForm>
+        }
+        else
+        {
+            <EditForm Model="_matKhau" OnValidSubmit="DatLaiAsync" class="dn-form">
+                <DataAnnotationsValidator />
+                <div class="truong">
+                    <label class="nhan" for="mk-moi">Mật khẩu mới</label>
+                    <div class="o-nhap">
+                        <span class="o-icon">@((MarkupString)Svg.Khoa(18))</span>
+                        <InputText id="mk-moi" type="@(_hienMatKhau ? "text" : "password")" @bind-Value="_matKhau.MatKhauMoi"
+                                   placeholder="Nhập mật khẩu mới" autocomplete="new-password" disabled="@_dangGui" aria-describedby="mk-goi-y" />
+                        <button type="button" class="o-nut-mat" @onclick="DoiHienMatKhau" disabled="@_dangGui"
+                                aria-label="@(_hienMatKhau ? "Ẩn mật khẩu" : "Hiện mật khẩu")" aria-pressed="@_hienMatKhau">
+                            @((MarkupString)(_hienMatKhau ? Svg.MatGach() : Svg.Mat()))
+                        </button>
+                    </div>
+                    <small id="mk-goi-y" class="qmk-goi-y">@QuyTacMatKhau.ThongBao</small>
+                    <ValidationMessage For="() => _matKhau.MatKhauMoi" class="loi-truong" />
+                </div>
+                <div class="truong">
+                    <label class="nhan" for="mk-xac-nhan">Nhập lại mật khẩu mới</label>
+                    <div class="o-nhap">
+                        <span class="o-icon">@((MarkupString)Svg.Khoa(18))</span>
+                        <InputText id="mk-xac-nhan" type="@(_hienMatKhau ? "text" : "password")" @bind-Value="_matKhau.MatKhauXacNhan"
+                                   placeholder="Nhập lại để xác nhận" autocomplete="new-password" disabled="@_dangGui" />
+                    </div>
+                    <ValidationMessage For="() => _matKhau.MatKhauXacNhan" class="loi-truong" />
+                </div>
+                <button type="submit" class="nut-chinh" disabled="@_dangGui">@(_dangGui ? "Đang lưu…" : "Đặt lại mật khẩu")</button>
+                <button type="button" class="lien-ket qmk-gui-lai" @onclick="QuayLaiOtp" disabled="@_dangGui">Quay lại xác minh mã</button>
+            </EditForm>
+        }
+    </section>
+</main>
+
+@code {
+    private QuenMatKhauRequest _email = new();
+    private XacMinhOtpDatLaiRequest _otp = new();
+    private DatLaiMatKhauForm _matKhau = new();
+    private int _buoc = 1; // 1: email, 2: OTP, 3: mật khẩu mới
+    private bool _dangGui;
+    private bool _xong;
+    private bool _hienMatKhau;
+    private bool _canFocus;
+    private string _loi;
+    private string _thongBao;
+    private ElementReference _oOtp;
+    private ElementReference _tieuDe;
+    private DateTimeOffset _guiLaiLuc;
+    private readonly CancellationTokenSource _dungDongHo = new();
+
+    private int GiayChoGuiLai => Math.Max(0, (int)Math.Ceiling((_guiLaiLuc - DateTimeOffset.UtcNow).TotalSeconds));
+
+    protected override void OnInitialized() => _ = DemNguocAsync();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_canFocus) return;
+        _canFocus = false;
+        if (_buoc == 2 && !_xong) await _oOtp.FocusAsync();
+        else await _tieuDe.FocusAsync();
+    }
+
+    private async Task DemNguocAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(_dungDongHo.Token))
+            {
+                if (_buoc == 2 && !_xong) await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private string TieuDe()
+    {
+        if (_xong) return "Đã đặt lại mật khẩu";
+        if (_buoc == 1) return "Quên mật khẩu";
+        if (_buoc == 2) return "Xác minh email";
+        return "Đặt mật khẩu mới";
+    }
+
+    private string MoTa()
+    {
+        if (_xong) return "Bạn có thể đăng nhập bằng mật khẩu mới.";
+        if (_buoc == 1) return "Nhập email tài khoản để nhận mã khôi phục.";
+        if (_buoc == 2) return "Kiểm tra hộp thư và nhập mã OTP gồm 6 chữ số.";
+        return "Nhập mật khẩu mới hai lần để tránh nhập nhầm.";
+    }
+
+    private void NhapOtp(string giaTri) => _otp.MaOtp = new string((giaTri ?? "").Where(c => c >= '0' && c <= '9').Take(6).ToArray());
+    private void DoiHienMatKhau() => _hienMatKhau = !_hienMatKhau;
+
+    private void DoiEmail()
+    {
+        _buoc = 1;
+        _otp = new();
+        _matKhau = new();
+        _loi = null;
+        _thongBao = null;
+        _canFocus = true;
+    }
+
+    private void QuayLaiOtp()
+    {
+        _buoc = 2;
+        _matKhau = new();
+        _hienMatKhau = false;
+        _thongBao = null;
+        _canFocus = true;
+    }
+
+    private async Task GuiOtpAsync()
+    {
+        if (_dangGui) return;
+        _loi = null;
+        _thongBao = null;
+        _dangGui = true;
+        try
+        {
+            using var res = await Http.PostAsJsonAsync("api/auth/forgot-password", new QuenMatKhauRequest { Email = _email.Email.Trim() });
+            if (res.IsSuccessStatusCode)
+            {
+                var kq = await res.Content.ReadFromJsonAsync<OtpDaGuiDto>();
+                _thongBao = kq.Message;
+                _otp = new() { Email = _email.Email.Trim() };
+                _matKhau = new();
+                _guiLaiLuc = DateTimeOffset.UtcNow.AddSeconds(kq.GuiLaiSauGiay);
+                _buoc = 2;
+                _canFocus = true;
+            }
+            else await DocLoiAsync(res);
+        }
+        catch (HttpRequestException) { _loi = "Không kết nối được máy chủ API. Vui lòng thử lại."; }
+        catch (System.Text.Json.JsonException) { _loi = "Máy chủ trả về dữ liệu không hợp lệ. Vui lòng thử lại."; }
+        finally { _dangGui = false; }
+    }
+
+    private async Task XacMinhAsync()
+    {
+        if (_dangGui) return;
+        _loi = null;
+        _thongBao = null;
+        _dangGui = true;
+        try
+        {
+            using var res = await Http.PostAsJsonAsync("api/auth/forgot-password/verify-otp", _otp);
+            if (res.IsSuccessStatusCode)
+            {
+                _buoc = 3;
+                _matKhau = new();
+                _hienMatKhau = false;
+                _thongBao = "Email đã được xác minh. Hãy đặt mật khẩu mới.";
+                _canFocus = true;
+            }
+            else await DocLoiAsync(res);
+        }
+        catch (HttpRequestException) { _loi = "Không kết nối được máy chủ API. Vui lòng thử lại."; }
+        catch (System.Text.Json.JsonException) { _loi = "Máy chủ trả về dữ liệu không hợp lệ. Vui lòng thử lại."; }
+        finally { _dangGui = false; }
+    }
+
+    private async Task DatLaiAsync()
+    {
+        if (_dangGui || _buoc != 3) return;
+        _loi = null;
+        _thongBao = null;
+        _dangGui = true;
+        try
+        {
+            using var res = await Http.PostAsJsonAsync("api/auth/reset-password", new DatLaiMatKhauRequest
+            {
+                Email = _otp.Email, MaOtp = _otp.MaOtp, MatKhauMoi = _matKhau.MatKhauMoi
+            });
+            if (res.IsSuccessStatusCode)
+            {
+                var kq = await res.Content.ReadFromJsonAsync<KetQuaDto>();
+                _thongBao = kq.Message;
+                _xong = true;
+                _otp.MaOtp = "";
+                _matKhau = new();
+                _canFocus = true;
+            }
+            else
+            {
+                await DocLoiAsync(res);
+                if (res.StatusCode == System.Net.HttpStatusCode.BadRequest) QuayLaiOtp();
+            }
+        }
+        catch (HttpRequestException) { _loi = "Không kết nối được máy chủ API. Vui lòng thử lại."; }
+        catch (System.Text.Json.JsonException) { _loi = "Máy chủ trả về dữ liệu không hợp lệ. Vui lòng thử lại."; }
+        finally { _dangGui = false; }
+    }
+
+    private async Task DocLoiAsync(HttpResponseMessage res)
+    {
+        if (res.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+        {
+            _loi = "Thao tác quá nhanh. Vui lòng đợi rồi thử lại.";
+            return;
+        }
+        var loi = await res.Content.ReadFromJsonAsync<ApiError>();
+        _loi = loi?.Message ?? "Không xử lý được yêu cầu. Vui lòng thử lại.";
+    }
+
+    public void Dispose()
+    {
+        _dungDongHo.Cancel();
+        _dungDongHo.Dispose();
+    }
+}
