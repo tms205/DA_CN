@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../api.dart';
+import '../../kiem_tra_du_lieu.dart';
 import '../../theme.dart';
 import '../../widgets/icons.dart';
 import '../../widgets/widgets.dart';
@@ -36,12 +37,12 @@ class _DangKyScreenState extends State<DangKyScreen> {
 
   // Người dùng gõ sau ô "+84": nhận cả "906218774" lẫn "0906218774" → luôn đổi về dạng 0xxxxxxxxx
   String _sdtChuan() {
-    String so = _soDienThoai.text.replaceAll(RegExp(r'\D'), ''); // bỏ hết ký tự không phải số
+    String so = _soDienThoai.text.trim(); // Không âm thầm bỏ ký tự sai rồi đăng ký số khác.
     if (so.startsWith('0')) return so;
     return '0$so';
   }
 
-  bool _emailHopLe() => RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(_email.text.trim());
+  bool _emailHopLe() => emailGmailHopLe(_email.text.trim());
 
   bool _sdtHopLe() => RegExp(r'^0\d{9}$').hasMatch(_sdtChuan());
 
@@ -60,7 +61,7 @@ class _DangKyScreenState extends State<DangKyScreen> {
   // Kiểm tra dữ liệu trước khi gọi API. Trả về câu lỗi, hợp lệ thì trả về null.
   String? _kiemTra() {
     if (_hoTen.text.trim().isEmpty) return 'Vui lòng nhập họ và tên.';
-    if (!_emailHopLe()) return 'Email không hợp lệ.';
+    if (!_emailHopLe()) return 'Email nhập mới phải là địa chỉ @gmail.com hợp lệ.';
     if (!_sdtHopLe()) return 'Số điện thoại phải gồm 9 số sau +84 (hoặc 10 số bắt đầu bằng 0).';
     if (!RegExp(r'^(?=.*[A-Z])(?=.*\d).{8,}$').hasMatch(_matKhau.text)) {
       return 'Mật khẩu tối thiểu 8 ký tự, có chữ hoa và số.';

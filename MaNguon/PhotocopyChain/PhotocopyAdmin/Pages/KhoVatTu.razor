@@ -26,7 +26,7 @@
 
     @if (LaQuanLyChiNhanh() && _tonKho?.Count > 0)
     {
-        <div class="the the-rong">
+        <form @onsubmit="TaoPhieuAsync" @onsubmit:preventDefault class="the the-rong">
             <h2 class="the-tieu-de nho">@(LaCEO() ? "Lập và duyệt phiếu nhập vật tư" : "Đề xuất lập phiếu nhập vật tư mới")</h2>
             <div class="ca-loc-luoi">
                 <div class="truong">
@@ -40,21 +40,21 @@
                 </div>
                 <div class="truong">
                     <label class="nhan">Nhà cung cấp</label>
-                    <input class="ca-o-loc" placeholder="Tên đơn vị cung ứng" @bind="_form.NhaCungCap" />
+                    <input maxlength="150" class="ca-o-loc" placeholder="Tên đơn vị cung ứng" @bind="_form.NhaCungCap" />
                 </div>
                 <div class="truong">
                     <label class="nhan">Số lượng nhập</label>
-                    <input class="ca-o-loc" type="number" min="1" @bind="_form.SoLuong" />
+                    <input max="2147483647" required step="1" class="ca-o-loc" type="number" min="1" @bind="_form.SoLuong" />
                 </div>
                 <div class="truong">
                     <label class="nhan">Đơn giá nhập (₫)</label>
-                    <input class="ca-o-loc mono" type="number" min="0" step="1000" @bind="_form.DonGia" />
+                    <input max="999999999999" required class="ca-o-loc mono" type="number" min="0" step="1" @bind="_form.DonGia" />
                 </div>
                 <div class="truong" style="align-self: flex-end;">
-                    <button class="nut-chinh" style="width: 100%;" @onclick="TaoPhieuAsync">@(LaCEO() ? "Lập phiếu & duyệt trực tiếp" : "Gửi đề xuất CEO duyệt")</button>
+                    <button type="submit" class="nut-chinh" style="width: 100%;">@(LaCEO() ? "Lập phiếu & duyệt trực tiếp" : "Gửi đề xuất CEO duyệt")</button>
                 </div>
             </div>
-        </div>
+        </form>
     }
 
     <div class="the the-bang">
@@ -216,7 +216,8 @@
 
     private async Task TaoPhieuAsync()
     {
-        _loi = null;
+        _loi = QuyTacNhap.LayLoi(_form);
+        if (_loi != null) return;
         var r = await Http.PostAsJsonAsync("api/quan-tri/phieu-nhap", _form);
 
         if (r.IsSuccessStatusCode)

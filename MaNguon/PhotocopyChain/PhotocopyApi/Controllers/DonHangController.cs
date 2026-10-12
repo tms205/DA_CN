@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Data;
 using System.Net.Http.Headers;
 using System.Text;
@@ -284,8 +285,8 @@ public class DonHangController : ControllerBase
         string soDienThoai = (req.SoDienThoai ?? "").Trim();
         if (hoTen.Length < 2)
             return BadRequest(new { message = "Vui lòng nhập họ tên khách hàng." });
-        if (soDienThoai.Length < 9 || soDienThoai.Length > 15 || soDienThoai.Any(c => !char.IsDigit(c)))
-            return BadRequest(new { message = "Số điện thoại khách hàng không hợp lệ." });
+        if (!System.Text.RegularExpressions.Regex.IsMatch(soDienThoai, PhotocopyShared.KiemTraDuLieu.QuyTacNhap.SoDienThoai))
+            return BadRequest(new { message = PhotocopyShared.KiemTraDuLieu.QuyTacNhap.LoiSoDienThoai });
 
         using var conn = new SqlConnection(_chuoiKetNoi);
         KhachTaiQuayDto khach = await conn.QueryFirstOrDefaultAsync<KhachTaiQuayDto>(
@@ -451,7 +452,7 @@ public class DonHangController : ControllerBase
     // Khách chỉ xem được đơn của mình; nhân viên xem được đơn của chi nhánh mình; Super Admin xem tất cả.
     [HttpGet("{maDonHang}")]
     [Authorize]
-    public async Task<IActionResult> ChiTiet(int maDonHang)
+    public async Task<IActionResult> ChiTiet([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maDonHang)
     {
         int maNguoiDung = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
         string vaiTro = User.FindFirst(TenClaim.VaiTro).Value;
@@ -516,7 +517,7 @@ public class DonHangController : ControllerBase
     // GET api/don-hang/5/may-in — F-21: các máy in của chi nhánh giữ đơn, kèm cờ có in được đơn này không
     [HttpGet("{maDonHang}/may-in")]
     [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
-    public async Task<IActionResult> DanhSachMayIn(int maDonHang)
+    public async Task<IActionResult> DanhSachMayIn([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maDonHang)
     {
         using var conn = new SqlConnection(_chuoiKetNoi);
 
@@ -575,7 +576,7 @@ public class DonHangController : ControllerBase
     // POST api/don-hang/5/tiep-nhan — F-15: thợ in nhận đơn vào xử lý
     [HttpPost("{maDonHang}/tiep-nhan")]
     [Authorize(Roles = "BRANCH_ADMIN,STAFF")]
-    public async Task<IActionResult> TiepNhan(int maDonHang)
+    public async Task<IActionResult> TiepNhan([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maDonHang)
     {
         int maNhanVien = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
         int maChiNhanh = int.Parse(User.FindFirst(TenClaim.MaChiNhanh).Value);
@@ -610,7 +611,7 @@ public class DonHangController : ControllerBase
     // Phục hồi đúng dòng của đơn đã trả tiền bị mất file, không tính lại tiền hoặc đổi quy cách.
     [HttpPut("{maDonHang:int}/chi-tiet/{maChiTiet:int}/file")]
     [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
-    public async Task<IActionResult> PhucHoiFileIn(int maDonHang, int maChiTiet,
+    public async Task<IActionResult> PhucHoiFileIn([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maDonHang, [Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maChiTiet,
         PhucHoiFileInRequest req, [FromServices] TuDongInService tuDongIn)
     {
         if (req.MaFileIn <= 0) return BadRequest(new { message = "Mã file mới không hợp lệ." });
@@ -683,7 +684,7 @@ public class DonHangController : ControllerBase
     //   DANG_IN     → DA_IN   : đánh dấu đã in xong; file vẫn giữ tới khi đơn hoàn tất / bị hủy
     [HttpPut("{maDonHang}/trang-thai-in")]
     [Authorize(Roles = "BRANCH_ADMIN,STAFF")]
-    public async Task<IActionResult> CapNhatTrangThaiIn(int maDonHang, CapNhatTrangThaiInRequest req)
+    public async Task<IActionResult> CapNhatTrangThaiIn([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maDonHang, CapNhatTrangThaiInRequest req)
     {
         if (req.TrangThaiMoi != "DANG_IN" && req.TrangThaiMoi != "DA_IN")
             return BadRequest(new { message = "Trạng thái in không hợp lệ." });
@@ -822,7 +823,7 @@ public class DonHangController : ControllerBase
     // Đường dẫn file không bao giờ lộ ra ngoài, luôn phải đi qua đây để kiểm quyền.
     [HttpGet("{maDonHang}/file/{maFile}")]
     [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
-    public async Task<IActionResult> TaiFileIn(int maDonHang, int maFile)
+    public async Task<IActionResult> TaiFileIn([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maDonHang, [Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maFile)
     {
         using var conn = new SqlConnection(_chuoiKetNoi);
 
@@ -845,7 +846,7 @@ public class DonHangController : ControllerBase
     // POST api/don-hang/5/giao-tai-quay — F-18: bàn giao; đơn COD được thu vào ca tại bước này.
     [HttpPost("{maDonHang}/giao-tai-quay")]
     [Authorize(Roles = "BRANCH_ADMIN,STAFF")]
-    public async Task<IActionResult> GiaoTaiQuay(int maDonHang)
+    public async Task<IActionResult> GiaoTaiQuay([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maDonHang)
     {
         int maNhanVien = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
         using var conn = new SqlConnection(_chuoiKetNoi);
@@ -880,7 +881,7 @@ public class DonHangController : ControllerBase
     // Việc in lại vẫn đi qua hàng đợi và trừ kho thật, nhưng khách không bị thu thêm tiền.
     [HttpPost("{maDonHang}/in-lai-tai-quay")]
     [Authorize(Roles = "BRANCH_ADMIN,STAFF")]
-    public async Task<IActionResult> TaoInLaiTaiQuay(int maDonHang, TaoInLaiTaiQuayRequest req)
+    public async Task<IActionResult> TaoInLaiTaiQuay([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maDonHang, TaoInLaiTaiQuayRequest req)
     {
         int maNhanVien = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
         int maChiNhanh = int.Parse(User.FindFirst(TenClaim.MaChiNhanh).Value);
@@ -935,7 +936,7 @@ public class DonHangController : ControllerBase
     // Khách đổi ý hoặc mua thêm: tạo đơn COD mới, chỉ tính đúng phạm vi trang và gia công được chọn.
     [HttpPost("{maDonHang}/bo-sung-tai-quay")]
     [Authorize(Roles = "BRANCH_ADMIN,STAFF")]
-    public async Task<IActionResult> TaoDonBoSungTaiQuay(int maDonHang, TaoDonBoSungTaiQuayRequest req)
+    public async Task<IActionResult> TaoDonBoSungTaiQuay([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maDonHang, TaoDonBoSungTaiQuayRequest req)
     {
         int maNhanVien = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
         int maChiNhanh = int.Parse(User.FindFirst(TenClaim.MaChiNhanh).Value);
@@ -973,7 +974,7 @@ public class DonHangController : ControllerBase
     // POST api/don-hang/5/huy — khách chỉ tự hủy khi quầy chưa tiếp nhận; quản lý hủy các bước còn lại.
     [HttpPost("{maDonHang}/huy")]
     [Authorize(Roles = "CUSTOMER,SUPER_ADMIN,BRANCH_ADMIN")]
-    public async Task<IActionResult> HuyDon(int maDonHang, HuyDonRequest req)
+    public async Task<IActionResult> HuyDon([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maDonHang, HuyDonRequest req)
     {
         int maNguoiHuy = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
         if (string.IsNullOrWhiteSpace(req.LyDo))
@@ -1028,7 +1029,7 @@ public class DonHangController : ControllerBase
     // POST api/don-hang/5/hoan-tien — chỉ Super Admin xác nhận sau khi đã chuyển tiền lại cho khách.
     [HttpPost("{maDonHang}/hoan-tien")]
     [Authorize(Roles = "SUPER_ADMIN")]
-    public async Task<IActionResult> HoanTien(int maDonHang)
+    public async Task<IActionResult> HoanTien([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maDonHang)
     {
         int maNguoiDuyet = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
         using var conn = new SqlConnection(_chuoiKetNoi);
@@ -1054,7 +1055,7 @@ public class DonHangController : ControllerBase
     // POST api/don-hang/5/danh-gia — khách đánh giá một lần sau khi đơn hoàn thành.
     [HttpPost("{maDonHang}/danh-gia")]
     [Authorize(Roles = "CUSTOMER")]
-    public async Task<IActionResult> DanhGia(int maDonHang, DanhGiaRequest req)
+    public async Task<IActionResult> DanhGia([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maDonHang, DanhGiaRequest req)
     {
         int maKhachHang = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
         if (req.SoSao < 1 || req.SoSao > 5)
@@ -1102,7 +1103,7 @@ public class DonHangController : ControllerBase
 
     [HttpPut("danh-gia/{maDanhGia}/an")]
     [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN")]
-    public async Task<IActionResult> AnDanhGia(int maDanhGia)
+    public async Task<IActionResult> AnDanhGia([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maDanhGia)
     {
         int? maChiNhanh = User.FindFirst(TenClaim.MaChiNhanh) == null
             ? null : int.Parse(User.FindFirst(TenClaim.MaChiNhanh).Value);

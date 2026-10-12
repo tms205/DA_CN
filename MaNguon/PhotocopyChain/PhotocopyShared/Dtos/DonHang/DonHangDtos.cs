@@ -1,9 +1,12 @@
+using PhotocopyShared.KiemTraDuLieu;
+using System.ComponentModel.DataAnnotations;
 using PhotocopyShared.Dtos.DatIn;
 
 namespace PhotocopyShared.Dtos.DonHang;
 
 public sealed class PhucHoiFileInRequest
 {
+    [Range(1, int.MaxValue, ErrorMessage = "Mã file phải là số nguyên dương.")]
     public int MaFileIn { get; set; }
 }
 
@@ -59,22 +62,32 @@ public sealed class DanhSachThongBaoDto
 /// <summary>F-09 — bước 3/4 trên App: đặt đơn thật. Dùng lại <see cref="DongInRequest"/> của màn báo giá.
 /// KHÔNG có trường phương thức thanh toán: đơn đặt trên App luôn phải chuyển khoản VietQR trước
 /// (chốt 20/09/2026). Tiền mặt chỉ dành cho khách tới tận tiệm ngồi đợi in — đơn đó do nhân viên quầy lập.</summary>
-public sealed class DatDonHangRequest
+public sealed partial class DatDonHangRequest
 {
+    [Range(1, int.MaxValue, ErrorMessage = "Mã chi nhánh phải là số nguyên dương.")]
     public int MaChiNhanh { get; set; }
     /// <summary>TAI_QUAY hoặc GIAO_HANG.</summary>
+    [Required(ErrorMessage = "Vui lòng nhập giá trị.")]
+    [RegularExpression(@"^(TAI_QUAY|GIAO_HANG)$", ErrorMessage = "Lựa chọn không hợp lệ.")]
     public string HinhThucNhan { get; set; } = "TAI_QUAY";
     /// <summary>Bắt buộc khi GIAO_HANG.</summary>
+    [MaxLength(255, ErrorMessage = "Địa chỉ giao tối đa 255 ký tự.")]
     public string? DiaChiGiao { get; set; }
     /// <summary>Tọa độ GPS khách bấm "Dùng vị trí hiện tại" — gửi cho Ahamove định vị chính xác hơn.</summary>
+    [Range(typeof(decimal), "-90", "90", ErrorMessage = "Vĩ độ phải từ -90 đến 90.")]
     public decimal? ViDoGiao { get; set; }
+    [Range(typeof(decimal), "-180", "180", ErrorMessage = "Kinh độ phải từ -180 đến 180.")]
     public decimal? KinhDoGiao { get; set; }
+    [RegularExpression(QuyTacNhap.SoDienThoai, ErrorMessage = QuyTacNhap.LoiSoDienThoai)]
     public string? SdtNhan { get; set; }
     public bool InGap { get; set; }
+    [RegularExpression(@"^[A-Za-z0-9_-]{1,30}$", ErrorMessage = "Mã khuyến mãi tối đa 30 ký tự, chỉ gồm chữ, số, dấu gạch ngang hoặc gạch dưới.")]
     public string? MaCodeKhuyenMai { get; set; }
     /// <summary>Ghi chú cho thợ in (nhập ở bước 2).</summary>
+    [MaxLength(255, ErrorMessage = "Ghi chú tối đa 255 ký tự.")]
     public string? GhiChu { get; set; }
     /// <summary>Danh sách file cùng cấu hình in mà khách đã chọn.</summary>
+    [DanhSachFile]
     public List<DongInRequest> FileIn { get; set; } = [];
 }
 
@@ -93,6 +106,7 @@ public sealed class DatDonHangResponse
 public sealed class ChiNhanhDatDonRequest
 {
     /// <summary>Các mã dịch vụ IN_AN khách đã chọn (mỗi file 1 mã).</summary>
+    [DanhSachMa(BatBuoc = true)]
     public List<int> DsMaDichVu { get; set; } = [];
 }
 
@@ -239,8 +253,11 @@ public sealed class MayInDto
 public sealed class CapNhatTrangThaiInRequest
 {
     /// <summary>DANG_IN hoặc DA_IN.</summary>
+    [Required(ErrorMessage = "Vui lòng nhập giá trị.")]
+    [RegularExpression(@"^(DANG_IN|DA_IN)$", ErrorMessage = "Lựa chọn không hợp lệ.")]
     public string TrangThaiMoi { get; set; } = "";
     /// <summary>Máy in được chọn khi bắt đầu in (F-21) — có thể bỏ trống.</summary>
+    [Range(1, int.MaxValue, ErrorMessage = "Mã máy in phải là số nguyên dương.")]
     public int? MaMayIn { get; set; }
 }
 
@@ -340,11 +357,13 @@ public sealed class DonHangTrongCaDto
 public sealed class MoCaRequest
 {
     /// <summary>Tiền lẻ có sẵn trong két lúc mở ca.</summary>
+    [SoTien]
     public decimal TienDauCa { get; set; }
 }
 
 public sealed class DongCaRequest
 {
     /// <summary>Số tiền mặt đếm được trong két lúc đóng ca.</summary>
+    [SoTien]
     public decimal TongDoanhThuCuoiCa { get; set; }
 }

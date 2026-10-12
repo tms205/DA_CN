@@ -81,23 +81,23 @@
 
     @if (_suaChiNhanh != null)
     {
-        <div class="the the-rong">
+        <form @onsubmit="LuuChiNhanhAsync" @onsubmit:preventDefault class="the the-rong">
             <div class="ca-dau">
                 <h2 class="the-tieu-de nho">Cập nhật thông tin chi nhánh: @_suaChiNhanh.TenChiNhanh</h2>
-                <button class="nut-dong" title="Đóng" @onclick="() => _suaChiNhanh = null">✕</button>
+                <button type="button" class="nut-dong" title="Đóng" @onclick="() => _suaChiNhanh = null">✕</button>
             </div>
             <div class="ca-loc-luoi">
                 <div class="truong">
                     <label class="nhan">Tên chi nhánh</label>
-                    <input class="ca-o-loc" @bind="_suaChiNhanh.TenChiNhanh" />
+                    <input required maxlength="100" class="ca-o-loc" @bind="_suaChiNhanh.TenChiNhanh" />
                 </div>
                 <div class="truong">
                     <label class="nhan">Điện thoại hotline</label>
-                    <input class="ca-o-loc mono" @bind="_suaChiNhanh.SoDienThoai" />
+                    <input inputmode="numeric" pattern="0[0-9]{9}" title="10 chữ số, bắt đầu bằng 0" maxlength="10" class="ca-o-loc mono" @bind="_suaChiNhanh.SoDienThoai" />
                 </div>
                 <div class="truong">
                     <label class="nhan">Bán kính giao nhận tối đa (km)</label>
-                    <input class="ca-o-loc" type="number" step="0.5" min="0" @bind="_suaChiNhanh.BanKinhGiao" />
+                    <input max="999.99" required class="ca-o-loc" type="number" step="0.01" min="0" @bind="_suaChiNhanh.BanKinhGiao" />
                 </div>
                 <div class="truong">
                     <label class="nhan">Trạng thái vận hành</label>
@@ -110,14 +110,14 @@
             <div class="truong" style="margin-top: 12px;">
                 <label class="nhan">Địa chỉ chi nhánh</label>
                 <div class="o-nhap">
-                    <input @bind="_suaChiNhanh.DiaChi" />
+                    <input required maxlength="255" @bind="_suaChiNhanh.DiaChi" />
                 </div>
             </div>
             <div class="xac-nhan-o" style="margin-top: 16px;">
-                <button class="nut-chinh" @onclick="LuuChiNhanhAsync">Lưu thay đổi</button>
-                <button class="nut-phu" @onclick="() => _suaChiNhanh = null">Hủy</button>
+                <button type="submit" class="nut-chinh">Lưu thay đổi</button>
+                <button type="button" class="nut-phu" @onclick="() => _suaChiNhanh = null">Hủy</button>
             </div>
-        </div>
+        </form>
     }
 
     <div class="the the-bang">
@@ -158,10 +158,10 @@
                                     <span class="mono"><b>@m.TocDo</b> trang/phút</span>
                                 </td>
                                 <td data-nhan="Chỉ số trang in">
-                                    <div style="display: flex; align-items: center; gap: 8px;">
-                                        <input class="ca-o-loc mono" style="width: 120px; height: 38px;" type="number" min="0" @bind="m.SoTrangDaIn" />
-                                        <button class="nut-nho" title="Lưu số counter hiện tại" @onclick="() => LuuChiSoMayAsync(m)">Lưu số</button>
-                                    </div>
+                                    <form style="display: flex; align-items: center; gap: 8px;" @onsubmit="() => LuuChiSoMayAsync(m)" @onsubmit:preventDefault>
+                                        <input max="2147483647" required step="1" class="ca-o-loc mono" style="width: 120px; height: 38px;" type="number" min="0" @bind="m.SoTrangDaIn" />
+                                        <button type="submit" class="nut-nho" title="Lưu số counter hiện tại">Lưu số</button>
+                                    </form>
                                 </td>
                                 <td data-nhan="Trạng thái máy">
                                     <span class="nhan-mau @MauMay(m.TrangThai)">@m.TrangThai</span>
@@ -290,6 +290,8 @@
 
     private async Task LuuChiNhanhAsync()
     {
+        _loi = QuyTacNhap.LayLoi(_suaChiNhanh);
+        if (_loi != null) return;
         var r = await Http.PutAsJsonAsync("api/quan-tri/chi-nhanh/" + _suaChiNhanh.MaChiNhanh, _suaChiNhanh);
         if (r.IsSuccessStatusCode)
         {
@@ -305,6 +307,8 @@
 
     private async Task DoiMayAsync(MayInQuanTriDto m, string tt)
     {
+        _loi = QuyTacNhap.LayLoi(new CapNhatMayInRequest { TrangThai = tt, SoTrangDaIn = m.SoTrangDaIn });
+        if (_loi != null) return;
         var r = await Http.PutAsJsonAsync(
             "api/quan-tri/may-in/" + m.MaMayIn,
             new CapNhatMayInRequest

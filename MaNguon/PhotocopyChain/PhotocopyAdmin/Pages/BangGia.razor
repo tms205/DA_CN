@@ -36,12 +36,12 @@
 
     @if (CoTheSua())
     {
-        <div class="the the-rong">
+        <form @onsubmit="LuuAsync" @onsubmit:preventDefault class="the the-rong">
             <h2 class="the-tieu-de nho">@(_dangSua == null ? "Thêm dịch vụ / quy cách mới" : "Chỉnh sửa dịch vụ #" + _dangSua.MaDichVu)</h2>
             <div class="ca-loc-luoi">
                 <div class="truong">
                     <label class="nhan">Tên dịch vụ</label>
-                    <input class="ca-o-loc" placeholder="VD: In A4 đen trắng 1 mặt" @bind="_form.TenDichVu" />
+                    <input required maxlength="100" class="ca-o-loc" placeholder="VD: In A4 đen trắng 1 mặt" @bind="_form.TenDichVu" />
                 </div>
                 <div class="truong">
                     <label class="nhan">Nhóm dịch vụ</label>
@@ -76,17 +76,17 @@
                 </div>
                 <div class="truong">
                     <label class="nhan">Đơn giá (₫)</label>
-                    <input class="ca-o-loc mono" type="number" min="0" step="50" @bind="_form.DonGia" />
+                    <input max="999999999999" required class="ca-o-loc mono" type="number" min="0" step="1" @bind="_form.DonGia" />
                 </div>
             </div>
             <div class="xac-nhan-o">
-                <button class="nut-chinh" style="min-width: 120px;" @onclick="LuuAsync">Lưu dịch vụ</button>
+                <button type="submit" class="nut-chinh" style="min-width: 120px;">Lưu dịch vụ</button>
                 @if (_dangSua != null)
                 {
-                    <button class="nut-phu" @onclick="BoSua">Hủy chỉnh sửa</button>
+                    <button type="button" class="nut-phu" @onclick="BoSua">Hủy chỉnh sửa</button>
                 }
             </div>
-        </div>
+        </form>
     }
 
     <div class="the the-bang">
@@ -212,8 +212,9 @@
 
     private async Task LuuAsync()
     {
-        _loi = null;
         _thongBao = null;
+        _loi = QuyTacNhap.LayLoi(_form);
+        if (_loi != null) return;
 
         var res = _dangSua == null
             ? await Http.PostAsJsonAsync("api/quan-tri/dich-vu", _form)

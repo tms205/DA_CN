@@ -126,7 +126,7 @@
 
     @if (_donPhatSinh != null)
     {
-        <div class="the the-rong bg-phat-sinh">
+        <form @onsubmit="TaoPhatSinhAsync" @onsubmit:preventDefault class="the the-rong bg-phat-sinh">
             <div class="ca-dau">
                 <div>
                     <h2 class="the-tieu-de nho">@(_cheDoPhatSinh == "IN_LAI_LOI_QUAY" ? "In lại miễn phí do lỗi quầy" : "Lập đơn khách mua thêm")</h2>
@@ -134,7 +134,7 @@
                         Đơn gốc @_donPhatSinh.MaDonHangHienThi · @_donPhatSinh.TenKhachHang
                     </p>
                 </div>
-                <button class="nut-dong" @onclick="DongPhatSinh">✕</button>
+                <button type="button" class="nut-dong" @onclick="DongPhatSinh">✕</button>
             </div>
 
             <div class="o-canh-bao @(_cheDoPhatSinh == "IN_LAI_LOI_QUAY" ? "bg-mien-phi" : "")">
@@ -157,15 +157,15 @@
                 </label>
                 <label class="truong">
                     <span class="nhan">Từ trang</span>
-                    <input class="ca-o-loc mono" type="number" min="@TrangNhoNhat" max="@TrangLonNhat" @bind="_tuTrangPhatSinh" @bind:after="KiemTraKimGocBoSung" />
+                    <input required step="1" class="ca-o-loc mono" type="number" min="@TrangNhoNhat" max="@TrangLonNhat" @bind="_tuTrangPhatSinh" @bind:after="KiemTraKimGocBoSung" />
                 </label>
                 <label class="truong">
                     <span class="nhan">Đến trang</span>
-                    <input class="ca-o-loc mono" type="number" min="@TrangNhoNhat" max="@TrangLonNhat" @bind="_denTrangPhatSinh" @bind:after="KiemTraKimGocBoSung" />
+                    <input required step="1" class="ca-o-loc mono" type="number" min="@TrangNhoNhat" max="@TrangLonNhat" @bind="_denTrangPhatSinh" @bind:after="KiemTraKimGocBoSung" />
                 </label>
                 <label class="truong">
                     <span class="nhan">Số bản</span>
-                    <input class="ca-o-loc mono" type="number" min="1" max="@SoBanLonNhat" @bind="_soBanPhatSinh" />
+                    <input required step="1" class="ca-o-loc mono" type="number" min="1" max="@SoBanLonNhat" @bind="_soBanPhatSinh" />
                 </label>
             </div>
 
@@ -205,7 +205,7 @@
             {
                 <label class="truong">
                     <span class="nhan">Lỗi của quầy <span class="chu-mo">(bắt buộc)</span></span>
-                    <input class="ca-o-loc" maxlength="200" @bind="_lyDoInLai" placeholder="Ví dụ: lem mực trang 3-5, in sai màu" />
+                    <input required class="ca-o-loc" maxlength="200" @bind="_lyDoInLai" placeholder="Ví dụ: lem mực trang 3-5, in sai màu" />
                 </label>
             }
 
@@ -220,13 +220,13 @@
                     <b class="mono hd-tong">@(_cheDoPhatSinh == "IN_LAI_LOI_QUAY" ? "0₫" : Tien(TienDuKienBoSung))</b>
                 </div>
                 <div class="xac-nhan-o">
-                    <button class="nut-nho" disabled="@_dangGui" @onclick="DongPhatSinh">Hủy</button>
-                    <button class="nut-nho chinh" disabled="@(_dangGui || !PhatSinhHopLe)" @onclick="TaoPhatSinhAsync">
+                    <button type="button" class="nut-nho" disabled="@_dangGui" @onclick="DongPhatSinh">Hủy</button>
+                    <button type="submit" class="nut-nho chinh" disabled="@(_dangGui || !PhatSinhHopLe)">
                         @(_dangGui ? "Đang tạo…" : _cheDoPhatSinh == "IN_LAI_LOI_QUAY" ? "Tạo việc in lại 0₫" : "Tạo đơn bổ sung COD")
                     </button>
                 </div>
             </div>
-        </div>
+        </form>
     }
 </div>
 

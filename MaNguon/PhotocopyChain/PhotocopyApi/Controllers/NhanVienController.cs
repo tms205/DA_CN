@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Data;
 using Dapper;
 using Microsoft.AspNetCore.Authorization;
@@ -52,7 +53,7 @@ public class NhanVienController : ControllerBase
     // POST api/nhan-vien/5/cap-lai-mat-khau — cấp mật khẩu tạm cho nhân viên quên mật khẩu.
     // Mật khẩu tạm chỉ trả về đúng 1 lần cho người cấp đọc cho nhân viên, CSDL chỉ lưu bản đã băm.
     [HttpPost("{maNhanVien}/cap-lai-mat-khau")]
-    public async Task<IActionResult> CapLaiMatKhau(int maNhanVien)
+    public async Task<IActionResult> CapLaiMatKhau([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maNhanVien)
     {
         int maNguoiCap = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
         string matKhauTam = TaoMatKhauTam();
@@ -149,7 +150,7 @@ public class NhanVienController : ControllerBase
 
     // PUT api/nhan-vien/5/trang-thai — khóa hoặc mở lại tài khoản trong đúng phạm vi quản lý.
     [HttpPut("{maNhanVien}/trang-thai")]
-    public async Task<IActionResult> CapNhatTrangThai(int maNhanVien, CapNhatTrangThaiRequest req)
+    public async Task<IActionResult> CapNhatTrangThai([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maNhanVien, CapNhatTrangThaiRequest req)
     {
         int maNguoiCap = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
         string vaiTro = User.FindFirst(TenClaim.VaiTro).Value;

@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Data;
 using System.Net.Http.Headers;
 using System.Text;
@@ -37,7 +38,7 @@ public class BaoGiaController : ControllerBase
 
     // POST api/bao-gia
     [HttpPost]
-    public async Task<IActionResult> TinhGia(BaoGiaRequest req, [FromQuery] int? maKhachHang)
+    public async Task<IActionResult> TinhGia(BaoGiaRequest req, [FromQuery] [Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int? maKhachHang)
     {
         string vaiTro = User.FindFirst(TenClaim.VaiTro).Value;
         int maNguoiDung = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);

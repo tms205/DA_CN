@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Data;
 using Dapper;
 using Microsoft.AspNetCore.Authorization;
@@ -59,7 +60,7 @@ public class ThanhToanController : ControllerBase
     // GET api/thanh-toan/5 — màn Thanh toán trên App gọi liên tục để biết ngân hàng đã báo tiền chưa
     [HttpGet("{maDonHang:int}")]
     [Authorize(Roles = "CUSTOMER,SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
-    public async Task<IActionResult> XemThanhToan(int maDonHang)
+    public async Task<IActionResult> XemThanhToan([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maDonHang)
     {
         using var conn = new SqlConnection(_chuoiKetNoi);
         ThanhToanDto tt = await DocThanhToanDuocPhep(conn, maDonHang);
@@ -86,7 +87,7 @@ public class ThanhToanController : ControllerBase
     // POST api/thanh-toan/5/payos — tạo mới hoặc lấy lại trang checkout của đúng đơn này.
     [HttpPost("{maDonHang:int}/payos")]
     [Authorize(Roles = "CUSTOMER,SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
-    public async Task<IActionResult> TaoLienKetPayOS(int maDonHang)
+    public async Task<IActionResult> TaoLienKetPayOS([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maDonHang)
     {
         using var conn = new SqlConnection(_chuoiKetNoi);
         ThanhToanDto tt = await DocThanhToanDuocPhep(conn, maDonHang);

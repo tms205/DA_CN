@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'phien.dart';
+import 'kiem_tra_du_lieu.dart';
 
 // Địa chỉ API.
 // Điện thoại thật cắm USB: chạy "adb reverse tcp:5268 tcp:5268" trên máy tính để localhost:5268 trên điện thoại
@@ -33,6 +34,8 @@ class Api {
   }
 
   static Future<KetQuaApi> post(String duongDan, Map<String, dynamic> duLieu) async {
+    String? loi = kiemTraDuLieu(duongDan, duLieu);
+    if (loi != null) return KetQuaApi()..loi = loi;
     try {
       http.Response res = await http
           .post(Uri.parse(diaChiApi + duongDan), headers: _taoHeader(), body: jsonEncode(duLieu))
@@ -44,6 +47,10 @@ class Api {
   }
 
   static Future<KetQuaApi> put(String duongDan, [Map<String, dynamic>? duLieu]) async {
+    if (duLieu != null) {
+      String? loi = kiemTraDuLieu(duongDan, duLieu);
+      if (loi != null) return KetQuaApi()..loi = loi;
+    }
     try {
       http.Response res = await http
           .put(Uri.parse(diaChiApi + duongDan), headers: _taoHeader(), body: duLieu == null ? null : jsonEncode(duLieu))
@@ -57,6 +64,9 @@ class Api {
   // Tải 1 file lên (gửi dạng multipart/form-data, tên trường "file").
   // Máy chủ còn phải đổi sang PDF + đếm trang nên cho chờ tới 3 phút.
   static Future<KetQuaApi> taiFile(String duongDanFile, String tenFile) async {
+    if (tenFile.trim().isEmpty || tenFile.length > 255) {
+      return KetQuaApi()..loi = 'Tên file không được để trống và tối đa 255 ký tự.';
+    }
     try {
       var yeuCau = http.MultipartRequest('POST', Uri.parse('$diaChiApi/api/file-in'));
       yeuCau.headers['Authorization'] = 'Bearer ${Phien.token}';

@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
@@ -47,7 +48,7 @@ public class FileInController : ControllerBase
     // Request du 1 MB cho thong tin form, kich thuoc file toi da la 60 MB.
     [RequestSizeLimit(61 * 1024 * 1024)]
     [RequestFormLimits(MultipartBodyLengthLimit = 60 * 1024 * 1024)]
-    public async Task<IActionResult> TaiLen(IFormFile file, [FromQuery] int? maKhachHang)
+    public async Task<IActionResult> TaiLen(IFormFile file, [FromQuery] [Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int? maKhachHang)
     {
         string vaiTro = User.FindFirst(TenClaim.VaiTro).Value;
         int maNguoiDung = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
@@ -72,6 +73,9 @@ public class FileInController : ControllerBase
         // kiểm tra file rỗng, dung lượng, đuôi file
         if (file == null || file.Length == 0)
             return BadRequest(new { message = "File rỗng." });
+
+        if (string.IsNullOrWhiteSpace(file.FileName) || Path.GetFileName(file.FileName).Length > 255)
+            return BadRequest(new { message = "Tên file không được để trống và tối đa 255 ký tự." });
 
         int toiDaMb = _config.GetValue<int>("LuuTruFile:DungLuongToiDaMb");
         if (file.Length > toiDaMb * 1024L * 1024L)
@@ -160,7 +164,7 @@ public class FileInController : ControllerBase
     // xem lại thông tin 1 file (chỉ xem được file của chính mình)
     [HttpGet("{maFileIn}")]
     [Authorize(Roles = "CUSTOMER")]
-    public async Task<IActionResult> ChiTiet(int maFileIn)
+    public async Task<IActionResult> ChiTiet([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maFileIn)
     {
         int maKhachHang = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
 
@@ -175,7 +179,7 @@ public class FileInController : ControllerBase
     // Xóa file vừa tải nhưng chưa dùng để đặt đơn. Dùng khi người dùng chọn nhầm file
     // hoặc đổi khách trên màn Lập đơn tại quầy, tránh để PDF mồ côi trên ổ đĩa.
     [HttpDelete("{maFileIn}")]
-    public async Task<IActionResult> XoaFileChuaDat(int maFileIn, [FromQuery] int? maKhachHang)
+    public async Task<IActionResult> XoaFileChuaDat([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maFileIn, [FromQuery] [Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int? maKhachHang)
     {
         int maNguoiDung = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
         string vaiTro = User.FindFirst(TenClaim.VaiTro).Value;

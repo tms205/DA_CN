@@ -35,40 +35,40 @@
     }
     else
     {
-        <div class="the the-rong">
+        <form @onsubmit="LuuAsync" @onsubmit:preventDefault class="the the-rong">
             <h2 class="the-tieu-de nho">@(_dangSua == null ? "Tạo mã khuyến mãi mới" : "Chỉnh sửa khuyến mãi #" + _dangSua.MaKhuyenMai)</h2>
             <div class="ca-loc-luoi">
                 <div class="truong">
                     <label class="nhan">Mã code ưu đãi</label>
-                    <input class="ca-o-loc mono" placeholder="VD: INAN20" @bind="_form.MaCode" />
+                    <input required maxlength="30" class="ca-o-loc mono" placeholder="VD: INAN20" @bind="_form.MaCode" />
                 </div>
                 <div class="truong">
                     <label class="nhan">Tên chương trình khuyến mãi</label>
-                    <input class="ca-o-loc" placeholder="VD: Giảm 20% đầu năm học" @bind="_form.TenKhuyenMai" />
+                    <input maxlength="150" class="ca-o-loc" placeholder="VD: Giảm 20% đầu năm học" @bind="_form.TenKhuyenMai" />
                 </div>
                 <div class="truong">
                     <label class="nhan">% giảm giá</label>
-                    <input class="ca-o-loc" type="number" min="1" max="100" @bind="_form.PhanTramGiam" />
+                    <input required step="1" class="ca-o-loc" type="number" min="1" max="100" @bind="_form.PhanTramGiam" />
                 </div>
                 <div class="truong">
                     <label class="nhan">Số tiền giảm tối đa (₫)</label>
-                    <input class="ca-o-loc mono" type="number" min="0" step="1000" @bind="_form.GiamToiDa" />
+                    <input max="999999999999" class="ca-o-loc mono" type="number" min="0" step="1" @bind="_form.GiamToiDa" />
                 </div>
                 <div class="truong">
                     <label class="nhan">Đơn hàng tối thiểu (₫)</label>
-                    <input class="ca-o-loc mono" type="number" min="0" step="1000" @bind="_form.DonToiThieu" />
+                    <input max="999999999999" required class="ca-o-loc mono" type="number" min="0" step="1" @bind="_form.DonToiThieu" />
                 </div>
                 <div class="truong">
                     <label class="nhan">Số lượng mã phát hành</label>
-                    <input class="ca-o-loc" type="number" min="0" @bind="_form.SoLuong" />
+                    <input max="2147483647" required step="1" class="ca-o-loc" type="number" min="0" @bind="_form.SoLuong" />
                 </div>
                 <div class="truong">
                     <label class="nhan">Ngày bắt đầu</label>
-                    <input class="ca-o-loc" type="date" @bind="_form.NgayBatDau" />
+                    <input required min="1753-01-01" max="9999-12-31" class="ca-o-loc" type="date" @bind="_form.NgayBatDau" />
                 </div>
                 <div class="truong">
                     <label class="nhan">Ngày kết thúc</label>
-                    <input class="ca-o-loc" type="date" @bind="_form.NgayKetThuc" />
+                    <input required min="1753-01-01" max="9999-12-31" class="ca-o-loc" type="date" @bind="_form.NgayKetThuc" />
                 </div>
                 <div class="truong">
                     <label class="nhan">Trạng thái áp dụng</label>
@@ -79,13 +79,13 @@
                 </div>
             </div>
             <div class="xac-nhan-o">
-                <button class="nut-chinh" style="min-width: 130px;" @onclick="LuuAsync">Lưu khuyến mãi</button>
+                <button type="submit" class="nut-chinh" style="min-width: 130px;">Lưu khuyến mãi</button>
                 @if (_dangSua != null)
                 {
-                    <button class="nut-phu" @onclick="BoSua">Hủy chỉnh sửa</button>
+                    <button type="button" class="nut-phu" @onclick="BoSua">Hủy chỉnh sửa</button>
                 }
             </div>
-        </div>
+        </form>
     }
 
     <div class="the the-bang">
@@ -197,8 +197,10 @@
 
     private async Task LuuAsync()
     {
-        _loi = null;
         _thongBao = null;
+        _form.MaCode = _form.MaCode.Trim();
+        _loi = QuyTacNhap.LayLoi(_form);
+        if (_loi != null) return;
 
         var res = _dangSua == null
             ? await Http.PostAsJsonAsync("api/quan-tri/khuyen-mai", _form)

@@ -33,12 +33,12 @@
         <div class="o-loi">@((MarkupString)Svg.ChamThan())<span>@_loi</span></div>
     }
 
-    <div class="the the-rong">
+    <form @onsubmit="TaoNhanVienAsync" @onsubmit:preventDefault class="the the-rong">
         <h2 class="the-tieu-de nho">Tạo tài khoản nhân viên mới</h2>
         <div class="ca-loc-luoi">
-            <div class="truong"><label class="nhan">Họ tên</label><input class="ca-o-loc" placeholder="VD: Nguyễn Văn B" @bind="_tao.HoTen" /></div>
-            <div class="truong"><label class="nhan">Email</label><input class="ca-o-loc" type="email" placeholder="nv@photocopy.vn" @bind="_tao.Email" /></div>
-            <div class="truong"><label class="nhan">Số điện thoại</label><input class="ca-o-loc" placeholder="09xxxxxxxx" @bind="_tao.SoDienThoai" /></div>
+            <div class="truong"><label class="nhan">Họ tên</label><input required maxlength="100" class="ca-o-loc" placeholder="VD: Nguyễn Văn B" @bind="_tao.HoTen" /></div>
+            <div class="truong"><label class="nhan">Email</label><input required maxlength="100" class="ca-o-loc" type="email" placeholder="nhanvien@gmail.com" @bind="_tao.Email" /></div>
+            <div class="truong"><label class="nhan">Số điện thoại</label><input inputmode="numeric" pattern="0[0-9]{9}" title="10 chữ số, bắt đầu bằng 0" maxlength="10" class="ca-o-loc" placeholder="09xxxxxxxx" @bind="_tao.SoDienThoai" /></div>
             <div class="truong">
                 <label class="nhan">Vai trò</label>
                 <select class="ca-o-loc" @bind="_tao.VaiTro">
@@ -62,14 +62,14 @@
                     </select>
                 </div>
             }
-            <div class="truong"><label class="nhan">Mật khẩu ban đầu</label><input class="ca-o-loc" type="password" placeholder="••••••••" @bind="_tao.MatKhau" /></div>
+            <div class="truong"><label class="nhan">Mật khẩu ban đầu</label><input required maxlength="72" class="ca-o-loc" type="password" placeholder="••••••••" @bind="_tao.MatKhau" /></div>
         </div>
         <div style="margin-top: 14px;">
-            <button class="nut-chinh" disabled="@_dangCap" @onclick="TaoNhanVienAsync">
+            <button type="submit" class="nut-chinh" disabled="@_dangCap">
                 @(_dangCap ? "Đang tạo…" : "Tạo nhân viên")
             </button>
         </div>
-    </div>
+    </form>
 
     <div class="the the-bang">
         <div class="bang-tieu-de">
@@ -208,6 +208,9 @@
 
     private async Task TaoNhanVienAsync()
     {
+        _tao.Email = _tao.Email.Trim();
+        _loi = QuyTacNhap.LayLoi(_tao);
+        if (_loi != null) return;
         _loi = null; _dangCap = true;
         var res = await Http.PostAsJsonAsync("api/nhan-vien", _tao);
         if (res.IsSuccessStatusCode)

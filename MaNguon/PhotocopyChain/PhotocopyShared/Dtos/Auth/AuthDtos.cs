@@ -1,3 +1,4 @@
+using PhotocopyShared.KiemTraDuLieu;
 using System.ComponentModel.DataAnnotations;
 
 namespace PhotocopyShared.Dtos.Auth;
@@ -5,9 +6,12 @@ namespace PhotocopyShared.Dtos.Auth;
 public sealed class DangNhapRequest
 {
     [Required(ErrorMessage = "Vui lòng nhập email hoặc số điện thoại.")]
+    [TaiKhoan]
+    [MaxLength(100, ErrorMessage = "Tài khoản tối đa 100 ký tự.")]
     public string TaiKhoan { get; set; } = "";
 
     [Required(ErrorMessage = "Vui lòng nhập mật khẩu.")]
+    [MaxLength(1024, ErrorMessage = "Mật khẩu tối đa 1024 ký tự.")]
     public string MatKhau { get; set; } = "";
 
     /// <summary>Web: "Duy trì phiên trong 8 giờ". Mobile: "Ghi nhớ đăng nhập".</summary>
@@ -52,14 +56,16 @@ public sealed class DangKyRequest
     [Required(ErrorMessage = "Vui lòng nhập email.")]
     [EmailAddress(ErrorMessage = "Email không hợp lệ.")]
     [MaxLength(100, ErrorMessage = "Email tối đa 100 ký tự.")]
+    [Gmail]
     public string Email { get; set; } = "";
 
     [Required(ErrorMessage = "Vui lòng nhập số điện thoại.")]
-    [RegularExpression(@"^0\d{9}$", ErrorMessage = "Số điện thoại phải gồm 10 chữ số, bắt đầu bằng 0.")]
+    [RegularExpression(QuyTacNhap.SoDienThoai, ErrorMessage = "Số điện thoại phải gồm 10 chữ số, bắt đầu bằng 0.")]
     public string SoDienThoai { get; set; } = "";
 
     [Required(ErrorMessage = "Vui lòng nhập mật khẩu.")]
     [RegularExpression(QuyTacMatKhau.BieuThuc, ErrorMessage = QuyTacMatKhau.ThongBao)]
+    [MatKhauMoi]
     public string MatKhau { get; set; } = "";
 }
 
@@ -68,10 +74,12 @@ public sealed class XacNhanDangKyRequest
 {
     [Required(ErrorMessage = "Vui lòng nhập email.")]
     [EmailAddress(ErrorMessage = "Email không hợp lệ.")]
+    [MaxLength(100, ErrorMessage = "Email tối đa 100 ký tự.")]
+    [Gmail]
     public string Email { get; set; } = "";
 
     [Required(ErrorMessage = "Vui lòng nhập mã OTP.")]
-    [RegularExpression(@"^\d{6}$", ErrorMessage = "Mã OTP gồm 6 chữ số.")]
+    [RegularExpression(@"^[0-9]{6}$", ErrorMessage = "Mã OTP gồm 6 chữ số.")]
     public string MaOtp { get; set; } = "";
 }
 
@@ -95,7 +103,7 @@ public sealed class CapNhatHoSoRequest
     [MaxLength(100, ErrorMessage = "Họ tên tối đa 100 ký tự.")]
     public string HoTen { get; set; } = "";
 
-    [RegularExpression(@"^0\d{9}$", ErrorMessage = "Số điện thoại phải gồm 10 chữ số, bắt đầu bằng 0.")]
+    [RegularExpression(QuyTacNhap.SoDienThoai, ErrorMessage = "Số điện thoại phải gồm 10 chữ số, bắt đầu bằng 0.")]
     public string? SoDienThoai { get; set; }
 
     /// <summary>Chỉ áp dụng cho khách hàng.</summary>
@@ -106,10 +114,12 @@ public sealed class CapNhatHoSoRequest
 public sealed class DoiMatKhauRequest
 {
     [Required(ErrorMessage = "Vui lòng nhập mật khẩu hiện tại.")]
+    [MaxLength(1024, ErrorMessage = "Mật khẩu hiện tại tối đa 1024 ký tự.")]
     public string MatKhauCu { get; set; } = "";
 
     [Required(ErrorMessage = "Vui lòng nhập mật khẩu mới.")]
     [RegularExpression(QuyTacMatKhau.BieuThuc, ErrorMessage = QuyTacMatKhau.ThongBao)]
+    [MatKhauMoi]
     public string MatKhauMoi { get; set; } = "";
 }
 
@@ -117,6 +127,7 @@ public sealed class QuenMatKhauRequest
 {
     [Required(ErrorMessage = "Vui lòng nhập email.")]
     [EmailAddress(ErrorMessage = "Email không hợp lệ.")]
+    [MaxLength(100, ErrorMessage = "Email tối đa 100 ký tự.")]
     public string Email { get; set; } = "";
 }
 
@@ -124,6 +135,7 @@ public sealed class XacMinhOtpDatLaiRequest
 {
     [Required(ErrorMessage = "Vui lòng nhập email.")]
     [EmailAddress(ErrorMessage = "Email không hợp lệ.")]
+    [MaxLength(100, ErrorMessage = "Email tối đa 100 ký tự.")]
     public string Email { get; set; } = "";
 
     [Required(ErrorMessage = "Vui lòng nhập mã OTP.")]
@@ -135,13 +147,15 @@ public sealed class DatLaiMatKhauRequest
 {
     [Required(ErrorMessage = "Vui lòng nhập email.")]
     [EmailAddress(ErrorMessage = "Email không hợp lệ.")]
+    [MaxLength(100, ErrorMessage = "Email tối đa 100 ký tự.")]
     public string Email { get; set; } = "";
 
     [Required(ErrorMessage = "Vui lòng nhập mã OTP.")]
-    [RegularExpression(@"^\d{6}$", ErrorMessage = "Mã OTP gồm 6 chữ số.")]
+    [RegularExpression(@"^[0-9]{6}$", ErrorMessage = "Mã OTP gồm 6 chữ số.")]
     public string MaOtp { get; set; } = "";
 
     [Required(ErrorMessage = "Vui lòng nhập mật khẩu mới.")]
     [RegularExpression(QuyTacMatKhau.BieuThuc, ErrorMessage = QuyTacMatKhau.ThongBao)]
+    [MatKhauMoi]
     public string MatKhauMoi { get; set; } = "";
 }

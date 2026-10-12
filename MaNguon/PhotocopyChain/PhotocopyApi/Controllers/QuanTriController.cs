@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Data;
 using Dapper;
 using Microsoft.AspNetCore.Authorization;
@@ -70,7 +71,7 @@ public class QuanTriController : ControllerBase
 
     [HttpPut("dich-vu/{maDichVu}")]
     [Authorize(Roles = "SUPER_ADMIN")]
-    public async Task<IActionResult> CapNhatDichVu(int maDichVu, LuuDichVuRequest req)
+    public async Task<IActionResult> CapNhatDichVu([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maDichVu, LuuDichVuRequest req)
     {
         int? maChiNhanh = LayChiNhanhTuToken();
         string loi = QuyTacQuanTriChiNhanh.KiemTraDichVu(req, maChiNhanh);
@@ -114,7 +115,7 @@ public class QuanTriController : ControllerBase
 
     [HttpPut("chi-nhanh/{maChiNhanh}")]
     [Authorize(Roles = "SUPER_ADMIN")]
-    public async Task<IActionResult> CapNhatChiNhanh(int maChiNhanh, ChiNhanhQuanTriDto req)
+    public async Task<IActionResult> CapNhatChiNhanh([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maChiNhanh, ChiNhanhQuanTriDto req)
     {
         if (!DuocLamViecVoiChiNhanh(maChiNhanh))
             return StatusCode(403, new { message = "Chi nhánh không thuộc phạm vi đang chọn." });
@@ -153,7 +154,7 @@ public class QuanTriController : ControllerBase
 
     [HttpPut("may-in/{maMayIn}")]
     [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN")]
-    public async Task<IActionResult> CapNhatMayIn(int maMayIn, CapNhatMayInRequest req)
+    public async Task<IActionResult> CapNhatMayIn([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maMayIn, CapNhatMayInRequest req)
     {
         if (req.TrangThai != "HOAT_DONG" && req.TrangThai != "BAO_TRI" && req.TrangThai != "HONG")
             return BadRequest(new { message = "Trạng thái máy in không hợp lệ." });
@@ -203,7 +204,7 @@ public class QuanTriController : ControllerBase
 
     [HttpPut("khach-hang/{maKhachHang}/trang-thai")]
     [Authorize(Roles = "SUPER_ADMIN")]
-    public async Task<IActionResult> CapNhatKhachHang(int maKhachHang, CapNhatTrangThaiRequest req)
+    public async Task<IActionResult> CapNhatKhachHang([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maKhachHang, CapNhatTrangThaiRequest req)
     {
         if (req.TrangThai != "HOAT_DONG" && req.TrangThai != "KHOA")
             return BadRequest(new { message = "Trạng thái tài khoản không hợp lệ." });
@@ -270,7 +271,7 @@ public class QuanTriController : ControllerBase
 
     [HttpPut("khuyen-mai/{maKhuyenMai}")]
     [Authorize(Roles = "SUPER_ADMIN")]
-    public async Task<IActionResult> CapNhatKhuyenMai(int maKhuyenMai, LuuKhuyenMaiRequest req)
+    public async Task<IActionResult> CapNhatKhuyenMai([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maKhuyenMai, LuuKhuyenMaiRequest req)
     {
         int? maChiNhanh = LayChiNhanhTuToken();
         string loi = QuyTacQuanTriChiNhanh.KiemTraKhuyenMai(req, maChiNhanh);
@@ -362,7 +363,7 @@ public class QuanTriController : ControllerBase
 
     [HttpPost("phieu-nhap/{maPhieuNhap}/duyet")]
     [Authorize(Roles = "SUPER_ADMIN")]
-    public async Task<IActionResult> DuyetPhieuNhap(int maPhieuNhap, DuyetPhieuNhapRequest req)
+    public async Task<IActionResult> DuyetPhieuNhap([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maPhieuNhap, DuyetPhieuNhapRequest req)
     {
         int maNguoiDuyet = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
         using var conn = new SqlConnection(_chuoiKetNoi);
@@ -381,7 +382,7 @@ public class QuanTriController : ControllerBase
 
     [HttpPost("phieu-nhap/{maPhieuNhap}/nhan-hang")]
     [Authorize(Roles = "BRANCH_ADMIN")]
-    public async Task<IActionResult> NhanHang(int maPhieuNhap, NhanHangRequest req)
+    public async Task<IActionResult> NhanHang([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maPhieuNhap, NhanHangRequest req)
     {
         int maChiNhanh = int.Parse(User.FindFirst(TenClaim.MaChiNhanh).Value);
         if (req.SoLuongThucNhan <= 0) return BadRequest(new { message = "Số lượng thực nhận phải lớn hơn 0." });
@@ -410,6 +411,8 @@ public class QuanTriController : ControllerBase
         DateTime tu = (tuNgay ?? DateTime.Today.AddDays(-6)).Date;
         DateTime den = (denNgay ?? DateTime.Today).Date;
         if (tu > den) return BadRequest(new { message = "Từ ngày không được lớn hơn đến ngày." });
+        if (tu.Year < 1753 || den >= new DateTime(9999, 12, 31))
+            return BadRequest(new { message = "Khoảng báo cáo phải từ 01/01/1753 đến 30/12/9999." });
 
         // Chỉ ghép các biểu thức cố định do server chọn, tuyệt đối không đưa chuỗi của client thẳng vào SQL.
         string cachNhom = (nhomTheo ?? "ngay").Trim().ToLowerInvariant();

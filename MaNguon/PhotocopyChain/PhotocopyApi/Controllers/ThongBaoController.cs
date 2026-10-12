@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -54,7 +55,7 @@ public class ThongBaoController : ControllerBase
 
     // PUT api/thong-bao/5/da-doc — đánh dấu 1 thông báo là đã đọc
     [HttpPut("{maThongBao}/da-doc")]
-    public async Task<IActionResult> DanhDauDaDoc(int maThongBao)
+    public async Task<IActionResult> DanhDauDaDoc([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maThongBao)
     {
         int maNguoiDung = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
 

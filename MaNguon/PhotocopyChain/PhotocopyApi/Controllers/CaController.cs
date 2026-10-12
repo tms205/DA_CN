@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Data;
 using Dapper;
 using Microsoft.AspNetCore.Authorization;
@@ -93,7 +94,7 @@ public class CaController : ControllerBase
     // Web tự chia 5 dòng mỗi trang để code dễ đọc và dữ liệu của một ca cũng không quá lớn.
     [HttpGet("{maCa}/don-hang")]
     [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
-    public async Task<IActionResult> DonHangTrongCa(int maCa)
+    public async Task<IActionResult> DonHangTrongCa([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maCa)
     {
         int? maChiNhanh = User.FindFirst(TenClaim.MaChiNhanh) == null
             ? null
@@ -122,6 +123,8 @@ public class CaController : ControllerBase
 
         if (ngayBatDau > ngayKetThuc)
             return BadRequest(new { message = "Từ ngày không được lớn hơn đến ngày." });
+        if (ngayBatDau.Year < 1753 || ngayKetThuc >= new DateTime(9999, 12, 31))
+            return BadRequest(new { message = "Khoảng lịch sử phải từ 01/01/1753 đến 30/12/9999." });
 
         string vaiTro = User.FindFirst(TenClaim.VaiTro).Value;
         int maNguoiDung = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
@@ -253,7 +256,7 @@ public class CaController : ControllerBase
     // POST api/ca/5/xac-nhan — ghi nhận khoản chi và số tiền nhân viên bù khi két thiếu.
     [HttpPost("{maCa}/xac-nhan")]
     [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN")]
-    public async Task<IActionResult> XacNhanCa(int maCa, XacNhanCaRequest req)
+    public async Task<IActionResult> XacNhanCa([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maCa, XacNhanCaRequest req)
     {
         int maQuanLy = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
         if (req.TienQuanLyDemCuoiCa == null || req.TienQuanLyDemCuoiCa < 0)

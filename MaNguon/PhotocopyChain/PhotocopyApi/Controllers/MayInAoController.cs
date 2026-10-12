@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Data;
 using System.Security.Cryptography;
 using System.Text;
@@ -42,7 +43,7 @@ public sealed class MayInAoController : ControllerBase
 
     [HttpPost("{maMayIn:int}/heartbeat")]
     [AllowAnonymous]
-    public async Task<IActionResult> Heartbeat(int maMayIn, BaoCaoMayInRequest req)
+    public async Task<IActionResult> Heartbeat([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maMayIn, BaoCaoMayInRequest req)
     {
         IActionResult loiKhoa = KiemTraKhoa();
         if (loiKhoa != null) return loiKhoa;
@@ -69,7 +70,7 @@ public sealed class MayInAoController : ControllerBase
 
     [HttpGet("{maMayIn:int}/lenh-tiep-theo")]
     [AllowAnonymous]
-    public async Task<IActionResult> LenhTiepTheo(int maMayIn)
+    public async Task<IActionResult> LenhTiepTheo([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maMayIn)
     {
         IActionResult loiKhoa = KiemTraKhoa();
         if (loiKhoa != null) return loiKhoa;
@@ -123,7 +124,7 @@ public sealed class MayInAoController : ControllerBase
 
     [HttpGet("don/{maDonHang:int}/file/{maFile:int}")]
     [AllowAnonymous]
-    public async Task<IActionResult> TaiFile(int maDonHang, int maFile)
+    public async Task<IActionResult> TaiFile([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maDonHang, [Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maFile)
     {
         IActionResult loiKhoa = KiemTraKhoa();
         if (loiKhoa != null) return loiKhoa;
@@ -153,7 +154,7 @@ public sealed class MayInAoController : ControllerBase
 
     [HttpPost("don/{maDonHang:int}/hoan-tat")]
     [AllowAnonymous]
-    public async Task<IActionResult> HoanTat(int maDonHang, BaoCaoMayInRequest req)
+    public async Task<IActionResult> HoanTat([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maDonHang, BaoCaoMayInRequest req)
     {
         IActionResult loiKhoa = KiemTraKhoa();
         if (loiKhoa != null) return loiKhoa;
@@ -211,7 +212,7 @@ public sealed class MayInAoController : ControllerBase
 
     [HttpPost("don/{maDonHang:int}/loi")]
     [AllowAnonymous]
-    public IActionResult BaoLoi(int maDonHang, BaoCaoMayInRequest req)
+    public IActionResult BaoLoi([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maDonHang, BaoCaoMayInRequest req)
     {
         IActionResult loiKhoa = KiemTraKhoa();
         if (loiKhoa != null) return loiKhoa;

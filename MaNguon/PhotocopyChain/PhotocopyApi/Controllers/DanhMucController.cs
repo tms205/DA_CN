@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Dapper;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
@@ -30,7 +31,7 @@ public class DanhMucController : ControllerBase
 
     // các dòng giá in ấn + gia công đang hiển thị 
     [HttpGet("bang-gia")]
-    public async Task<IActionResult> BangGia([FromQuery] int maChiNhanh)
+    public async Task<IActionResult> BangGia([FromQuery] [Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maChiNhanh)
     {
         if (maChiNhanh <= 0)
             return BadRequest(new { message = "Hãy chọn chi nhánh để xem bảng giá." });

@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using PhotocopyShared.Dtos.Auth;
+using PhotocopyShared.KiemTraDuLieu;
 
 namespace PhotocopyAdmin;
 
@@ -8,6 +9,7 @@ public sealed class DatLaiMatKhauForm
 {
     [Required(ErrorMessage = "Vui lòng nhập mật khẩu mới.")]
     [RegularExpression(QuyTacMatKhau.BieuThuc, ErrorMessage = QuyTacMatKhau.ThongBao)]
+    [MatKhauMoi]
     public string MatKhauMoi { get; set; } = "";
 
     [Required(ErrorMessage = "Vui lòng nhập lại mật khẩu mới.")]
