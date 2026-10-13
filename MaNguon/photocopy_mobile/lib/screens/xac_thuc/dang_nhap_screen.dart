@@ -8,6 +8,7 @@ import '../../widgets/icons.dart';
 import '../../widgets/widgets.dart';
 import 'dang_ky_screen.dart';
 import 'quen_mat_khau_screen.dart';
+import 'nut_google.dart';
 import '../trang_chinh_screen.dart';
 
 // F-02 — Figma 06-Mobile-DangNhap: một màn dùng chung cho Khách hàng và Shipper.
@@ -42,6 +43,7 @@ class _DangNhapScreenState extends State<DangNhapScreen> {
   }
 
   Future<void> _dangNhap() async {
+    if (_dangGui) return;
     FocusScope.of(context).unfocus(); // ẩn bàn phím
     if (_taiKhoan.text.trim().isEmpty || _matKhau.text.isEmpty) {
       setState(() => _loi = 'Vui lòng nhập email/số điện thoại và mật khẩu.');
@@ -170,11 +172,8 @@ class _DangNhapScreenState extends State<DangNhapScreen> {
                     const SizedBox(height: 14),
                     const DuongHoac('hoặc'),
                     const SizedBox(height: 14),
-                    NutPhu(
-                      nhan: 'Tiếp tục với Google',
-                      icon: const GoogleLogo(),
-                      onPressed: () => hienThongBaoNhanh(context, 'Đăng nhập Google chưa được bật ở phiên bản này.'),
-                    ),
+                    NutGoogle(ghiNho: _ghiNho, dangBan: _dangGui,
+                        dangXuLyChanged: (v) { if (mounted) setState(() => _dangGui = v); }),
                     const SizedBox(height: 14),
                     KhungNetDut(
                       child: Padding(

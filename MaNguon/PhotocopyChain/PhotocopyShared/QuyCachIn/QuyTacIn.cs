@@ -16,8 +16,13 @@ public static class QuyTacIn
     private static bool LaLoXo(string ten)
         => string.Equals(ten.Trim(), "Đóng lò xo", StringComparison.OrdinalIgnoreCase);
 
+    private static bool LaBiaKieng(string ten)
+        => string.Equals(ten.Trim(), "Đóng bìa kiếng", StringComparison.OrdinalIgnoreCase);
+
     public static bool LoaiTruNhau(string tenA, string? nhomA, string tenB, string? nhomB)
     {
+        // Bìa bảo vệ và lò xo là hai công đoạn có thể đi kèm, kể cả dữ liệu cũ cùng nhóm.
+        if ((LaBiaKieng(tenA) && LaLoXo(tenB)) || (LaLoXo(tenA) && LaBiaKieng(tenB))) return false;
         if (!string.IsNullOrWhiteSpace(nhomA) &&
             string.Equals(nhomA, nhomB, StringComparison.OrdinalIgnoreCase)) return true;
 

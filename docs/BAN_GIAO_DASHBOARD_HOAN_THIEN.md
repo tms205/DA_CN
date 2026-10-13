@@ -1,6 +1,6 @@
 # Bàn giao dashboard hoàn thiện
 
-Ngày: 13/10/2026. Phạm vi: Web quản trị PhotocopyChain và API báo cáo **chỉ đọc**.
+Ngày: 13/10/2026. Các mục 1–10 ghi lịch sử Dashboard/Web và API báo cáo chỉ đọc. Cập nhật mới: bỏ hai khối Dashboard, sửa liên hệ và bổ sung danh mục quản lý; xem mục 11.
 
 ## 1. Kết quả chính
 
@@ -9,7 +9,7 @@ Ngày: 13/10/2026. Phạm vi: Web quản trị PhotocopyChain và API báo cáo 
 - Preset hôm nay, tuần này, tháng này tự áp dụng. Ngày nhập **dd/MM/yyyy**, kiểm tra ngày thật và giới hạn kỳ; ngày tùy chọn vẫn có nút áp dụng để tránh gọi API khi đang gõ.
 - Biểu đồ ngày là cột; tuần/tháng là đường. Trục tiền dùng bước tròn, số tiền đầy đủ với ₫. Kỳ trước toàn 0 không vẽ đường/cột đối chiếu; không hiện tăng trưởng vô hạn.
 - Chỉ hiển thị so sánh chi nhánh khi có từ hai nhóm dữ liệu. Giữ một nút đến báo cáo chi nhánh; giải thích dài chuyển vào phần mở rộng bằng bàn phím.
-- Có cơ cấu dịch vụ, phương thức thanh toán, giờ cao điểm, thời gian xử lý, tỷ lệ đúng hẹn và đánh giá khách hàng từ dữ liệu hệ thống.
+- Có cơ cấu dịch vụ và phương thức thanh toán từ dữ liệu hệ thống. Khối giờ cao điểm/hiệu quả/đánh giá đã bỏ khỏi giao diện theo yêu cầu sau đó (mục 11).
 - Vận hành có đơn cần tiếp nhận/hỏa tốc/quá hạn, kho theo ngưỡng, máy theo heartbeat, ca mở, ca chờ xác nhận, ca có chênh lệch và phiếu chờ duyệt.
 - Cảnh báo cam chỉ bật khi có việc tương ứng; khi bằng 0 dùng trạng thái trung tính. Lỗi tải một nguồn không làm mất các nguồn còn lại và không giả số 0.
 - Hàng đợi, heartbeat và chỉ số ca tự cập nhật mỗi **60 giây** khi mở Vận hành và tab trình duyệt hiển thị; chuyển sang Kinh doanh dừng timer. Không quét lịch sử kho/phiếu bằng timer. Có thời điểm cập nhật riêng.
@@ -184,4 +184,13 @@ Web đang phục vụ CSS mới; Ctrl+F5 để nạp. Không sửa backend/DB, k
 - Chỉ sửa MainLayout.razor (markup footer), app-ui-v2.css (token sidebar và style ct-*), index.html (version 20261013-shell-compact), test và browser harness.
 
 Kiểm chứng: test nhãn liên hệ và width được xác nhận RED trước sửa; Web build 0 warning / 0 error, publish Release đạt; full .NET **316 đạt / 16 skip / 332, 0 lỗi**. Chrome fixture **390/768/1024/1366/1920px đều đạt**, thêm 390×640px, gồm vị trí/chiều cao footer, href/focus, đo sidebar 325px và các hồi quy dashboard. Ảnh footer/sidebar đã xem lại. CSS mới đang được Web 5064 phục vụ; không đổi backend/DB và chưa commit.
+
+## 11. Liên hệ và các danh mục quản lý
+
+- Email footer chuyển sang Gmail compose; điện thoại mở dialog có gọi/sao chép và phản hồi lỗi rõ ràng.
+- Bỏ Hiệu quả & trải nghiệm khách hàng và Giờ cao điểm; giữ Chi tiết doanh thu cùng cơ cấu dịch vụ/thanh toán.
+- Thêm Khách hàng và Dịch vụ trong Quản lý; CEO thêm được chi nhánh/máy in. Giữ quyền cũ, không sửa schema, không xóa dữ liệu.
+- Bảng giá chỉ sửa giá/trạng thái riêng từng cơ sở; dịch vụ chung không lặp theo chi nhánh. Bảo vệ quy cách đã có đơn và tên gia công gắn ràng buộc.
+- Full .NET: 325 đạt, 17 skip / 342, 0 lỗi; 2 bài SELECT CSDL thật đạt. Browser fixture qua 5 kích thước; không ghi dữ liệu thử vào database thật.
+- Chi tiết file/vùng dòng, cách chạy và giới hạn: [BAN_GIAO_QUAN_LY_DANH_MUC.md](BAN_GIAO_QUAN_LY_DANH_MUC.md).
 

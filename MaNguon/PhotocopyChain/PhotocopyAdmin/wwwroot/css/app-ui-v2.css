@@ -691,13 +691,13 @@ a:hover {
 .ct-ban-quyen { color: var(--chu-nhan); font-size: 14px; font-weight: 400; white-space: nowrap; }
 .ct-slogan { color: var(--chu-nhan); font-size: 14px; }
 .ct-lien-he { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin: 0; font-style: normal; max-width: 100%; }
-.ct-lien-he a { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 44px; padding: 4px 0 4px 16px; border-left: 1px solid var(--vach); color: var(--chu-nhan); }
+.ct-muc-lien-he { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 44px; padding: 4px 0 4px 16px; border-left: 1px solid var(--vach); color: var(--chu-nhan); background: none; border-top: 0; border-right: 0; border-bottom: 0; border-radius: 0; font: inherit; text-align: left; cursor: pointer; }
 .ct-lien-he-icon { display: flex; flex-shrink: 0; color: var(--accent); }
 .ct-lien-he-chu { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
 .ct-nhan { font-size: 14px; line-height: 1.4; color: var(--chu-nhan); }
 .ct-gia-tri { font-size: 16px; line-height: 1.5; font-weight: 500; overflow-wrap: anywhere; }
-.ct-lien-he a:hover .ct-gia-tri { color: var(--accent); text-decoration: underline; }
-.ct-lien-he a:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: var(--ban-kinh-sm); }
+.ct-muc-lien-he:hover .ct-gia-tri { color: var(--accent); text-decoration: underline; }
+.ct-muc-lien-he:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: var(--ban-kinh-sm); }
 
 @media (max-width: 1023px) {
     .chan-trang { padding: 10px 20px; }
@@ -707,8 +707,8 @@ a:hover {
     .chan-trang { display: grid; grid-template-columns: minmax(0, 1fr); padding: 6px 16px; gap: 8px; }
     .ct-thuong-hieu { min-width: 0; }
     .ct-lien-he { display: grid; grid-template-columns: minmax(0, 1fr) 116px; gap: 12px; width: 100%; padding-top: 8px; border-top: 1px solid var(--vach); align-items: start; }
-    .ct-lien-he a { border-left: 0; padding: 0; align-items: start; }
-    .ct-lien-he a + a { border-left: 1px solid var(--vach); padding-left: 12px; }
+    .ct-muc-lien-he { border-left: 0; padding: 0; align-items: start; }
+    .ct-muc-lien-he + .ct-muc-lien-he { border-left: 1px solid var(--vach); padding-left: 12px; }
     .ct-lien-he-icon { display: none; }
 }
 
@@ -2035,15 +2035,6 @@ a:hover {
 .tq-doi-chieu-tien { margin: 0; }
 .tq-doi-chieu-tien > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; padding: 8px 0; }
 .tq-doi-chieu-tien dd { margin: 0; color: var(--chu); font-weight: 600; }
-.tq-khung-gio { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
-.tq-khung-gio button[aria-pressed=true] { color: var(--accent); border-color: var(--accent); background: var(--accent-nhat); }
-.tq-nhiet { display: grid; grid-template-columns: 40px repeat(8, minmax(0, 1fr)); gap: 6px; margin-bottom: 16px; }
-.tq-nhiet > span { display: flex; align-items: center; justify-content: center; min-height: 36px; font-size: 16px; }
-.tq-nhiet-nhan { color: var(--chu-phu); }
-.tq-nhiet-o { background: var(--nen-phu); color: var(--chu-phu); border-radius: 2px; overflow-wrap: anywhere; }
-.tq-nhiet-o.muc-1 { background: var(--accent-nhat); color: var(--accent-sau); }
-.tq-nhiet-o.muc-2 { background: var(--accent-hover); color: var(--accent-sau); border: 1px solid var(--accent); }
-.tq-nhiet-o.muc-3 { background: var(--accent); color: var(--trang); }
 .tb-badge { margin-left: auto; padding: 2px 8px; font-size: 15px; color: var(--cb-tieu-de); background: var(--cb-nen); border: 1px solid var(--cb-vien); border-radius: 4px; }
 @container (max-width: 560px) { .tq-nhan-truc { font-size: 26px; } }
 @media (max-width: 1500px) {
@@ -2061,8 +2052,6 @@ a:hover {
     .tq-trang .tq-kpi { grid-template-columns: minmax(0, 1fr); }
     .tq-ca-hien-tai { padding: 16px; }
     .tq-tab button { flex: 1; padding: 12px 16px; }
-    .tq-nhiet { grid-template-columns: 28px repeat(8, minmax(0, 1fr)); gap: 3px; }
-    .tq-nhiet > span { font-size: 14px; }
     .tq-bo-loc, .tq-noi-bieu-do { padding: 16px; }
     .tq-kpi-tien { font-size: 28px; }
     .tq-tieu-muc, .tq-viec-can-lam { flex-direction: column; align-items: stretch; }
@@ -2429,10 +2418,10 @@ a:hover {
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
-/* Lập đơn tại quầy: dành đủ chỗ cho tên phương thức thanh toán. */
+/* Lập đơn tại quầy: hàng thanh toán gọn, cùng hàng với tốc độ xử lý. */
 .ldq-thanh-toan-khuyen-mai {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1.1fr) minmax(0, 2fr) minmax(0, 1.1fr);
     align-items: flex-end;
     gap: 14px;
     margin-top: 14px;
@@ -2440,18 +2429,19 @@ a:hover {
 .ldq-thanh-toan-khuyen-mai .truong {
     min-width: 0;
 }
-.ldq-thanh-toan {
-    flex: 2 1 360px;
-}
-.ldq-khuyen-mai {
-    flex: 1 1 240px;
-}
 .ldq-thanh-toan-khuyen-mai .ca-o-loc {
     width: 100%;
     min-width: 0;
 }
 .ldq-thanh-toan select {
     padding-inline: 10px;
+}
+@media (max-width: 1100px) {
+    .ldq-thanh-toan-khuyen-mai { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+    .ldq-toc-do { grid-column: 1 / -1; }
+}
+@media (max-width: 640px) {
+    .ldq-thanh-toan-khuyen-mai { grid-template-columns: minmax(0, 1fr); }
 }
 
 .ca-loc-hanh-dong {
@@ -2915,4 +2905,19 @@ a:hover {
         border: 1px solid #CCC;
         box-shadow: none;
     }
+}
+
+/* Hộp liên hệ dùng dialog gốc: giữ focus, đóng bằng Escape, không phụ thuộc app gọi của Windows. */
+.ct-hop-thoai { width: min(460px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 24px; border: 1px solid var(--vach); border-radius: var(--ban-kinh); color: var(--chu); background: var(--trang); }
+.ct-hop-thoai::backdrop { background: rgb(15 23 42 / 45%); }
+.ct-hop-thoai h2 { font-size: 20px; margin: 0; }
+.ct-hop-thoai p { margin: 16px 0; line-height: 1.6; }
+.ct-hop-thoai [role=status] { color: var(--chu-nhan); min-height: 24px; margin-bottom: 0; }
+
+/* Danh mục quản lý dùng cùng bảng hiện có; bộ lọc có khoảng thở riêng. */
+.dm-bo-loc { padding: 16px 20px; }
+.dn-google-nut { width: 100%; display: flex; justify-content: center; min-height: 44px; }
+.dn-google-ghi-chu { font-size: 15px; color: var(--chu-nhan); line-height: 1.5; text-align: center; margin: 8px 0; }
+@media (min-width: 1024px) {
+    .dm-khach-hang th:first-child { width: 28%; }
 }

@@ -176,13 +176,6 @@
                     <input max="2147483647" required step="1" class="ca-o-loc" type="number" min="1" @bind="_soBan" @bind:after="XoaBaoGia" />
                 </div>
                 }
-                <div class="truong">
-                    <label class="nhan">Tốc độ xử lý</label>
-                    <select class="ca-o-loc" @bind="KieuIn" @bind:after="DoiKieuInAsync" disabled="@(_dangGui || _dangTaiFile)">
-                        <option value="THUONG">In thường · theo hàng đợi</option>
-                        <option value="HOA_TOC">In hỏa tốc · ưu tiên (+10.000₫)</option>
-                    </select>
-                </div>
             </div>
 
             <div class="ldq-thanh-toan-khuyen-mai">
@@ -196,6 +189,13 @@
                 <div class="truong ldq-khuyen-mai">
                     <label class="nhan" for="ldq-ma-khuyen-mai">Mã khuyến mãi</label>
                     <input id="ldq-ma-khuyen-mai" maxlength="30" class="ca-o-loc mono" @bind="_maCode" @bind:after="XoaBaoGia" />
+                </div>
+                <div class="truong ldq-toc-do">
+                    <label class="nhan" for="ldq-toc-do">Tốc độ xử lý</label>
+                    <select id="ldq-toc-do" class="ca-o-loc" @bind="KieuIn" @bind:after="DoiKieuInAsync" disabled="@(_dangGui || _dangTaiFile)">
+                        <option value="THUONG">In thường · theo hàng đợi</option>
+                        <option value="HOA_TOC">In hỏa tốc (+10.000₫)</option>
+                    </select>
                 </div>
             </div>
 
@@ -230,7 +230,7 @@
                     </label>
                 }
             </div>
-            <p class="nv-phu">Kim góc: tối đa 50 tờ giấy mỗi file, mỗi bản. Lò xo không chọn cùng kim góc; ép plastic vẫn chọn cùng lò xo.</p>
+            <p class="nv-phu">Kim góc: tối đa 50 tờ giấy mỗi file, mỗi bản. Bìa kiếng và ép plastic có thể đi cùng lò xo; lò xo không chọn cùng kim góc.</p>
             @if (!KimGocHopLe())
             {
                 <div class="o-canh-bao">Có file vượt 50 tờ/bản theo mặt in hiện tại, không thể chọn bấm kim góc.</div>
@@ -509,8 +509,7 @@
             await Http.DeleteAsync("api/file-in/" + file.MaFileIn + "?maKhachHang=" + _khach.MaKhachHang);
     }
 
-    // Giống App mobile: chọn được nhiều gia công, riêng các dịch vụ cùng nhóm
-    // (DONG_GAY: bìa kiếng / lò xo) loại trừ nhau.
+    // Giống App mobile: bìa kiếng đi kèm lò xo; lò xo không đi cùng kim góc.
     private void DoiGiaCong(DichVuDto dichVu, bool chon)
     {
         _thongBaoGiaCong = null;

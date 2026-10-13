@@ -38,11 +38,12 @@ public class TongQuanPhanTichTests
         if (loi) Assert.DoesNotContain("Giờ cao điểm", html);
         else
         {
-            Assert.Contains("Giờ cao điểm", html);
+            Assert.DoesNotContain("Giờ cao điểm", html);
+            Assert.DoesNotContain("Hiệu quả & trải nghiệm khách hàng", html);
             Assert.Contains("In màu", html);
             Assert.Contains("Đóng lò xo", html);
             Assert.Contains("COD", html);
-            Assert.Contains("Chưa có dữ liệu", html);
+            Assert.Contains("105.000₫", html);
             Assert.DoesNotContain("NaN", html);
             Assert.DoesNotContain("Infinity", html);
         }

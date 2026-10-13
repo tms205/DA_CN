@@ -6,6 +6,16 @@ namespace PhotocopyApi.Tests;
 
 public class QuyTacQuanTriChiNhanhTests
 {
+    [Theory]
+    [InlineData("Bấm kim góc", "Bấm kim mới", true)]
+    [InlineData("Đóng lò xo", "Đóng gáy mới", true)]
+    [InlineData("Đóng lò xo", "Đóng lò xo", false)]
+    [InlineData("In A4", "In A4 đổi tên", false)]
+    public void DoiTenDichVu_KhongLamMatRangBuocGiaCong(string cu, string moi, bool coLoi)
+    {
+        Assert.Equal(coLoi, QuyTacQuanTriChiNhanh.KiemTraDoiTenDichVu(cu, moi) != null);
+    }
+
     [Fact]
     public void KiemTraDichVu_ChuaChonChiNhanh_ThongBaoLoi()
     {

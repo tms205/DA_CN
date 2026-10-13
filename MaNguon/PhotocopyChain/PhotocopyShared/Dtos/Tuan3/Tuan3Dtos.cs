@@ -219,7 +219,8 @@ public sealed partial class ChiNhanhQuanTriDto
     public decimal? KinhDo { get; set; }
     public TimeSpan GioMoCua { get; set; }
     public TimeSpan GioDongCua { get; set; }
-    [Range(typeof(decimal), "0", "999.99", ErrorMessage = "Bán kính giao phải từ 0 đến 999,99 km.")]
+    // Giới hạn viết bằng dấu chấm trong mã nguồn; không phụ thuộc culture vi-VN của trình duyệt.
+    [Range(typeof(decimal), "0", "999.99", ParseLimitsInInvariantCulture = true, ConvertValueInInvariantCulture = true, ErrorMessage = "Bán kính giao phải từ 0 đến 999,99 km.")]
     public decimal BanKinhGiao { get; set; }
     [Required(ErrorMessage = "Vui lòng nhập giá trị.")]
     [RegularExpression(@"^(HOAT_DONG|TAM_NGUNG)$", ErrorMessage = "Lựa chọn không hợp lệ.")]

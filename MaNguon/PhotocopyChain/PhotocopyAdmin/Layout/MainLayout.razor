@@ -4,6 +4,7 @@
 @inject HttpClient Http
 @inject NavigationManager Nav
 @inject ThongBaoPheDuyet ThongBao
+@inject IJSRuntime JS
 @implements IDisposable
 
 @* AppShell dùng chung: sidebar desktop, sidebar thu gọn và drawer trên màn hình nhỏ. *@
@@ -92,11 +93,13 @@
                     }
                     @if (LaQuanLy())
                     {
+                        <NavLink class="tb-muc" href="dich-vu" title="Dịch vụ" @onclick="DongMenu">@((MarkupString)Svg.DichVu(18)) <span>Dịch vụ</span></NavLink>
                         <NavLink class="tb-muc" href="nhan-vien" title="Nhân viên" @onclick="DongMenu">@((MarkupString)Svg.NguoiDung(18)) <span>Nhân viên</span></NavLink>
                         <NavLink class="tb-muc" href="danh-gia" title="Đánh giá khách hàng" @onclick="DongMenu">@((MarkupString)Svg.NgoiSao()) <span>Đánh giá khách hàng</span></NavLink>
                     }
                     @if (VaiTroLa("SUPER_ADMIN"))
                     {
+                        <NavLink class="tb-muc" href="khach-hang" title="Khách hàng" @onclick="DongMenu">@((MarkupString)Svg.NguoiMot(18)) <span>Khách hàng</span></NavLink>
                         <NavLink class="tb-muc" href="phe-duyet" title="Phê duyệt phiếu nhập và hoàn tiền" @onclick="DongMenu">@((MarkupString)Svg.DuyetHoSo(18)) <span>Phê duyệt</span>@if (ThongBao.SoCho != 0) { <span class="tb-badge" aria-label="@(ThongBao.SoCho == null ? "Số yêu cầu chờ duyệt chưa tải được" : $"{ThongBao.SoCho} yêu cầu chờ duyệt")">@(ThongBao.SoCho?.ToString() ?? "?")</span> }</NavLink>
                     }
                 </div>
@@ -175,18 +178,32 @@
                 <span class="ct-slogan">In rõ nét — Nhận đúng hẹn.</span>
             </div>
             <address class="ct-lien-he" aria-label="Thông tin liên hệ">
-                <a href="mailto:manh27062005@gmail.com" aria-label="Email liên hệ: manh27062005@gmail.com">
+                <a class="ct-muc-lien-he" href="@("https://mail.google.com/mail/?view=cm&fs=1&to=manh27062005%40gmail.com")" target="_blank" rel="noopener noreferrer" aria-label="Email liên hệ: manh27062005@gmail.com">
                     <span class="ct-lien-he-icon" aria-hidden="true">@((MarkupString)Svg.Thu(18))</span>
                     <span class="ct-lien-he-chu"><span class="ct-nhan">Email liên hệ</span><span class="ct-gia-tri">manh27062005&#64;<wbr />gmail.com</span></span>
                 </a>
-                <a href="tel:0769479813" aria-label="Điện thoại: 0769479813">
+                <button type="button" class="ct-muc-lien-he" aria-label="Điện thoại: 0769479813" aria-haspopup="dialog" @onclick="MoLienHeAsync">
                     <span class="ct-lien-he-icon" aria-hidden="true">@((MarkupString)Svg.DienThoai(18))</span>
                     <span class="ct-lien-he-chu"><span class="ct-nhan">Điện thoại</span><span class="ct-gia-tri">0769479813</span></span>
-                </a>
+                </button>
             </address>
         </footer>
     </section>
 </div>
+<dialog class="ct-hop-thoai" @ref="_hopLienHe" aria-labelledby="tieu-de-lien-he">
+    <form method="dialog" class="ca-dau">
+        <h2 id="tieu-de-lien-he">Liên hệ qua điện thoại</h2>
+        <button class="nut-dong" aria-label="Đóng liên hệ">×</button>
+    </form>
+    <p>Trên điện thoại, chọn gọi để mở ứng dụng điện thoại. Máy tính cần có ứng dụng hỗ trợ cuộc gọi; bạn cũng có thể sao chép số bên dưới.</p>
+    <label class="nhan" for="so-lien-he">Số điện thoại</label>
+    <input id="so-lien-he" class="ca-o-loc mono" value="0769479813" readonly autofocus />
+    <div class="xac-nhan-o">
+        <a class="nut-chinh" href="tel:0769479813">Gọi bằng ứng dụng</a>
+        <button type="button" class="nut-phu" @onclick="SaoChepSoAsync">Sao chép số</button>
+    </div>
+    <p role="status">@_ketQuaSaoChep</p>
+</dialog>
 
 @code {
     // Nhận trạng thái đăng nhập từ Blazor: sửa hồ sơ xong thì layout tự vẽ lại → tên ở sidebar đổi ngay
@@ -195,6 +212,8 @@
     // Người đang đăng nhập
     private NguoiDungDto ND => Phien.NguoiDung;
     private List<ChiNhanhDto> _dsChiNhanh = new();
+    private ElementReference _hopLienHe;
+    private string _ketQuaSaoChep;
     private bool _menuMo;
     private bool _menuThuGon;
     private HashSet<string> _cacNhomDangMo = new();
@@ -218,6 +237,8 @@
                 "don-hang-trong-ca" => ("Ca & tiền", "Lịch sử đơn theo ca"),
                 "kho-vat-tu" => ("Quản lý", "Kho vật tư"),
                 "nhan-vien" => ("Quản lý", "Nhân viên"),
+                "khach-hang" => ("Quản lý", "Khách hàng"),
+                "dich-vu" => ("Quản lý", "Dịch vụ"),
                 "danh-gia" => ("Quản lý", "Đánh giá khách hàng"),
                 "phe-duyet" => ("Quản lý", "Phê duyệt"),
                 "bang-gia" => ("Cấu hình", "Bảng giá in ấn"),
@@ -316,7 +337,7 @@
             _cacNhomDangMo.Add("bao-cao");
         else if (duongDan == "bang-gia" || duongDan == "khuyen-mai" || duongDan == "quan-tri")
             _cacNhomDangMo.Add("cau-hinh");
-        else if (duongDan == "kho-vat-tu" || duongDan == "nhan-vien" || duongDan == "danh-gia" || duongDan == "phe-duyet")
+        else if (duongDan == "kho-vat-tu" || duongDan == "nhan-vien" || duongDan == "danh-gia" || duongDan == "phe-duyet" || duongDan == "khach-hang" || duongDan == "dich-vu")
             _cacNhomDangMo.Add("quan-ly");
         else
             _cacNhomDangMo.Add("van-hanh");
@@ -340,6 +361,25 @@
     {
         await Phien.DangXuat();
         Nav.NavigateTo("dang-nhap", replace: true);
+    }
+
+    private async Task MoLienHeAsync()
+    {
+        _ketQuaSaoChep = null;
+        await JS.InvokeVoidAsync("moLienHeFooter", _hopLienHe);
+    }
+
+    private async Task SaoChepSoAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", "0769479813");
+            _ketQuaSaoChep = "Đã sao chép số điện thoại.";
+        }
+        catch (JSException)
+        {
+            _ketQuaSaoChep = "Trình duyệt không cho sao chép. Hãy chọn số điện thoại và sao chép thủ công.";
+        }
     }
 
     private void VeBadge() => _ = InvokeAsync(StateHasChanged);

@@ -22,7 +22,10 @@ void main() {
         bia = dv('Đóng bìa kiếng', 'DONG_GAY');
     expect(giaCongLoaiTru(loXo, kim), isTrue);
     expect(giaCongLoaiTru(kim, loXo), isTrue);
-    expect(giaCongLoaiTru(loXo, bia), isTrue);
+    expect(giaCongLoaiTru(loXo, bia), isFalse);
+    expect(giaCongLoaiTru(bia, loXo), isFalse);
+    expect(giaCongLoaiTru(dv(' ĐÓNG BÌA KIẾNG ', 'DONG_GAY'), loXo), isFalse);
+    expect(giaCongLoaiTru(dv('Kiểu A', 'DONG_GAY'), dv('Kiểu B', 'DONG_GAY')), isTrue);
     expect(giaCongLoaiTru(loXo, dv('Ép plastic')), isFalse);
     expect(giaCongLoaiTru(bia, kim), isFalse);
   });

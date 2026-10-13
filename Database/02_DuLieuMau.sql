@@ -43,7 +43,7 @@ INSERT INTO VatTu (TenVatTu, DonViTinh, DonGia) VALUES
 GO
 
 -- Ma 1-12: in an (gia / trang), ma 13-16: gia cong (gia / cuon)
--- NhomGiaCong = 'DONG_GAY': bia kieng va lo xo la 2 kieu dong gay, 1 ban in chi chon 1 trong 2
+-- Bìa kiếng và lò xo giữ nhóm cũ; sp_TinhTien cho phép kết hợp riêng cặp này.
 INSERT INTO DichVu (TenDichVu, LoaiDichVu, KhoGiay, LoaiGiay, MatIn, MauSac, NhomGiaCong, DonGia, MaVatTu) VALUES
 (N'In A4 70gsm 1 mặt đen trắng', 'IN_AN', 'A4', '70gsm', '1_MAT', 'DEN_TRANG', NULL,  300, 1),
 (N'In A4 70gsm 2 mặt đen trắng', 'IN_AN', 'A4', '70gsm', '2_MAT', 'DEN_TRANG', NULL,  250, 1),

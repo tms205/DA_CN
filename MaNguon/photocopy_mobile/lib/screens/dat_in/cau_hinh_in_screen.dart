@@ -449,7 +449,7 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
                   _luoiGiaCong(),
                   const SizedBox(height: 8),
                   Text(
-                    'Kim góc: tối đa 50 tờ/bản (${soToMoiBan(widget.file.soTrang ?? 0, _matIn)} tờ hiện tại). Lò xo không chọn cùng kim góc; ép plastic vẫn chọn cùng lò xo.',
+                    'Kim góc: tối đa 50 tờ/bản (${soToMoiBan(widget.file.soTrang ?? 0, _matIn)} tờ hiện tại). Bìa kiếng và ép plastic có thể đi cùng lò xo; lò xo không chọn cùng kim góc.',
                     style: AppTheme.font(size: 12, color: AppColors.chuPhu),
                   ),
                   if (_thongBaoGiaCong != null || !_kimGocHopLe())

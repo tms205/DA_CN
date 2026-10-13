@@ -24,7 +24,7 @@ namespace PhotocopyApi.Controllers;
 // F-01 → F-05: đăng nhập, đăng ký (có OTP), quên mật khẩu, hồ sơ cá nhân, đổi mật khẩu
 [ApiController]
 [Route("api/auth")]
-public class AuthController : ControllerBase
+public partial class AuthController : ControllerBase
 {
     private readonly string _chuoiKetNoi;
     private readonly IConfiguration _config;
@@ -32,10 +32,12 @@ public class AuthController : ControllerBase
     private readonly IWebHostEnvironment _env;
     private readonly ILogger<AuthController> _logger;
     private readonly OtpDatLaiStore _otpDatLai;
+    private readonly IGoogleTokenVerifier _google;
 
-    public AuthController(IConfiguration config, IMemoryCache cache, IWebHostEnvironment env, ILogger<AuthController> logger, OtpDatLaiStore otpDatLai = null)
+    public AuthController(IConfiguration config, IMemoryCache cache, IWebHostEnvironment env, ILogger<AuthController> logger, OtpDatLaiStore otpDatLai = null, IGoogleTokenVerifier google = null)
     {
         _config = config;
+        _google = google ?? new GoogleTokenVerifier(config);
         _cache = cache;
         _env = env;
         _logger = logger;
@@ -90,16 +92,14 @@ public class AuthController : ControllerBase
         }
         _cache.Remove("sai-mat-khau:" + taiKhoan.ToLower());   // đúng rồi thì đếm lại từ đầu
 
-        // 4. Kiểm tra tài khoản có bị khóa không, có đăng nhập đúng nơi không
-        //    (kiểm SAU khi đúng mật khẩu để người đoán mò không biết tài khoản thuộc vai trò nào)
-        if (nd.TrangThai != "HOAT_DONG")
-            return StatusCode(403, new { message = "Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên." });
+        return await HoanTatDangNhapAsync(conn, nd, laWeb, req.GhiNho);
+    }
 
-        bool laKhachHoacShipper = nd.VaiTro == "CUSTOMER" || nd.VaiTro == "SHIPPER";
-        if (laWeb && laKhachHoacShipper)
-            return StatusCode(403, new { message = "Khách hàng và Shipper vui lòng đăng nhập trên ứng dụng di động PhotocopyChain App." });
-        if (!laWeb && !laKhachHoacShipper)
-            return StatusCode(403, new { message = "Tài khoản nhân viên vui lòng đăng nhập tại Web quản trị." });
+    // Password và Google dùng cùng bước hoàn tất để không lệch quyền/ca làm việc.
+    private async Task<IActionResult> HoanTatDangNhapAsync(SqlConnection conn, NguoiDung nd, bool laWeb, bool ghiNho)
+    {
+        string loi = QuyTacDangNhap.KiemTraQuyen(nd.VaiTro, nd.TrangThai, laWeb);
+        if (loi != null) return StatusCode(403, new { message = loi });
 
         // 5. Nhân viên đăng nhập Web được tự mở ca với tiền đầu ca mặc định 200.000đ.
         // sp_MoCa trả lại ca hiện có nếu nhân viên đăng nhập lại, nên không tạo trùng.
@@ -124,7 +124,7 @@ public class AuthController : ControllerBase
 
         // 6. Tạo token trả về cho client
         NguoiDungDto hoSo = await DocHoSo(conn, nd.MaNguoiDung);
-        return Ok(TaoToken(hoSo, laWeb, req.GhiNho));
+        return Ok(TaoToken(hoSo, laWeb, ghiNho));
     }
 
     // ===================================================================== ĐĂNG KÝ (F-01)

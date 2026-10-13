@@ -1199,10 +1199,15 @@ public class DonHangController : ControllerBase
                 new { DsGiaCong = dsGiaCong, nguon.MaChiNhanh })).ToList();
         if (giaCong.Count != dsGiaCong.Count)
             throw new InvalidOperationException("Có dịch vụ hoàn thiện không tồn tại hoặc đã ngừng bán.");
-        bool trungNhom = giaCong.Where(x => !string.IsNullOrWhiteSpace(x.NhomGiaCong))
-            .GroupBy(x => x.NhomGiaCong, StringComparer.OrdinalIgnoreCase).Any(x => x.Count() > 1);
-        if (trungNhom)
-            throw new InvalidOperationException("Mỗi bản in chỉ được chọn một kiểu đóng gáy.");
+        for (int i = 0; i < giaCong.Count; i++)
+        {
+            for (int j = i + 1; j < giaCong.Count; j++)
+            {
+                if (QuyTacIn.LoaiTruNhau(giaCong[i].TenDichVu, giaCong[i].NhomGiaCong,
+                                       giaCong[j].TenDichVu, giaCong[j].NhomGiaCong))
+                    throw new InvalidOperationException("Có dịch vụ gia công không thể chọn cùng nhau.");
+            }
+        }
 
         YeuCauMayIn yeuCau = await DocYeuCauMayIn(conn, new List<int> { maDichVu });
         List<MayIn> dsMay = (await conn.QueryAsync<MayIn>(

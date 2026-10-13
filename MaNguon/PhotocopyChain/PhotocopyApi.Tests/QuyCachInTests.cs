@@ -28,9 +28,12 @@ public class QuyCachInTests
     [InlineData("Đóng lò xo", "DONG_GAY", "Ép plastic", null, false)]
     [InlineData("Đóng lò xo", "DONG_GAY", "Bấm kim góc", null, true)]
     [InlineData("Bấm kim góc", null, "Đóng lò xo", "DONG_GAY", true)]
-    [InlineData("Đóng lò xo", "DONG_GAY", "Đóng bìa kiếng", "DONG_GAY", true)]
+    [InlineData("Đóng lò xo", "DONG_GAY", "Đóng bìa kiếng", "DONG_GAY", false)]
+    [InlineData("Đóng bìa kiếng", "DONG_GAY", "Đóng lò xo", "DONG_GAY", false)]
+    [InlineData(" ĐÓNG BÌA KIẾNG ", "DONG_GAY", "đóng lò xo", "DONG_GAY", false)]
+    [InlineData("Kiểu đóng gáy A", "DONG_GAY", "Kiểu đóng gáy B", "DONG_GAY", true)]
     [InlineData("Đóng bìa kiếng", "DONG_GAY", "Bấm kim góc", null, false)]
-    public void GiaCong_GiuQuyTacCuVaThemLoaiTruKimGoc(string tenA, string nhomA,
+    public void GiaCong_BiaKiengDiCungLoXo_NhungVanChanKimGocVaNhomKhac(string tenA, string nhomA,
         string tenB, string nhomB, bool loaiTru)
         => Assert.Equal(loaiTru, QuyTacIn.LoaiTruNhau(tenA, nhomA, tenB, nhomB));
 

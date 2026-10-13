@@ -14,7 +14,7 @@ namespace PhotocopyApi.Controllers;
 [ApiController]
 [Route("api/quan-tri")]
 [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
-public class QuanTriController : ControllerBase
+public partial class QuanTriController : ControllerBase
 {
     private readonly string _chuoiKetNoi;
 
@@ -49,14 +49,14 @@ public class QuanTriController : ControllerBase
     public async Task<IActionResult> TaoDichVu(LuuDichVuRequest req)
     {
         int? maChiNhanh = LayChiNhanhTuToken();
-        string loi = QuyTacQuanTriChiNhanh.KiemTraDichVu(req, maChiNhanh);
+        string loi = QuyTacQuanTriChiNhanh.KiemTraDichVu(req, 1);
         if (loi != null) return BadRequest(new { message = loi });
 
         using var conn = new SqlConnection(_chuoiKetNoi);
         await conn.OpenAsync();
         await using var giaoDich = await conn.BeginTransactionAsync();
-        if (req.KichThuocAnh != null)
-            req.MaVatTu = await conn.QueryFirstAsync<int>("SELECT TOP 1 MaVatTu FROM VatTu WHERE TenVatTu=N'Giấy ảnh A4'", transaction: giaoDich);
+        string loiVatTu = await KiemTraVatTuDichVuAsync(conn, giaoDich, req);
+        if (loiVatTu != null) return BadRequest(new { message = loiVatTu });
         int ma = await conn.ExecuteScalarAsync<int>(
             @"INSERT INTO DichVu (TenDichVu, LoaiDichVu, KhoGiay, LoaiGiay, MatIn, MauSac,
                                   NhomGiaCong, DonGia, MaVatTu, TrangThai, KichThuocAnh)
@@ -68,29 +68,45 @@ public class QuanTriController : ControllerBase
               SELECT MaChiNhanh, @MaDichVu, @DonGia, @TrangThai FROM ChiNhanh",
             new { MaDichVu = ma, req.DonGia, req.TrangThai }, giaoDich);
         await giaoDich.CommitAsync();
-        return Ok(new { maDichVu = ma, message = "Đã thêm dòng bảng giá." });
+        return Ok(new { maDichVu = ma, message = "Đã thêm dịch vụ và giá khởi tạo tại các chi nhánh." });
     }
 
     [HttpPut("dich-vu/{maDichVu}")]
     [Authorize(Roles = "SUPER_ADMIN")]
     public async Task<IActionResult> CapNhatDichVu([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maDichVu, LuuDichVuRequest req)
+        => await LuuDichVuAsync(maDichVu, req, false);
+
+    private async Task<IActionResult> LuuDichVuAsync(int maDichVu, LuuDichVuRequest req, bool danhMucChung)
     {
         int? maChiNhanh = LayChiNhanhTuToken();
-        string loi = QuyTacQuanTriChiNhanh.KiemTraDichVu(req, maChiNhanh);
+        string loi = QuyTacQuanTriChiNhanh.KiemTraDichVu(req, danhMucChung ? 1 : maChiNhanh);
         if (loi != null) return BadRequest(new { message = loi });
 
         using var conn = new SqlConnection(_chuoiKetNoi);
         await conn.OpenAsync();
         await using var giaoDich = await conn.BeginTransactionAsync();
-        // Đơn cũ đã chốt đơn vị tính và quy cách: chỉ sửa giá/hiển thị, không đổi kích thước ảnh.
+        string tenCu = await conn.QueryFirstOrDefaultAsync<string>(
+            "SELECT TenDichVu FROM DichVu WITH (UPDLOCK,HOLDLOCK) WHERE MaDichVu=@MaDichVu",
+            new { MaDichVu = maDichVu }, giaoDich);
+        if (tenCu == null) return NotFound(new { message = "Không tìm thấy dịch vụ." });
+        string loiTen = QuyTacQuanTriChiNhanh.KiemTraDoiTenDichVu(tenCu, req.TenDichVu);
+        if (loiTen != null) return BadRequest(new { message = loiTen });
+        string loiVatTu = await KiemTraVatTuDichVuAsync(conn, giaoDich, req);
+        if (loiVatTu != null) return BadRequest(new { message = loiVatTu });
+        // Không thay quy cách/vật tư của dịch vụ đã có đơn; giá chi nhánh vẫn được sửa riêng.
         bool doiQuyCachDaDung = await conn.ExecuteScalarAsync<bool>(
-            @"SELECT CAST(CASE WHEN EXISTS (SELECT 1 FROM DichVu dv WHERE dv.MaDichVu=@MaDichVu
-                AND ISNULL(dv.KichThuocAnh,'')<>ISNULL(@KichThuocAnh,'')
-                AND EXISTS(SELECT 1 FROM ChiTietDonHang ct WHERE ct.MaDichVu=dv.MaDichVu))
-                THEN 1 ELSE 0 END AS BIT)", new { MaDichVu = maDichVu, req.KichThuocAnh }, giaoDich);
+            @"SELECT CAST(CASE WHEN EXISTS (SELECT 1 FROM DichVu dv WITH (UPDLOCK,HOLDLOCK) WHERE dv.MaDichVu=@MaDichVu
+                AND (dv.LoaiDichVu<>@LoaiDichVu
+                     OR ISNULL(dv.KhoGiay,'')<>ISNULL(@KhoGiay,'')
+                     OR ISNULL(dv.LoaiGiay,'')<>ISNULL(@LoaiGiay,'')
+                     OR ISNULL(dv.MatIn,'')<>ISNULL(@MatIn,'')
+                     OR ISNULL(dv.MauSac,'')<>ISNULL(@MauSac,'')
+                     OR ISNULL(dv.NhomGiaCong,'')<>ISNULL(@NhomGiaCong,'')
+                     OR ISNULL(dv.MaVatTu,0)<>ISNULL(@MaVatTu,0)
+                     OR ISNULL(dv.KichThuocAnh,'')<>ISNULL(@KichThuocAnh,''))
+                AND EXISTS(SELECT 1 FROM ChiTietDonHang ct WITH (UPDLOCK,HOLDLOCK) WHERE ct.MaDichVu=dv.MaDichVu))
+                THEN 1 ELSE 0 END AS BIT)", new { MaDichVu = maDichVu, req.LoaiDichVu, req.KhoGiay, req.LoaiGiay, req.MatIn, req.MauSac, req.NhomGiaCong, req.MaVatTu, req.KichThuocAnh }, giaoDich);
         if (doiQuyCachDaDung) return BadRequest(new { message = "Dịch vụ đã có đơn hàng: hãy thêm quy cách mới, không đổi đơn vị tính của dịch vụ cũ." });
-        if (req.KichThuocAnh != null)
-            req.MaVatTu = await conn.QueryFirstAsync<int>("SELECT TOP 1 MaVatTu FROM VatTu WHERE TenVatTu=N'Giấy ảnh A4'", transaction: giaoDich);
         int soDong = await conn.ExecuteAsync(
             @"UPDATE DichVu SET TenDichVu=@TenDichVu, LoaiDichVu=@LoaiDichVu, KhoGiay=@KhoGiay,
                     LoaiGiay=@LoaiGiay, MatIn=@MatIn, MauSac=@MauSac, NhomGiaCong=@NhomGiaCong,
@@ -102,12 +118,12 @@ public class QuanTriController : ControllerBase
                 req.MatIn, req.MauSac, req.NhomGiaCong, req.DonGia, req.MaVatTu, req.TrangThai, req.KichThuocAnh
             }, giaoDich);
         if (soDong == 0) return NotFound(new { message = "Không tìm thấy dịch vụ." });
-        await conn.ExecuteAsync(
+        if (!danhMucChung) await conn.ExecuteAsync(
             @"UPDATE BangGiaChiNhanh SET DonGia=@DonGia, TrangThai=@TrangThai
               WHERE MaChiNhanh=@MaChiNhanh AND MaDichVu=@MaDichVu",
             new { MaChiNhanh = maChiNhanh.Value, MaDichVu = maDichVu, req.DonGia, req.TrangThai }, giaoDich);
         await giaoDich.CommitAsync();
-        return Ok(new KetQuaDto { Message = "Đã cập nhật bảng giá." });
+        return Ok(new KetQuaDto { Message = danhMucChung ? "Đã cập nhật danh mục; giá từng chi nhánh không thay đổi." : "Đã cập nhật bảng giá." });
     }
 
     // ================================================================ CHI NHÁNH / MÁY IN
@@ -517,6 +533,22 @@ public class QuanTriController : ControllerBase
                 AND (@MaChiNhanh IS NULL OR dh.MaChiNhanh=@MaChiNhanh)
               ORDER BY dh.NgayDat", new { MaChiNhanh = maChiNhanh });
         return Ok(ds);
+    }
+
+    private static async Task<string> KiemTraVatTuDichVuAsync(SqlConnection conn, System.Data.Common.DbTransaction giaoDich, LuuDichVuRequest req)
+    {
+        if (req.KichThuocAnh != null)
+        {
+            req.MaVatTu = await conn.ExecuteScalarAsync<int?>("SELECT TOP 1 MaVatTu FROM VatTu WHERE TenVatTu=N'Giấy ảnh A4'", transaction: giaoDich);
+            if (req.MaVatTu == null) return "Chưa có vật tư Giấy ảnh A4; hãy cấu hình vật tư trước khi thêm ảnh thẻ.";
+        }
+        if (req.MaVatTu != null)
+        {
+            bool tonTai = await conn.ExecuteScalarAsync<bool>(
+                "SELECT CAST(CASE WHEN EXISTS(SELECT 1 FROM VatTu WHERE MaVatTu=@MaVatTu) THEN 1 ELSE 0 END AS BIT)", new { req.MaVatTu }, giaoDich);
+            if (!tonTai) return "Không tìm thấy vật tư tiêu hao đã chọn.";
+        }
+        return null;
     }
 
     private bool DuocLamViecVoiChiNhanh(int maChiNhanh)

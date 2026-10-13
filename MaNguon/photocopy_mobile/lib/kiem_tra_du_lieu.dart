@@ -50,6 +50,16 @@ String? kiemTraDuLieu(String duongDan, Map<String, dynamic> duLieu) {
   final don = path == '/api/don-hang';
   final baoGia = path == '/api/bao-gia';
 
+  if (path == '/api/auth/google/register') {
+    final ve = duLieu['veDangKy'];
+    if (ve is! String || ve.length < 40 || ve.length > 128) return 'Phiên đăng ký Google không hợp lệ. Hãy chọn Google lại.';
+    final ten = duLieu['hoTen'];
+    if (ten is! String || ten.trim().length < 2 || ten.length > 100) return 'Họ tên cần từ 2 đến 100 ký tự.';
+    final sdt = duLieu['soDienThoai'];
+    if (sdt is! String || !sdtHopLe(sdt)) return loiSdt;
+    if (duLieu['dongYDieuKhoan'] != true) return 'Vui lòng đồng ý điều khoản và chính sách bảo mật.';
+  }
+
   if (dangKy || hoSo) {
     final loi = _chuoi(duLieu['hoTen'], 'họ tên', 100, batBuoc: true);
     if (loi != null) return loi;

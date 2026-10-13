@@ -99,11 +99,20 @@ BEGIN
         THROW 50017, N'Gia công phải đi kèm một file có trong đơn.', 1;
     IF EXISTS (SELECT 1 FROM @DsGiaCong GROUP BY MaFile, MaDichVu HAVING COUNT(*) > 1)
         THROW 50018, N'Mỗi gia công chỉ được chọn 1 lần cho cùng một file.', 1;
-    -- Gia cong cung nhom thi loai tru nhau: 1 ban in chi dong lo xo HOAC bia kieng
-    IF EXISTS (SELECT 1 FROM @DsGiaCong g JOIN DichVu dv ON dv.MaDichVu = g.MaDichVu
-               WHERE dv.NhomGiaCong IS NOT NULL
-               GROUP BY g.MaFile, dv.NhomGiaCong HAVING COUNT(*) > 1)
-        THROW 50019, N'Mỗi bản in chỉ được chọn 1 kiểu đóng gáy (lò xo hoặc bìa kiếng).', 1;
+    -- Cùng nhóm vẫn loại trừ, riêng bìa kiếng + lò xo được đi kèm.
+    IF EXISTS (
+        SELECT 1 FROM @DsGiaCong a
+        JOIN DichVu da ON da.MaDichVu = a.MaDichVu
+        JOIN @DsGiaCong b ON b.MaFile = a.MaFile AND b.MaDichVu > a.MaDichVu
+        JOIN DichVu db ON db.MaDichVu = b.MaDichVu
+        WHERE NULLIF(LTRIM(RTRIM(da.NhomGiaCong)), '') IS NOT NULL
+          AND da.NhomGiaCong = db.NhomGiaCong
+          AND NOT (
+              (LTRIM(RTRIM(da.TenDichVu)) = N'Đóng bìa kiếng' AND LTRIM(RTRIM(db.TenDichVu)) = N'Đóng lò xo')
+              OR (LTRIM(RTRIM(da.TenDichVu)) = N'Đóng lò xo' AND LTRIM(RTRIM(db.TenDichVu)) = N'Đóng bìa kiếng')
+          )
+    )
+        THROW 50019, N'Có dịch vụ gia công cùng nhóm không thể chọn cùng nhau.', 1;
 
 
     -- Lo xo va kim goc loai tru nhau; plastic van duoc chon cung lo xo.

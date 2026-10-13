@@ -44,6 +44,22 @@ public class SidebarHeaderFooterTests
     }
 
     [Fact]
+    public async Task Sidebar_KhachHangVaDichVuNamTrongQuanLy_GiuQuyenCu()
+    {
+        string ceo = await Render("SUPER_ADMIN", "khach-hang");
+        string quanLy = Regex.Match(ceo, "<div id=\"menu-quan-ly\"(.*?)</section>", RegexOptions.Singleline).Value;
+        Assert.Contains("href=\"khach-hang\"", quanLy);
+        Assert.Contains("href=\"dich-vu\"", quanLy);
+        Assert.Contains("<strong>Khách hàng</strong>", ceo);
+        string branch = await Render("BRANCH_ADMIN", "dich-vu");
+        Assert.Contains("href=\"dich-vu\"", branch);
+        Assert.DoesNotContain("href=\"khach-hang\"", branch);
+        string staff = await Render("STAFF", "");
+        Assert.DoesNotContain("href=\"khach-hang\"", staff);
+        Assert.DoesNotContain("href=\"dich-vu\"", staff);
+    }
+
+    [Fact]
     public async Task Sidebar_MoiMucVaNhomCoHinhRieng()
     {
         string html = await Render("SUPER_ADMIN", "tong-quan");
@@ -70,10 +86,14 @@ public class SidebarHeaderFooterTests
         Assert.Contains("role=\"banner\"", html);
         Assert.Contains("role=\"contentinfo\"", html);
         Assert.DoesNotContain("CNTT-KLCN031", html);
-        Assert.Contains("href=\"mailto:manh27062005@gmail.com\"", html);
+        Assert.Contains("href=\"https://mail.google.com/mail/?view=cm&fs=1&to=manh27062005%40gmail.com\"", html);
+        Assert.Contains("target=\"_blank\"", html);
+        Assert.Contains("rel=\"noopener noreferrer\"", html);
         Assert.Contains("href=\"tel:0769479813\"", html);
         Assert.Contains("Email liên hệ", html);
         Assert.Contains("Điện thoại", html);
+        Assert.Contains("Liên hệ qua điện thoại", html);
+        Assert.Contains("Sao chép số", html);
         Assert.Contains("In rõ nét — Nhận đúng hẹn.", html);
         Assert.True(html.IndexOf("<footer", StringComparison.Ordinal) > html.IndexOf("</main>", StringComparison.Ordinal));
         Assert.True(html.IndexOf("<footer", StringComparison.Ordinal) > html.IndexOf("noi-dung-kiem-thu", StringComparison.Ordinal));

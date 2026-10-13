@@ -4,6 +4,16 @@ namespace PhotocopyApi;
 
 public static class QuyTacQuanTriChiNhanh
 {
+    public static string KiemTraDoiTenDichVu(string tenCu, string tenMoi)
+    {
+        // QuyTacIn và thủ tục SQL đang nhận diện hai dịch vụ này theo tên.
+        bool coRangBuoc = string.Equals(tenCu.Trim(), "Bấm kim góc", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(tenCu.Trim(), "Đóng lò xo", StringComparison.OrdinalIgnoreCase);
+        return coRangBuoc && !string.Equals(tenCu.Trim(), tenMoi.Trim(), StringComparison.OrdinalIgnoreCase)
+            ? "Không đổi tên Bấm kim góc / Đóng lò xo vì có ràng buộc số tờ và loại trừ gia công. Bạn vẫn có thể sửa giá tại Bảng giá in ấn."
+            : null;
+    }
+
     public static string KiemTraDichVu(LuuDichVuRequest req, int? maChiNhanh)
     {
         if (maChiNhanh == null) return "Hãy chọn một chi nhánh trước khi cập nhật bảng giá.";

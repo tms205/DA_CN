@@ -7,6 +7,7 @@ import '../../theme.dart';
 import '../../widgets/icons.dart';
 import '../../widgets/widgets.dart';
 import 'xac_thuc_otp_screen.dart';
+import 'nut_google.dart';
 
 // F-01 — Figma 07-Mobile-DangKy. Bước 1/2: nhập thông tin, API gửi mã OTP về email.
 // Tài khoản CHỈ được tạo sau khi nhập đúng mã ở bước 2 (màn XacThucOtpScreen).
@@ -71,6 +72,7 @@ class _DangKyScreenState extends State<DangKyScreen> {
   }
 
   Future<void> _tiepTuc() async {
+    if (_dangGui) return;
     FocusScope.of(context).unfocus();
     String? loi = _kiemTra();
     if (loi != null) {
@@ -142,11 +144,8 @@ class _DangKyScreenState extends State<DangKyScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  NutPhu(
-                    nhan: 'Đăng ký nhanh với Google',
-                    icon: const GoogleLogo(),
-                    onPressed: () => hienThongBaoNhanh(context, 'Đăng ký bằng Google chưa được bật ở phiên bản này.'),
-                  ),
+                  NutGoogle(dangBan: _dangGui,
+                      dangXuLyChanged: (v) { if (mounted) setState(() => _dangGui = v); }),
                   const SizedBox(height: 14),
                   const DuongHoac('hoặc điền biểu mẫu'),
                   const SizedBox(height: 14),
@@ -273,7 +272,7 @@ class _DangKyScreenState extends State<DangKyScreen> {
               top: false,
               child: Column(
                 children: [
-                  NutChinh(nhan: 'Tiếp tục', iconSau: Ico.muiTenPhai, dangTai: _dangGui, onPressed: _tiepTuc),
+                  NutChinh(nhan: 'Tiếp tục bằng email', iconSau: Ico.muiTenPhai, dangTai: _dangGui, onPressed: _tiepTuc),
                   SizedBox(
                     height: 52,
                     child: Row(

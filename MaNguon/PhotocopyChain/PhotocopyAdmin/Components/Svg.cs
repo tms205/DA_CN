@@ -28,6 +28,7 @@ public static class Svg
     public static string DangXuat(int co = 16) => Tao(co, """<path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>""", 1.8);
 
     // Menu sidebar (Figma HangDoiDon)
+    public static string DichVu(int co = 18) => Tao(co, """<path d="M4 3h16v18H4z"/><path d="M8 7h8M8 12h2M14 12h2M8 17h2M14 17h2"/>""");
     public static string BangDieuKhien(int co = 18) => Tao(co, """<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>""");
     public static string DongHoDo(int co = 18) => Tao(co, """<path d="M4.5 19a9 9 0 1115 0"/><path d="M12 3v3M3 12h3M18 12h3"/><path d="M12 12l4-4"/><circle cx="12" cy="12" r="1"/><path d="M7 19h10"/>""");
     public static string QuyTrinh(int co = 18) => Tao(co, """<rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="15" width="6" height="6" rx="1"/><path d="M9 6h6a3 3 0 013 3v6M15 12l3 3 3-3M6 9v12h6"/>""");

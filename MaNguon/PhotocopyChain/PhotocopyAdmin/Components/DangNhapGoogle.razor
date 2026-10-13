@@ -1,0 +1,113 @@
+@inject HttpClient Http
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+@if (_loi != null)
+{
+    <div class="o-loi" role="alert">@_loi</div>
+    <button type="button" class="nut-phu" @onclick="TaiCauHinhAsync">Thử lại Google</button>
+}
+else if (_cauHinh == null)
+{
+    <p class="dn-google-ghi-chu" role="status">Đang kiểm tra đăng nhập Google…</p>
+}
+else if (!_cauHinh.DaBat)
+{
+    <button type="button" class="nut-phu" disabled>@((MarkupString)Svg.Google)<span>Tiếp tục với Google</span></button>
+    <p class="dn-google-ghi-chu">Chưa cấu hình Google. Bạn vẫn có thể đăng nhập bằng mật khẩu.</p>
+}
+else
+{
+    <div class="dn-google-nut" aria-label="Đăng nhập bằng Google" @ref="_oGoogle" inert="@(_dangGui || DangBan)"></div>
+    @if (_dangGui) { <p class="dn-google-ghi-chu" role="status">Đang xác thực tài khoản Google…</p> }
+}
+
+@code {
+    [Parameter] public bool GhiNho { get; set; } = true;
+    [Parameter] public bool DangBan { get; set; }
+    [Parameter] public EventCallback<DangNhapResponse> ThanhCong { get; set; }
+    [Parameter] public EventCallback<bool> DangXuLyChanged { get; set; }
+    private GoogleCongKhaiDto _cauHinh;
+    private ElementReference _oGoogle;
+    private IJSObjectReference _module;
+    private DotNetObjectReference<DangNhapGoogle> _thamChieu;
+    private string _loi;
+    private bool _daHien, _dangGui, _daDong;
+
+    protected override async Task OnInitializedAsync() => await TaiCauHinhAsync();
+    private async Task TaiCauHinhAsync()
+    {
+        _loi = null;
+        _daHien = false;
+        try
+        {
+            _cauHinh = await Http.GetFromJsonAsync<GoogleCongKhaiDto>("api/auth/google/config");
+            if (_cauHinh == null) throw new InvalidOperationException();
+        }
+        catch { _loi = "Không tải được cấu hình Google. Kiểm tra API hoặc đăng nhập bằng mật khẩu."; }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_daDong || _daHien || _cauHinh?.DaBat != true || _loi != null) return;
+        _daHien = true;
+        try
+        {
+            _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/google-auth.js");
+            if (_daDong) { await _module.DisposeAsync(); return; }
+            _thamChieu ??= DotNetObjectReference.Create(this);
+            await _module.InvokeVoidAsync("hienNut", _oGoogle, _cauHinh.WebClientId, _thamChieu);
+        }
+        catch (JSException)
+        {
+            if (_daDong) return;
+            _loi = "Không mở được Google. Kiểm tra kết nối, popup và cấu hình origin Google Cloud.";
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    [JSInvokable]
+    public async Task NhanCredential(string credential)
+    {
+        if (_daDong || _dangGui || DangBan) return;
+        _dangGui = true;
+        await DangXuLyChanged.InvokeAsync(true);
+        await InvokeAsync(StateHasChanged);
+        try
+        {
+            using var res = await Http.PostAsJsonAsync("api/auth/admin/google",
+                new DangNhapGoogleRequest { IdToken = credential, GhiNho = GhiNho });
+            if (_daDong) return;
+            if (!res.IsSuccessStatusCode)
+            {
+                _loi = await DocLoiApi.TuPhanHoiAsync(res, "Không đăng nhập được bằng Google.");
+                return;
+            }
+            var phien = await res.Content.ReadFromJsonAsync<DangNhapResponse>();
+            if (phien?.NguoiDung == null || string.IsNullOrEmpty(phien.AccessToken))
+                throw new InvalidOperationException();
+            await ThanhCong.InvokeAsync(phien);
+        }
+        catch { if (!_daDong) _loi = "Không hoàn tất được đăng nhập Google. Vui lòng thử lại."; }
+        finally
+        {
+            _dangGui = false;
+            if (!_daDong)
+            {
+                await DangXuLyChanged.InvokeAsync(false);
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _daDong = true;
+        if (_module != null)
+        {
+            try { await _module.InvokeVoidAsync("dongNut", _oGoogle); await _module.DisposeAsync(); }
+            catch (JSException) { }
+        }
+        _thamChieu?.Dispose();
+    }
+}

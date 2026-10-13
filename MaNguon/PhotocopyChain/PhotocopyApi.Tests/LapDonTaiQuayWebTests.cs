@@ -195,6 +195,7 @@ public class LapDonTaiQuayWebTests
         string quyCach = html[dauQuyCach..dauThanhToan];
         Assert.DoesNotContain("Mã khuyến mãi", quyCach);
         Assert.DoesNotContain("Thanh toán", quyCach);
+        Assert.DoesNotContain("Tốc độ xử lý", quyCach);
         int dauGioNhan = html.IndexOf("class=\"o-canh-bao\"", dauThanhToan, StringComparison.Ordinal);
         string thanhToan = html[dauThanhToan..dauGioNhan];
         Assert.Contains("for=\"ldq-thanh-toan\"", thanhToan);
@@ -203,6 +204,9 @@ public class LapDonTaiQuayWebTests
         Assert.Contains("COD · trả khi nhận tài liệu", thanhToan);
         Assert.Contains("for=\"ldq-ma-khuyen-mai\"", thanhToan);
         Assert.Contains("id=\"ldq-ma-khuyen-mai\"", thanhToan);
+        Assert.Contains("for=\"ldq-toc-do\"", thanhToan);
+        Assert.Contains("id=\"ldq-toc-do\"", thanhToan);
+        Assert.Contains("Tốc độ xử lý", thanhToan);
         var oTen = System.Text.RegularExpressions.Regex.Match(html, "<input[^>]*placeholder=\"Nguyễn Văn An\"[^>]*>").Value;
         var oSdt = System.Text.RegularExpressions.Regex.Match(html, "<input[^>]*placeholder=\"09xxxxxxxx\"[^>]*>").Value;
         Assert.NotEmpty(oTen);

@@ -4,7 +4,6 @@
 @inject HttpClient Http
 @inject PhienDangNhap Phien
 @inject NavigationManager Nav
-@inject ISnackbar Snackbar
 
 <PageTitle>Đăng nhập · PhotocopyChain</PageTitle>
 
@@ -79,10 +78,7 @@
 
         <div class="dn-hoac"><span></span>hoặc<span></span></div>
 
-        <button type="button" class="nut-phu" @onclick="GoogleChuaHoTro">
-            @((MarkupString)Svg.Google)
-            <span>Google công vụ</span>
-        </button>
+        <DangNhapGoogle GhiNho="_form.GhiNho" DangBan="_dangGui" DangXuLyChanged="GoogleDangXuLy" ThanhCong="HoanTatDangNhapAsync" />
 
         <details class="dn-chinh-sach">
             <summary>@((MarkupString)Svg.Khoa(14)) Chính sách đăng nhập</summary>
@@ -116,6 +112,7 @@
     // Bấm nút Đăng nhập (chỉ chạy khi 2 ô đã nhập đủ)
     private async Task DangNhapAsync()
     {
+        if (_dangGui) return;
         _loi = null;
         _dangGui = true;
         try
@@ -125,8 +122,7 @@
             if (res.IsSuccessStatusCode)
             {
                 var ketQua = await res.Content.ReadFromJsonAsync<DangNhapResponse>();
-                await Phien.DangNhap(ketQua, _form.GhiNho);
-                Nav.NavigateTo(DiemDen(), replace: true);
+                await HoanTatDangNhapAsync(ketQua);
             }
             else
             {
@@ -164,8 +160,11 @@
         return ReturnUrl;
     }
 
-    private void GoogleChuaHoTro()
+    private void GoogleDangXuLy(bool dangGui) => _dangGui = dangGui;
+
+    private async Task HoanTatDangNhapAsync(DangNhapResponse ketQua)
     {
-        Snackbar.Add("Đăng nhập bằng Google công vụ chưa được bật ở phiên bản này.", Severity.Info);
+        await Phien.DangNhap(ketQua, _form.GhiNho);
+        Nav.NavigateTo(DiemDen(), replace: true);
     }
 }

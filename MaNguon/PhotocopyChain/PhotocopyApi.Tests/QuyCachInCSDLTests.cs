@@ -52,7 +52,10 @@ public class QuyCachInCSDLTests
         Assert.Equal(50110, (await Assert.ThrowsAsync<SqlException>(() => BaoGia(2, "2_MAT", kim, loXo))).Number);
         Assert.True((await BaoGia(2, "2_MAT", plastic, loXo)).TongTien > 0);
         Assert.True((await BaoGia(2, "2_MAT", bia, kim)).TongTien > 0);
-        Assert.Equal(50019, (await Assert.ThrowsAsync<SqlException>(() => BaoGia(2, "2_MAT", bia, loXo))).Number);
+        var caHai = await BaoGia(2, "2_MAT", bia, loXo);
+        var chiBia = await BaoGia(2, "2_MAT", bia);
+        var chiLoXo = await BaoGia(2, "2_MAT", loXo);
+        Assert.Equal(chiBia.TienGiaCong + chiLoXo.TienGiaCong, caHai.TienGiaCong);
     }
 
     [KiemThuCSDL]

@@ -6,6 +6,9 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
+const { createDanhMucFixture, kiemTraDanhMuc } = require('./quan-ly-danh-muc.cjs');
+const { kiemTraGoogle } = require('./google-auth.cjs');
+const { kiemTraQuyCach } = require('./quy-cach-tai-quay.cjs');
 
 const webRoot = path.resolve(process.argv[2] || '');
 assert.ok(fs.existsSync(path.join(webRoot, 'index.html')), 'Truyền thư mục wwwroot của bản publish.');
@@ -54,9 +57,10 @@ async function run() {
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
   const results = [];
   try {
-    for (const width of [390, 768, 1024, 1366, 1920]) {
+    for (const width of (process.env.VERIFY_GOOGLE_ONLY === '1' || process.env.VERIFY_FORM_ONLY === '1' ? [] : [390, 768, 1024, 1366, 1920])) {
       const context = await browser.newContext({ viewport: { width, height: 1000 }, locale: 'vi-VN', timezoneId: 'Asia/Ho_Chi_Minh' });
       let mode = 'normal';
+      const danhMucFixture = createDanhMucFixture();
       const apiCalls = [], errors = [];
       await context.addInitScript(() => {
         if (!localStorage.getItem('fixture-anonymous') && !localStorage.getItem('photocopychain.phien')) localStorage.setItem('photocopychain.phien', JSON.stringify({
@@ -64,11 +68,19 @@ async function run() {
           nguoiDung: { maNguoiDung: 1, hoTen: 'CEO kiểm thử', tenVaiTro: 'SUPER_ADMIN', maChiNhanh: null, tenChiNhanh: null }
         }));
       });
+      await context.addInitScript(() => {
+        Object.defineProperty(navigator.clipboard, 'writeText', { configurable: true, value: async text => {
+          if (window.fixtureClipboardError) throw new DOMException('Clipboard denied', 'NotAllowedError');
+          window.fixtureCopiedText = text;
+        } });
+      });
       await context.route('**/*', async route => {
         const url = new URL(route.request().url());
         if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/hubs/')) {
-          assert.equal(route.request().method(), url.pathname.startsWith('/hubs/') ? 'POST' : 'GET', 'UI kiểm tra không được ghi dữ liệu.');
           const selected = (route.request().headers().authorization || '').includes('branch-fixture') ? 1 : Number(route.request().headers()['x-ma-chi-nhanh'] || 0);
+          const danhMuc = await danhMucFixture.response(route.request(), selected);
+          if (danhMuc) return route.fulfill({ status: danhMuc.status, contentType: 'application/json', body: JSON.stringify(danhMuc.body), headers: { 'Access-Control-Allow-Origin': '*' } });
+          assert.equal(route.request().method(), url.pathname.startsWith('/hubs/') ? 'POST' : 'GET', 'Chỉ fixture danh mục được xử lý request ghi; không gọi backend thật.');
           apiCalls.push({ path: url.pathname, selected });
           let body;
           if (url.pathname === '/api/quan-tri/bao-cao/doanh-thu') {
@@ -87,6 +99,7 @@ async function run() {
           } else if (url.pathname === '/api/quan-tri/bao-cao/hien-tai') body = {
             docLuc: new Date().toISOString(), tuNgayKiemDem: '2026-09-14T00:00:00', soCaDangMo: 2, soCaChoXacNhan: 1, soCaKiemDem: 0, soCaLech: 0, tienLech: 0, soPhieuChoDuyet: 1, soHoanTienChoDuyet: 1
           };
+          else if (url.pathname === '/api/auth/google/config') body = { daBat: false, webClientId: '' };
           else if (url.pathname === '/api/danh-muc/chi-nhanh') body = [1, 2, 3].map(id => ({ maChiNhanh: id, tenChiNhanh: `Chi nhánh ${id}`, diaChi: 'Địa chỉ kiểm thử' }));
           else if (url.pathname === '/api/don-hang/hang-doi') body = mode === 'operations-empty' ? [] : fixtureQueue(selected);
           else if (url.pathname === '/api/quan-tri/may-in') body = (selected ? [selected] : [1, 2, 3]).map(id => ({ maMayIn: id, maChiNhanh: id, tenChiNhanh: `Chi nhánh ${id}`, tenMay: `Máy in ${id}`, khoGiay: 'A4', tocDo: 30, trangThai: 'HOAT_DONG' }));
@@ -101,11 +114,14 @@ async function run() {
           else throw new Error(`API chưa khai báo fixture: ${url.pathname}`);
           return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body), headers: { 'Access-Control-Allow-Origin': '*' } });
         }
+        if (url.hostname === 'mail.google.com') return route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>Gmail compose fixture</h1>' });
         if (url.origin !== base && !url.hostname.endsWith('googleapis.com') && !url.hostname.endsWith('gstatic.com')) return route.abort();
         return route.continue();
       });
       const page = await context.newPage();
       page.on('pageerror', error => errors.push(error.message));
+      const consoleErrors = [];
+      page.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });
       await page.clock.install();
       const noOverflow = async () => assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1 && document.querySelector('main').scrollWidth <= document.querySelector('main').clientWidth + 1), `Tràn ngang ở ${width}px`);
       try {
@@ -124,8 +140,37 @@ async function run() {
         await expect(header).toHaveCount(1);
         await expect(header.getByText('Tổng quan', { exact: true })).toHaveCount(1);
         await expect(footer).not.toContainText('CNTT-KLCN031');
-        await expect(footer.getByRole('link', { name: 'Email liên hệ: manh27062005@gmail.com', exact: true })).toHaveAttribute('href', 'mailto:manh27062005@gmail.com');
-        await expect(footer.getByRole('link', { name: 'Điện thoại: 0769479813', exact: true })).toHaveAttribute('href', 'tel:0769479813');
+        await expect(footer.getByRole('link', { name: 'Email liên hệ: manh27062005@gmail.com', exact: true })).toHaveAttribute('href', 'https://mail.google.com/mail/?view=cm&fs=1&to=manh27062005%40gmail.com');
+        await expect(footer.getByRole('button', { name: 'Điện thoại: 0769479813', exact: true })).toHaveAttribute('aria-haspopup', 'dialog');
+        const gmailPromise = context.waitForEvent('page');
+        await footer.getByRole('link', { name: 'Email liên hệ: manh27062005@gmail.com', exact: true }).click();
+        const gmail = await gmailPromise;
+        await expect(gmail.getByRole('heading', { name: 'Gmail compose fixture' })).toBeVisible();
+        assert.equal(new URL(gmail.url()).searchParams.get('to'), 'manh27062005@gmail.com');
+        await gmail.close();
+        const phone = footer.getByRole('button', { name: 'Điện thoại: 0769479813', exact: true });
+        await phone.click();
+        const dialog = page.getByRole('dialog', { name: 'Liên hệ qua điện thoại' });
+        await expect(dialog).toBeVisible();
+        await expect(dialog.getByLabel('Số điện thoại')).toBeFocused();
+        await expect(dialog.getByRole('link', { name: 'Gọi bằng ứng dụng' })).toHaveAttribute('href', 'tel:0769479813');
+        await dialog.getByRole('button', { name: 'Sao chép số', exact: true }).click();
+        await expect(dialog.getByRole('status')).toHaveText('Đã sao chép số điện thoại.');
+        assert.equal(await page.evaluate(() => window.fixtureCopiedText), '0769479813');
+        await page.evaluate(() => window.fixtureClipboardError = true);
+        await dialog.getByRole('button', { name: 'Sao chép số', exact: true }).click();
+        await expect(dialog.getByRole('status')).toContainText('sao chép thủ công');
+        await page.evaluate(() => window.fixtureClipboardError = false);
+        for (let i = 0; i < 6; i++) {
+          await page.keyboard.press('Tab');
+          // Chrome có thể chuyển focus tới thanh địa chỉ sau phần tử cuối.
+          // Không được chuyển tới bất kỳ phần tử tương tác nào của trang nền.
+          assert.ok(await dialog.evaluate(el => el.contains(document.activeElement) || document.activeElement === document.body), 'Không được focus vào trang nền của dialog.');
+        }
+        await page.keyboard.press('Escape');
+        await expect(dialog).not.toBeVisible(); await expect(phone).toBeFocused();
+        await phone.click(); await dialog.getByRole('button', { name: 'Đóng liên hệ' }).click();
+        await expect(dialog).not.toBeVisible();
         await expect(footer).toContainText('In rõ nét — Nhận đúng hẹn.');
         await expect(footer).toBeVisible();
         const footerTop = (await footer.boundingBox()).y;
@@ -142,7 +187,7 @@ async function run() {
         await footer.screenshot({ animations: 'disabled', path: path.join(output, `footer-bar-${width}.png`) });
         await footer.getByRole('link', { name: 'Email liên hệ: manh27062005@gmail.com', exact: true }).focus();
         await page.keyboard.press('Tab');
-        await expect(footer.getByRole('link', { name: 'Điện thoại: 0769479813', exact: true })).toBeFocused();
+        await expect(footer.getByRole('button', { name: 'Điện thoại: 0769479813', exact: true })).toBeFocused();
         if (width === 390) {
           await page.setViewportSize({ width, height: 640 });
           assert.ok(await footer.evaluate(el => el.getBoundingClientRect().bottom <= innerHeight + 1));
@@ -183,10 +228,10 @@ async function run() {
           return [...svg.querySelectorAll('text')].every(text => { const r = text.getBoundingClientRect(); return r.left >= box.left - 1 && r.right <= box.right + 1; });
         }), 'Nhãn biểu đồ không được bị cắt.');
         await page.screenshot({ animations: 'disabled', path: path.join(output, `chart-${width}.png`) });
-        await page.getByRole('heading', { name: 'Giờ cao điểm', exact: true }).scrollIntoViewIfNeeded();
-        await page.getByRole('button', { name: '16–23 giờ', exact: true }).click();
-        await expect(page.getByRole('button', { name: '16–23 giờ', exact: true })).toHaveAttribute('aria-pressed', 'true');
-        await expect(page.getByRole('button', { name: '08–15 giờ', exact: true })).toHaveAttribute('aria-pressed', 'false');
+        await expect(page.getByRole('heading', { name: 'Giờ cao điểm', exact: true })).toHaveCount(0);
+        await expect(page.getByRole('heading', { name: 'Hiệu quả & trải nghiệm khách hàng', exact: true })).toHaveCount(0);
+        await expect(detail).toHaveCount(1);
+        await page.getByRole('heading', { name: 'Cơ cấu dịch vụ', exact: true }).scrollIntoViewIfNeeded();
         await noOverflow();
         await page.screenshot({ animations: 'disabled', path: path.join(output, `analysis-${width}.png`) });
         // Preset tự áp dụng, không cần bấm nút lần nữa.
@@ -284,6 +329,7 @@ async function run() {
         await page.getByRole('button', { name: 'Xem đơn chờ', exact: true }).click();
         await expect(page.getByRole('table').getByRole('row')).toHaveCount(4);
         await noOverflow();
+        await kiemTraDanhMuc({ page, base, fixture: danhMucFixture, width, output, noOverflow });
         await page.evaluate(() => localStorage.setItem('photocopychain.phien', JSON.stringify({ accessToken: 'branch-fixture', hetHanLuc: '2099-01-01T00:00:00Z', nguoiDung: { maNguoiDung: 2, hoTen: 'Quản lý thử', tenVaiTro: 'BRANCH_ADMIN', maChiNhanh: 1, tenChiNhanh: 'Chi nhánh 1' } })));
         await page.goto(base + '/tong-quan');
         await expect(operations).toHaveAttribute('aria-selected', 'true');
@@ -294,7 +340,23 @@ async function run() {
         if (await operationMenu.getAttribute('aria-expanded') !== 'true') await operationMenu.click();
         await sidebar.getByRole('link', { name: 'Hàng đợi đơn', exact: true }).click();
         await expect(header.getByText('Hàng đợi đơn hàng', { exact: true })).toHaveCount(1);
+        await page.goto(base + '/quan-tri');
+        await expect(page.getByRole('heading', { name: 'Mạng lưới chi nhánh & vùng phục vụ' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Thêm chi nhánh', exact: true })).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Thêm máy in', exact: true })).toHaveCount(0);
+        await page.goto(base + '/dich-vu');
+        await expect(page.getByRole('heading', { name: 'Danh mục dịch vụ', exact: true })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Thêm dịch vụ', exact: true })).toHaveCount(0);
+        await page.goto(base + '/khach-hang');
+        await expect(page.getByRole('heading', { name: 'Không có quyền truy cập' })).toBeVisible();
         await page.evaluate(() => localStorage.setItem('photocopychain.phien', JSON.stringify({ accessToken: 'ui-fixture-not-a-real-token', hetHanLuc: '2099-01-01T00:00:00Z', nguoiDung: { maNguoiDung: 3, hoTen: 'Nhân viên thử', tenVaiTro: 'STAFF', maChiNhanh: 1, tenChiNhanh: 'Chi nhánh 1' } })));
+        await page.goto(base + '/quan-tri');
+        await expect(page.getByRole('button', { name: 'Thêm chi nhánh', exact: true })).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Thêm máy in', exact: true })).toHaveCount(0);
+        await page.goto(base + '/dich-vu');
+        await expect(page.getByRole('heading', { name: 'Không có quyền truy cập' })).toBeVisible();
+        await page.goto(base + '/khach-hang');
+        await expect(page.getByRole('heading', { name: 'Không có quyền truy cập' })).toBeVisible();
         const previousCount = apiCalls.filter(x => x.path.includes('bao-cao')).length;
         await page.goto(base + '/tong-quan');
         await expect(page.getByRole('heading', { name: 'Không có quyền truy cập' })).toBeVisible();
@@ -312,13 +374,17 @@ async function run() {
         await expect(header).toHaveCount(0); await expect(footer).toHaveCount(0);
         await noOverflow();
         assert.deepEqual(errors, []);
-        results.push({ width, status: 'PASS', scenarios: 'sidebar unique icons/independent groups/drawer/collapse, header SPA navigation/footer/auth layout, dashboard regression/roles/errors/keyboard/presets/chart/pagination, timer at 1366' });
+        assert.deepEqual(consoleErrors.filter(x => /Unhandled exception|crit: Microsoft/i.test(x)), []);
+        results.push({ width, status: 'PASS', scenarios: 'CRUD danh mục fixture, Gmail popup/phone dialog/copy/focus, sidebar unique icons/independent groups/drawer/collapse, header SPA navigation/footer/auth layout, dashboard regression/roles/errors/keyboard/presets/chart/pagination, timer at 1366' });
       } catch (error) {
         await page.screenshot({ animations: 'disabled', path: path.join(output, `failure-${width}.png`), fullPage: true });
+        console.error(consoleErrors.filter(x => /Unhandled|Exception|critical/i.test(x)).join('\n'));
         throw error;
       } finally { await context.close(); }
     }
-    console.log(JSON.stringify({ results, screenshots: output, note: 'API fixture only, no real DB/payment writes' }, null, 2));
+    if (process.env.VERIFY_FORM_ONLY !== '1') results.push(...await kiemTraGoogle(browser, base, output));
+    if (process.env.VERIFY_GOOGLE_ONLY !== '1') results.push(...await kiemTraQuyCach(browser, base, output));
+    console.log(JSON.stringify({ results, screenshots: output, note: 'API/Google fixture only, no real DB/payment writes' }, null, 2));
   } finally { await browser.close(); }
 }
 run().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => server.close());

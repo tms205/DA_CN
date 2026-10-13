@@ -1,0 +1,96 @@
+@page "/khach-hang"
+@attribute [Authorize(Roles = "SUPER_ADMIN")]
+@inject HttpClient Http
+
+<PageTitle>Khách hàng · PhotocopyChain</PageTitle>
+<TieuDeTrang TieuDe="Khách hàng" MoTa="Quản lý tài khoản và thống kê đơn trong phạm vi đang chọn. Khóa tài khoản áp dụng toàn hệ thống." />
+
+<div class="than-trang khoi-doc">
+    @if (_loi != null) { <div class="o-loi" role="alert">@_loi</div> }
+    @if (_thongBao != null) { <div class="o-thanh-cong" role="status">@_thongBao</div> }
+    <section class="the the-bang" aria-label="Danh sách khách hàng">
+        <div class="bang-tieu-de"><div><h2>Danh sách khách hàng</h2><p class="bang-mo-ta">Tổng chi tiêu chỉ tính đơn hoàn tất, không tính đơn in lại lỗi quầy.</p></div><button class="nut-phu" @onclick="TaiAsync" disabled="@_dangTai">Làm mới</button></div>
+        <div class="dm-bo-loc ca-loc-luoi">
+            <div class="truong"><label class="nhan" for="kh-tim">Tìm khách hàng</label><input id="kh-tim" class="ca-o-loc" @bind="_tuKhoa" @bind:event="oninput" @bind:after="VeTrangDau" placeholder="Tên, email hoặc số điện thoại" /></div>
+            <div class="truong"><label class="nhan" for="kh-trang-thai">Trạng thái tài khoản</label><select id="kh-trang-thai" class="ca-o-loc" @bind="_trangThai" @bind:after="VeTrangDau"><option value="">Tất cả</option><option value="HOAT_DONG">Hoạt động</option><option value="KHOA">Bị khóa</option></select></div>
+        </div>
+        @if (_dangTai) { <div class="bang-trong" role="status">Đang tải khách hàng…</div> }
+        else
+        {
+            <div class="bang-cuon"><table class="bang dm-khach-hang">
+                <thead><tr><th scope="col">Khách hàng</th><th scope="col">Số điện thoại</th><th scope="col">Tổng đơn</th><th scope="col">Tổng chi tiêu</th><th scope="col">Trạng thái</th><th scope="col">Thao tác</th></tr></thead>
+                <tbody>
+                @foreach (var k in DaLoc.Skip((_trang - 1) * 10).Take(10))
+                {
+                    <tr @key="k.MaNguoiDung">
+                        <td data-nhan="Khách hàng"><b>@k.HoTen</b><div class="nv-phu">@k.Email</div></td>
+                        <td data-nhan="Số điện thoại" class="mono">@(k.SoDienThoai ?? "Chưa cung cấp")</td>
+                        <td data-nhan="Tổng đơn" class="mono">@k.SoDon</td>
+                        <td data-nhan="Tổng chi tiêu" class="mono">@TongQuanBaoCao.Tien(k.TongChiTieu)</td>
+                        <td data-nhan="Trạng thái"><span class="nhan-mau @(k.TrangThai == "KHOA" ? "nhan-do" : "nhan-xanh")">@(k.TrangThai == "KHOA" ? "Bị khóa" : "Hoạt động")</span></td>
+                        <td data-nhan="Thao tác"><button class="nut-nho" @onclick="() => _chiTiet = k">Chi tiết</button><button class="nut-nho @(k.TrangThai == "KHOA" ? "" : "nguy-hiem")" @onclick="() => ChonDoiTrangThai(k)" disabled="@_dangLuu">@(k.TrangThai == "KHOA" ? "Mở khóa" : "Khóa")</button></td>
+                    </tr>
+                }
+                @if (DaLoc.Count == 0) { <tr><td colspan="6">Không có khách hàng phù hợp.</td></tr> }
+                </tbody>
+            </table></div>
+            <div class="bang-tieu-de"><span>Trang @_trang / @SoTrang · @DaLoc.Count khách hàng</span><div class="xac-nhan-o"><button class="nut-phu" disabled="@(_trang <= 1)" @onclick="() => _trang--">Trước</button><button class="nut-phu" disabled="@(_trang >= SoTrang)" @onclick="() => _trang++">Sau</button></div></div>
+        }
+    </section>
+    @if (_chiTiet != null)
+    {
+        <section class="the the-rong" aria-label="Chi tiết khách hàng">
+            <div class="ca-dau"><h2 class="the-tieu-de nho">@_chiTiet.HoTen</h2><button class="nut-dong" aria-label="Đóng chi tiết khách hàng" @onclick="() => _chiTiet = null">×</button></div>
+            <dl class="tq-doi-chieu-tien"><div><dt>Email</dt><dd>@_chiTiet.Email</dd></div><div><dt>Điện thoại</dt><dd>@(_chiTiet.SoDienThoai ?? "Chưa cung cấp")</dd></div><div><dt>Địa chỉ</dt><dd>@(_chiTiet.DiaChi ?? "Chưa cung cấp")</dd></div><div><dt>Ngày đăng ký</dt><dd>@_chiTiet.NgayTao.ToString("dd/MM/yyyy HH:mm")</dd></div></dl>
+        </section>
+    }
+    @if (_doiTrangThai != null)
+    {
+        <section class="the the-rong" aria-label="Xác nhận trạng thái khách hàng">
+            <h2 class="the-tieu-de nho">@(_doiTrangThai.TrangThai == "KHOA" ? "Mở khóa" : "Khóa") tài khoản @_doiTrangThai.HoTen?</h2>
+            <p>Thay đổi có hiệu lực toàn hệ thống; không xóa tài khoản hay lịch sử đơn.</p>
+            <div class="xac-nhan-o"><button class="nut-chinh" disabled="@_dangLuu" @onclick="DoiTrangThaiAsync">@(_dangLuu ? "Đang lưu…" : "Xác nhận")</button><button class="nut-phu" disabled="@_dangLuu" @onclick="() => _doiTrangThai = null">Hủy</button></div>
+        </section>
+    }
+</div>
+
+@code {
+    private List<KhachHangQuanTriDto> _ds = new();
+    private KhachHangQuanTriDto _chiTiet, _doiTrangThai;
+    private string _tuKhoa = "", _trangThai = "", _loi, _thongBao;
+    private int _trang = 1;
+    private bool _dangTai, _dangLuu;
+    private List<KhachHangQuanTriDto> DaLoc => _ds.Where(x =>
+        (_trangThai == "" || x.TrangThai == _trangThai) &&
+        new[] { x.HoTen, x.Email, x.SoDienThoai }.Any(s => (s ?? "").Contains(_tuKhoa.Trim(), StringComparison.OrdinalIgnoreCase))).ToList();
+    private int SoTrang => Math.Max(1, (DaLoc.Count + 9) / 10);
+    private void VeTrangDau() => _trang = 1;
+    protected override async Task OnInitializedAsync() => await TaiAsync();
+    private void ChonDoiTrangThai(KhachHangQuanTriDto k) { _doiTrangThai = k; _loi = _thongBao = null; }
+    private async Task TaiAsync()
+    {
+        _dangTai = true;
+        _loi = null;
+        try { _ds = await Http.GetFromJsonAsync<List<KhachHangQuanTriDto>>("api/quan-tri/khach-hang") ?? new(); _trang = Math.Min(_trang, SoTrang); }
+        catch (HttpRequestException) { _loi = "Không tải được khách hàng. Kiểm tra API và bấm Làm mới."; }
+        finally { _dangTai = false; }
+    }
+    private async Task DoiTrangThaiAsync()
+    {
+        if (_dangLuu || _doiTrangThai == null) return;
+        _dangLuu = true;
+        _loi = null;
+        try
+        {
+            var k = _doiTrangThai;
+            var r = await Http.PutAsJsonAsync($"api/quan-tri/khach-hang/{k.MaNguoiDung}/trang-thai",
+                new CapNhatTrangThaiRequest { TrangThai = k.TrangThai == "KHOA" ? "HOAT_DONG" : "KHOA" });
+            if (!r.IsSuccessStatusCode) { _loi = await DocLoiApi.TuPhanHoiAsync(r, "Không đổi được trạng thái tài khoản."); return; }
+            _thongBao = "Đã cập nhật tài khoản " + k.HoTen + ".";
+            _doiTrangThai = _chiTiet = null;
+            await TaiAsync();
+        }
+        catch (HttpRequestException) { _loi = "Mất kết nối API. Làm mới danh sách để kiểm tra kết quả."; }
+        finally { _dangLuu = false; }
+    }
+}

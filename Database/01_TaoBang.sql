@@ -31,6 +31,17 @@ CREATE TABLE NguoiDung (
 );
 GO
 
+-- Google không lưu mật khẩu, liên kết về tài khoản NguoiDung hiện có.
+CREATE TABLE dbo.LienKetTaiKhoanGoogle (
+    GoogleSubject VARCHAR(255) COLLATE Latin1_General_100_BIN2 NOT NULL,
+    MaNguoiDung INT NOT NULL,
+    NgayLienKet DATETIME2 NOT NULL CONSTRAINT DF_LienKetGoogle_Ngay DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT PK_LienKetTaiKhoanGoogle PRIMARY KEY (GoogleSubject),
+    CONSTRAINT UQ_LienKetGoogle_NguoiDung UNIQUE (MaNguoiDung),
+    CONSTRAINT FK_LienKetGoogle_NguoiDung FOREIGN KEY (MaNguoiDung) REFERENCES dbo.NguoiDung(MaNguoiDung)
+);
+GO
+
 CREATE TABLE MayIn (
     MaMayIn      INT IDENTITY(1,1) PRIMARY KEY,
     MaChiNhanh   INT NOT NULL REFERENCES ChiNhanh(MaChiNhanh),

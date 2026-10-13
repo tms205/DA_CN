@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="_content/MudBlazor/MudBlazor.min.css" />
     <link rel="stylesheet" href="css/app.css" />
-    <link rel="stylesheet" href="css/app-ui-v2.css?v=20261013-shell-compact" />
+    <link rel="stylesheet" href="css/app-ui-v2.css?v=20261013-gia-cong-layout" />
     <link rel="icon" type="image/png" href="icon-192.png" />
 </head>
 
@@ -30,7 +30,8 @@
     </div>
 
     <script src="_framework/blazor.webassembly.js"></script>
-    <script>window.dashboardDangHienThi = () => document.visibilityState === 'visible';</script>
+    <script>window.moLienHeFooter = hop => hop.showModal();
+        window.dashboardDangHienThi = () => document.visibilityState === 'visible';</script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
 </body>
 

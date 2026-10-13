@@ -2,10 +2,12 @@
 @attribute [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN")]
 @inject HttpClient Http
 @inject PhienDangNhap Phien
+@inject PhamViChiNhanh PhamVi
+@inject NavigationManager Nav
 
 <PageTitle>Chi nhánh & máy in · PhotocopyChain</PageTitle>
 
-<TieuDeTrang TieuDe="Chi nhánh & máy in" MoTa="Quản lý mạng lưới chi nhánh, thiết bị in ấn và danh mục khách hàng toàn hệ thống" />
+<TieuDeTrang TieuDe="Chi nhánh & máy in" MoTa="Quản lý mạng lưới chi nhánh, thiết bị in ấn và vùng phục vụ toàn hệ thống" />
 
 <div class="than-trang khoi-doc">
     @if (_loi != null)
@@ -21,6 +23,80 @@
             @((MarkupString)Svg.DauTich(16))
             <span>@_thongBao</span>
         </div>
+    }
+
+    @if (LaSuper())
+    {
+        <div class="xac-nhan-o">
+            <button class="nut-chinh" @onclick="ThemChiNhanh">Thêm chi nhánh</button>
+            <button class="nut-phu" @onclick="ThemMayIn">Thêm máy in</button>
+        </div>
+    }
+    <button class="nut-phu" @onclick="TaiAsync" disabled="@_dangLuu">Làm mới danh sách</button>
+    @if (_suaChiNhanh != null)
+    {
+        <form @onsubmit="LuuChiNhanhAsync" @onsubmit:preventDefault class="the the-rong">
+            <div class="ca-dau">
+                <h2 class="the-tieu-de nho">@(_suaChiNhanh.MaChiNhanh == 0 ? "Thêm chi nhánh mới" : "Sửa chi nhánh: " + _suaChiNhanh.TenChiNhanh)</h2>
+                <button type="button" class="nut-dong" title="Đóng" @onclick="() => _suaChiNhanh = null">✕</button>
+            </div>
+            <div class="ca-loc-luoi">
+                <div class="truong">
+                    <label class="nhan" for="qt-truong-1">Tên chi nhánh</label>
+                    <input id="qt-truong-1" required maxlength="100" class="ca-o-loc" @bind="_suaChiNhanh.TenChiNhanh" />
+                </div>
+                <div class="truong">
+                    <label class="nhan" for="qt-truong-2">Điện thoại hotline</label>
+                    <input id="qt-truong-2" inputmode="numeric" pattern="0[0-9]{9}" title="10 chữ số, bắt đầu bằng 0" maxlength="10" class="ca-o-loc mono" @bind="_suaChiNhanh.SoDienThoai" />
+                </div>
+                <div class="truong">
+                    <label class="nhan" for="qt-truong-3">Bán kính giao nhận tối đa (km)</label>
+                    <input id="qt-truong-3" max="999.99" required class="ca-o-loc" type="number" step="0.01" min="0" @bind="_suaChiNhanh.BanKinhGiao" />
+                </div>
+                <div class="truong">
+                    <label class="nhan" for="qt-truong-4">Trạng thái vận hành</label>
+                    <select id="qt-truong-4" class="ca-o-loc" @bind="_suaChiNhanh.TrangThai">
+                        <option value="HOAT_DONG">Đang hoạt động</option>
+                        <option value="TAM_NGUNG">Tạm ngưng nhận đơn</option>
+                    </select>
+                </div>
+            </div>
+            <div class="ca-loc-luoi">
+                <div class="truong"><label class="nhan" for="cn-mo">Giờ mở cửa</label><input id="cn-mo" type="time" required class="ca-o-loc" @bind="GioMo" /></div>
+                <div class="truong"><label class="nhan" for="cn-dong">Giờ đóng cửa</label><input id="cn-dong" type="time" required class="ca-o-loc" @bind="GioDong" /></div>
+                <div class="truong"><label class="nhan" for="cn-vi-do">Vĩ độ (nếu giao hàng)</label><input id="cn-vi-do" type="number" min="-90" max="90" step="0.000001" class="ca-o-loc" @bind="_suaChiNhanh.ViDo" /></div>
+                <div class="truong"><label class="nhan" for="cn-kinh-do">Kinh độ (nếu giao hàng)</label><input id="cn-kinh-do" type="number" min="-180" max="180" step="0.000001" class="ca-o-loc" @bind="_suaChiNhanh.KinhDo" /></div>
+            </div>
+            <div class="truong" style="margin-top: 12px;">
+                <label class="nhan" for="cn-dia-chi">Địa chỉ chi nhánh</label>
+                <div class="o-nhap">
+                    <input id="cn-dia-chi" required maxlength="255" @bind="_suaChiNhanh.DiaChi" />
+                </div>
+            </div>
+            <div class="xac-nhan-o" style="margin-top: 16px;">
+                <button type="submit" class="nut-chinh" disabled="@_dangLuu">@(_dangLuu ? "Đang lưu…" : "Lưu chi nhánh")</button>
+                <button type="button" class="nut-phu" @onclick="() => _suaChiNhanh = null">Hủy</button>
+            </div>
+        </form>
+    }
+
+    @if (_themMay != null)
+    {
+        <form class="the the-rong" @onsubmit="LuuMayMoiAsync" @onsubmit:preventDefault>
+            <div class="ca-dau"><h2 class="the-tieu-de nho">Thêm máy in mới</h2><button type="button" class="nut-dong" aria-label="Hủy thêm máy in" @onclick="() => _themMay = null">×</button></div>
+            <div class="ca-loc-luoi">
+                <div class="truong"><label class="nhan" for="may-chi-nhanh">Chi nhánh quản lý</label><select id="may-chi-nhanh" class="ca-o-loc" required @bind="_themMay.MaChiNhanh" disabled="@(PhamVi.MaChiNhanh != null)"><option value="0">Chọn chi nhánh</option>@foreach (var cn in _chiNhanh ?? new()) { <option value="@cn.MaChiNhanh">@cn.TenChiNhanh</option> }</select></div>
+                <div class="truong"><label class="nhan" for="may-ten">Tên máy / model</label><input id="may-ten" class="ca-o-loc" maxlength="100" required @bind="_themMay.TenMay" /></div>
+                <div class="truong"><label class="nhan" for="may-kho">Khổ giấy lớn nhất</label><select id="may-kho" class="ca-o-loc" @bind="_themMay.KhoGiay"><option value="A4">A4</option><option value="A3">A3 (hỗ trợ A4)</option></select></div>
+                <div class="truong"><label class="nhan" for="may-toc-do">Tốc độ (trang/phút)</label><input id="may-toc-do" class="ca-o-loc" type="number" required min="1" max="1000" step="1" @bind="_themMay.TocDo" /></div>
+                <div class="truong"><label class="nhan" for="may-counter">Counter ban đầu</label><input id="may-counter" class="ca-o-loc" type="number" required min="0" max="2147483647" step="1" @bind="_themMay.SoTrangDaIn" /></div>
+                <div class="truong"><label class="nhan" for="may-trang-thai">Trạng thái thiết bị</label><select id="may-trang-thai" class="ca-o-loc" @bind="_themMay.TrangThai"><option value="HOAT_DONG">Hoạt động</option><option value="BAO_TRI">Bảo trì</option><option value="HONG">Hỏng</option></select></div>
+                <label class="ca-chon"><input type="checkbox" @bind="_themMay.InMau" /> Hỗ trợ in màu</label>
+                <label class="ca-chon"><input type="checkbox" @bind="_themMay.In2Mat" /> Hỗ trợ in hai mặt</label>
+            </div>
+            <p class="nv-phu">Đăng ký danh mục không tự kết nối thiết bị vật lý. Máy chỉ nhận job sau khi gateway/máy in ảo gửi heartbeat; thông số nên khớp model thực tế.</p>
+            <div class="xac-nhan-o"><button class="nut-chinh" disabled="@_dangLuu">@(_dangLuu ? "Đang lưu…" : "Lưu máy in")</button><button type="button" class="nut-phu" disabled="@_dangLuu" @onclick="() => _themMay = null">Hủy</button></div>
+        </form>
     }
 
     <div class="the the-bang">
@@ -78,47 +154,6 @@
             </div>
         }
     </div>
-
-    @if (_suaChiNhanh != null)
-    {
-        <form @onsubmit="LuuChiNhanhAsync" @onsubmit:preventDefault class="the the-rong">
-            <div class="ca-dau">
-                <h2 class="the-tieu-de nho">Cập nhật thông tin chi nhánh: @_suaChiNhanh.TenChiNhanh</h2>
-                <button type="button" class="nut-dong" title="Đóng" @onclick="() => _suaChiNhanh = null">✕</button>
-            </div>
-            <div class="ca-loc-luoi">
-                <div class="truong">
-                    <label class="nhan">Tên chi nhánh</label>
-                    <input required maxlength="100" class="ca-o-loc" @bind="_suaChiNhanh.TenChiNhanh" />
-                </div>
-                <div class="truong">
-                    <label class="nhan">Điện thoại hotline</label>
-                    <input inputmode="numeric" pattern="0[0-9]{9}" title="10 chữ số, bắt đầu bằng 0" maxlength="10" class="ca-o-loc mono" @bind="_suaChiNhanh.SoDienThoai" />
-                </div>
-                <div class="truong">
-                    <label class="nhan">Bán kính giao nhận tối đa (km)</label>
-                    <input max="999.99" required class="ca-o-loc" type="number" step="0.01" min="0" @bind="_suaChiNhanh.BanKinhGiao" />
-                </div>
-                <div class="truong">
-                    <label class="nhan">Trạng thái vận hành</label>
-                    <select class="ca-o-loc" @bind="_suaChiNhanh.TrangThai">
-                        <option value="HOAT_DONG">Đang hoạt động</option>
-                        <option value="TAM_NGUNG">Tạm ngưng nhận đơn</option>
-                    </select>
-                </div>
-            </div>
-            <div class="truong" style="margin-top: 12px;">
-                <label class="nhan">Địa chỉ chi nhánh</label>
-                <div class="o-nhap">
-                    <input required maxlength="255" @bind="_suaChiNhanh.DiaChi" />
-                </div>
-            </div>
-            <div class="xac-nhan-o" style="margin-top: 16px;">
-                <button type="submit" class="nut-chinh">Lưu thay đổi</button>
-                <button type="button" class="nut-phu" @onclick="() => _suaChiNhanh = null">Hủy</button>
-            </div>
-        </form>
-    }
 
     <div class="the the-bang">
         <div class="bang-tieu-de">
@@ -184,86 +219,39 @@
         }
     </div>
 
-    @if (LaSuper())
-    {
-        <div class="the the-bang">
-            <div class="bang-tieu-de">
-                <div>
-                    <h2>Danh mục khách hàng</h2>
-                    <p class="bang-mo-ta">Thông tin liên hệ và tài khoản khách hàng.</p>
-                </div>
-                <span class="bang-dem">@(_khach?.Count ?? 0) tài khoản</span>
-            </div>
-            @if (_khach != null)
-            {
-                <div class="bang-cuon">
-                    <table role="table" class="bang">
-                        <thead>
-                            <tr>
-                                <th scope="col">Khách hàng</th>
-                                <th scope="col">Số điện thoại</th>
-                                <th scope="col">Tổng đơn</th>
-                                <th scope="col">Tổng chi tiêu</th>
-                                <th scope="col">Trạng thái tài khoản</th>
-                                <th scope="col" class="cot-hanh-dong">Thao tác</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (KhachHangQuanTriDto k in _khach)
-                            {
-                                <tr>
-                                    <td data-nhan="Khách hàng">
-                                        <b>@k.HoTen</b>
-                                        <div class="nv-phu">@k.Email</div>
-                                    </td>
-                                    <td class="mono" data-nhan="Số điện thoại">@k.SoDienThoai</td>
-                                    <td class="mono" data-nhan="Tổng đơn"><b>@k.SoDon</b> đơn</td>
-                                    <td class="mono hd-tong" data-nhan="Tổng chi tiêu">@Tien(k.TongChiTieu)</td>
-                                    <td data-nhan="Trạng thái tài khoản">
-                                        <span class="nhan-mau @(k.TrangThai == "HOAT_DONG" ? "nhan-xanh" : "nhan-do")">
-                                            @(k.TrangThai == "HOAT_DONG" ? "Hoạt động" : "Bị khóa")
-                                        </span>
-                                    </td>
-                                    <td class="cot-hanh-dong" data-nhan="Thao tác">
-                                        @if (k.TrangThai == "KHOA")
-                                        {
-                                            <button class="nut-nho" title="Mở khóa tài khoản khách hàng" @onclick="() => DoiKhachAsync(k)">Mở khóa</button>
-                                        }
-                                        else
-                                        {
-                                            <button class="nut-nho nguy-hiem" title="Khóa tài khoản khách hàng" @onclick="() => DoiKhachAsync(k)">Khóa</button>
-                                        }
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            }
-        </div>
-    }
+
+
 </div>
 
 @code {
     private List<ChiNhanhQuanTriDto> _chiNhanh;
     private List<MayInQuanTriDto> _mayIn;
-    private List<KhachHangQuanTriDto> _khach;
     private ChiNhanhQuanTriDto _suaChiNhanh;
+    private TaoMayInRequest _themMay;
+    private bool _dangLuu;
+    private TimeOnly GioMo { get => TimeOnly.FromTimeSpan(_suaChiNhanh.GioMoCua); set => _suaChiNhanh.GioMoCua = value.ToTimeSpan(); }
+    private TimeOnly GioDong { get => TimeOnly.FromTimeSpan(_suaChiNhanh.GioDongCua); set => _suaChiNhanh.GioDongCua = value.ToTimeSpan(); }
+    private void ThemChiNhanh() { _loi = _thongBao = null; _themMay = null; _suaChiNhanh = new() { GioMoCua = TimeSpan.FromHours(9), GioDongCua = TimeSpan.FromHours(21), BanKinhGiao = 10, TrangThai = "HOAT_DONG" }; }
+    private void ThemMayIn() { _loi = _thongBao = null; _suaChiNhanh = null; _themMay = new() { MaChiNhanh = PhamVi.MaChiNhanh ?? 0 }; }
     private string _loi;
     private string _thongBao;
 
-    protected override async Task OnInitializedAsync() => await TaiAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        if (Nav.Uri.Contains("da-them-chi-nhanh=1"))
+            _thongBao = "Đã thêm chi nhánh, tạo giá mặc định và kho trống. Bạn có thể chọn cơ sở mới ở thanh phạm vi.";
+        await TaiAsync();
+    }
 
     private bool LaSuper() => Phien.NguoiDung?.TenVaiTro == "SUPER_ADMIN";
 
     private async Task TaiAsync()
     {
+        _loi = null;
         try
         {
             _chiNhanh = await Http.GetFromJsonAsync<List<ChiNhanhQuanTriDto>>("api/quan-tri/chi-nhanh") ?? new();
             _mayIn = await Http.GetFromJsonAsync<List<MayInQuanTriDto>>("api/quan-tri/may-in") ?? new();
-            if (LaSuper())
-                _khach = await Http.GetFromJsonAsync<List<KhachHangQuanTriDto>>("api/quan-tri/khach-hang") ?? new();
         }
         catch
         {
@@ -273,6 +261,8 @@
 
     private void ChonChiNhanh(ChiNhanhQuanTriDto c)
     {
+        _themMay = null;
+        _loi = _thongBao = null;
         _suaChiNhanh = new()
         {
             MaChiNhanh = c.MaChiNhanh,
@@ -290,19 +280,49 @@
 
     private async Task LuuChiNhanhAsync()
     {
+        if (_dangLuu || _suaChiNhanh == null) return;
         _loi = QuyTacNhap.LayLoi(_suaChiNhanh);
         if (_loi != null) return;
-        var r = await Http.PutAsJsonAsync("api/quan-tri/chi-nhanh/" + _suaChiNhanh.MaChiNhanh, _suaChiNhanh);
-        if (r.IsSuccessStatusCode)
+        _dangLuu = true;
+        _thongBao = null;
+        try
         {
+            bool themMoi = _suaChiNhanh.MaChiNhanh == 0;
+            var r = themMoi ? await Http.PostAsJsonAsync("api/quan-tri/chi-nhanh", _suaChiNhanh)
+                : await Http.PutAsJsonAsync("api/quan-tri/chi-nhanh/" + _suaChiNhanh.MaChiNhanh, _suaChiNhanh);
+            if (!r.IsSuccessStatusCode) { _loi = await DocLoiApi.TuPhanHoiAsync(r, "Không lưu được chi nhánh."); return; }
+            if (themMoi)
+            {
+                // Nạp lại shell để danh sách phạm vi có cơ sở mới, kể cả khi trước đó đang xem cơ sở khác.
+                await PhamVi.ChonAsync(null);
+                Nav.NavigateTo("quan-tri?da-them-chi-nhanh=1", forceLoad: true);
+                return;
+            }
             _thongBao = "Đã cập nhật chi nhánh.";
             _suaChiNhanh = null;
             await TaiAsync();
         }
-        else
+        catch (HttpRequestException) { _loi = "Mất kết nối API. Làm mới danh sách trước khi thử lại để tránh tạo trùng."; }
+        finally { _dangLuu = false; }
+    }
+
+    private async Task LuuMayMoiAsync()
+    {
+        if (_dangLuu || _themMay == null) return;
+        _loi = QuyTacNhap.LayLoi(_themMay);
+        if (_loi != null) return;
+        _dangLuu = true;
+        _thongBao = null;
+        try
         {
-            _loi = (await r.Content.ReadFromJsonAsync<ApiError>()).Message;
+            var r = await Http.PostAsJsonAsync("api/quan-tri/may-in", _themMay);
+            if (!r.IsSuccessStatusCode) { _loi = await DocLoiApi.TuPhanHoiAsync(r, "Không thêm được máy in."); return; }
+            _themMay = null;
+            _thongBao = "Đã đăng ký máy in. Kết nối máy in ảo hoặc gateway để thiết bị nhận lệnh.";
+            await TaiAsync();
         }
+        catch (HttpRequestException) { _loi = "Mất kết nối API. Làm mới danh sách trước khi thử lại để tránh tạo trùng."; }
+        finally { _dangLuu = false; }
     }
 
     private async Task DoiMayAsync(MayInQuanTriDto m, string tt)
@@ -334,31 +354,9 @@
         await DoiMayAsync(m, m.TrangThai == "HOAT_DONG" ? "BAO_TRI" : "HOAT_DONG");
     }
 
-    private async Task DoiKhachAsync(KhachHangQuanTriDto k)
-    {
-        var r = await Http.PutAsJsonAsync(
-            "api/quan-tri/khach-hang/" + k.MaNguoiDung + "/trang-thai",
-            new CapNhatTrangThaiRequest
-            {
-                TrangThai = k.TrangThai == "KHOA" ? "HOAT_DONG" : "KHOA"
-            });
-
-        if (r.IsSuccessStatusCode)
-            await TaiAsync();
-        else
-            _loi = (await r.Content.ReadFromJsonAsync<ApiError>()).Message;
-    }
-
     private string MauMay(string s) => s == "HOAT_DONG"
         ? "nhan-xanh"
         : s == "HONG" ? "nhan-do" : "nhan-cam";
 
-    private static readonly System.Globalization.NumberFormatInfo KieuSo = new()
-    {
-        NumberGroupSeparator = ".",
-        NumberDecimalSeparator = ","
-    };
-
-    private string Tien(decimal s) => s.ToString("#,##0", KieuSo) + "₫";
     private string Gio(TimeSpan gio) => gio.ToString(@"hh\:mm");
 }

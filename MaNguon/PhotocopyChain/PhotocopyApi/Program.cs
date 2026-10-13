@@ -63,10 +63,14 @@ builder.Services.AddControllers()
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<OtpDatLaiStore>();
+builder.Services.AddSingleton<IGoogleTokenVerifier>(sp => new GoogleTokenVerifier(sp.GetRequiredService<IConfiguration>()));
 
 // Dùng chung hạn mức cho gửi mã và đặt lại mật khẩu.
 builder.Services.AddRateLimiter(options =>
 {
+    options.AddPolicy("google-auth", context =>
+        RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "khong-ro-ip",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(10), QueueLimit = 0, AutoReplenishment = true }));
     options.AddPolicy("khoi-phuc-mat-khau", context =>
         RateLimitPartition.GetFixedWindowLimiter(
             context.Connection.RemoteIpAddress?.ToString() ?? "khong-ro-ip",
@@ -80,8 +84,9 @@ builder.Services.AddRateLimiter(options =>
     options.OnRejected = async (context, dung) =>
     {
         context.HttpContext.Response.StatusCode = 429;
+        bool laGoogle = context.HttpContext.Request.Path.Value?.Contains("/google", StringComparison.OrdinalIgnoreCase) == true;
         await context.HttpContext.Response.WriteAsJsonAsync(
-            new { message = "Quá nhiều yêu cầu khôi phục mật khẩu. Vui lòng thử lại sau." }, dung);
+            new { message = laGoogle ? "Quá nhiều yêu cầu đăng nhập Google. Vui lòng thử lại sau." : "Quá nhiều yêu cầu khôi phục mật khẩu. Vui lòng thử lại sau." }, dung);
     };
 });
 
