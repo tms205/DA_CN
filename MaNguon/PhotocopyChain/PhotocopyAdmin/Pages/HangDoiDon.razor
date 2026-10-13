@@ -26,6 +26,18 @@
             <div class="o-canh-bao"><span>@_tinThanhToan</span></div>
         }
 
+        @if (_ds != null && _loi == null && DemTheoLoc("CHO_XAC_NHAN") > 0)
+        {
+            <section class="hd-thong-bao-cho" aria-label="Đơn chờ tiếp nhận" aria-live="polite">
+                <span class="hd-dem-cho mono">@DemTheoLoc("CHO_XAC_NHAN")</span>
+                <div>
+                    <h2>Đơn đang chờ tiếp nhận</h2>
+                    <p>@_ds.Count(x => QuyTacHangDoi.LopCho(x) == "hd-cho-tiep-nhan") cần nhân viên tiếp nhận · @_ds.Count(x => QuyTacHangDoi.LopCho(x) == "hd-cho-thanh-toan") chờ thanh toán QR · @_ds.Count(x => QuyTacHangDoi.LopCho(x) == "hd-cho-tu-dong") chờ hệ thống.</p>
+                </div>
+                <button type="button" class="nut-nho" @onclick="XemDonCho">Xem đơn chờ</button>
+            </section>
+        }
+
         <div class="the the-bang">
             <div class="bang-tieu-de">
                 <div>
@@ -44,7 +56,7 @@
             <div class="thanh-loc">
                 @foreach (string trangThai in DsLoc)
                 {
-                    <button class="chip @(trangThai == _loc ? "chon" : "")" @onclick="() => DoiLoc(trangThai)">
+                    <button class="chip @(trangThai == _loc ? "chon" : "") @(trangThai == "CHO_XAC_NHAN" && DemTheoLoc(trangThai) > 0 ? "hd-chip-cho" : "")" aria-pressed="@(trangThai == _loc ? "true" : "false")" @onclick="() => DoiLoc(trangThai)">
                         @TenLoc(trangThai) · @DemTheoLoc(trangThai)
                     </button>
                 }
@@ -76,7 +88,7 @@
                         <tbody>
                             @foreach (var don in DonCuaTrangHienTai())
                             {
-                                <tr class="@(_donDangChon != null && _donDangChon.MaDonHang == don.MaDonHang ? "dong-chon" : "")"
+                                <tr class="@QuyTacHangDoi.LopCho(don) @(_donDangChon != null && _donDangChon.MaDonHang == don.MaDonHang ? "dong-chon" : "")"
                                     @onclick="() => MoChiTiet(don.MaDonHang)">
                                     <td data-nhan="Mã đơn">
                                         <div class="hd-ma mono">@don.MaDonHangHienThi</div>
@@ -113,7 +125,13 @@
                                             <span class="nhan-mau nhan-xam">Chưa thanh toán</span>
                                         }
                                     </td>
-                                    <td data-nhan="Trạng thái"><span class="nhan-mau @MauNhan(don.TrangThaiDonHang)">@TrangThaiDonHang.TenHienThi(don.TrangThaiDonHang)</span></td>
+                                    <td data-nhan="Trạng thái">
+                                        <span class="nhan-mau @MauNhan(don.TrangThaiDonHang)">@TrangThaiDonHang.TenHienThi(don.TrangThaiDonHang)</span>
+                                        @if (!string.IsNullOrEmpty(QuyTacHangDoi.NhanCho(don)))
+                                        {
+                                            <div class="hd-viec-cho">@QuyTacHangDoi.NhanCho(don)</div>
+                                        }
+                                    </td>
                                 </tr>
                             }
                         </tbody>
@@ -434,6 +452,11 @@
 
     private string _loc = "TAT_CA";
     private string _tuKhoa = "";
+    private void XemDonCho()
+    {
+        _tuKhoa = "";
+        DoiLoc("CHO_XAC_NHAN");
+    }
     private string _loi;
     private string _loiThaoTac;
     private bool _dangGui = false;

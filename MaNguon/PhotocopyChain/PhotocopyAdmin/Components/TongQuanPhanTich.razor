@@ -1,0 +1,110 @@
+@inject HttpClient Http
+
+@if (_dangTai) { <div class="the bang-trong" role="status">Đang tải phân tích dịch vụ và hiệu quả…</div> }
+else if (_loi != null) { <div class="o-loi" role="alert">@_loi <button type="button" class="nut-nho" @onclick="TaiAsync">Thử lại phân tích</button></div> }
+else if (_ds != null)
+{
+    <div class="tq-luoi-deu">
+        <section class="the the-bang" aria-label="Cơ cấu dịch vụ">
+            <div class="bang-tieu-de"><div><h2>Cơ cấu dịch vụ</h2><p class="bang-mo-ta">Tiền dịch vụ trước giảm giá, không cộng gia công hai lần.</p></div></div>
+            <div class="tq-danh-sach">
+                @foreach (var dv in _ds.DichVu)
+                {
+                    <div class="tq-dong-thong-tin"><span>@dv.Ten</span><b class="mono">@TongQuanBaoCao.Tien(dv.SoTien)</b></div>
+                }
+                @if (_ds.DichVu.Count == 0) { <p class="nv-phu">Chưa có dữ liệu dịch vụ trong kỳ.</p> }
+                <details class="tq-giai-thich"><summary>Đối chiếu dịch vụ với doanh thu</summary><dl class="tq-doi-chieu-tien">
+                    <div><dt>Tổng chi tiết dịch vụ</dt><dd>@TongQuanBaoCao.Tien(_ds.DichVu.Sum(x => x.SoTien))</dd></div>
+                    <div><dt>Phụ phí / điều chỉnh</dt><dd>@TongQuanBaoCao.Tien(_ds.TienHang - _ds.DichVu.Sum(x => x.SoTien))</dd></div>
+                    <div><dt>Phí vận chuyển</dt><dd>@TongQuanBaoCao.Tien(_ds.PhiShip)</dd></div>
+                    <div><dt>Giảm giá (trừ)</dt><dd>@TongQuanBaoCao.Tien(_ds.GiamGia)</dd></div>
+                    <div><dt>Doanh thu đơn hoàn tất</dt><dd>@TongQuanBaoCao.Tien(_ds.DoanhThu)</dd></div>
+                </dl><p>Đơn giá gia công lấy từ dữ liệu đã chốt. In màu/đen trắng phân loại theo danh mục dịch vụ hiện tại; ảnh thẻ theo quy cách lưu trong đơn. Không tự phân bổ giảm giá vào từng dịch vụ.</p>
+                @if (_ds.DoanhThu != _ds.TienHang + _ds.PhiShip - _ds.GiamGia) { <p class="tq-chu-canh-bao">Tổng đơn và các thành phần tiền có chênh lệch; cần kiểm tra dữ liệu gốc.</p> }
+                </details>
+            </div>
+        </section>
+        <section class="the the-bang" aria-label="Cơ cấu phương thức thanh toán">
+            <div class="bang-tieu-de"><div><h2>Phương thức thanh toán</h2><p class="bang-mo-ta">Phân loại doanh thu đơn hoàn tất, không phải sao kê tiền nhận.</p></div></div>
+            <div class="tq-danh-sach">
+                @foreach (var tt in _ds.ThanhToan)
+                {
+                    <div class="tq-dong-thong-tin"><div><b>@tt.Ten</b><p>@tt.SoDon đơn</p></div><b class="mono">@TongQuanBaoCao.Tien(tt.SoTien)</b></div>
+                }
+                @if (_ds.ThanhToan.Count == 0) { <p class="nv-phu">Chưa có dữ liệu thanh toán trong kỳ.</p> }
+            </div>
+        </section>
+    </div>
+    <section class="the tq-ca-hien-tai" aria-label="Hiệu quả và đánh giá">
+        <h2>Hiệu quả &amp; trải nghiệm khách hàng</h2>
+        <div class="tq-kpi">
+            <div><h3>Thời gian xử lý trung bình</h3><strong>@ThoiGian(_ds.HieuQua.PhutXuLyTrungBinh)</strong><p>@_ds.HieuQua.SoDonCoMoc đơn có mốc hợp lệ / @_ds.HieuQua.SoDon đơn hoàn tất</p></div>
+            <div><h3>Hoàn tất đúng hẹn</h3><strong>@(_ds.HieuQua.SoDonCoHen == 0 ? "Chưa có dữ liệu" : TongQuanBaoCao.So(100m * _ds.HieuQua.SoDonDungHen / _ds.HieuQua.SoDonCoHen) + "%")</strong><p>@_ds.HieuQua.SoDonDungHen / @_ds.HieuQua.SoDonCoHen đơn có giờ hẹn hợp lệ</p></div>
+            <div><h3>Đánh giá khách hàng</h3><strong>@(_ds.DanhGia.DiemTrungBinh.HasValue ? TongQuanBaoCao.So(_ds.DanhGia.DiemTrungBinh.Value) + " / 5" : "Chưa có dữ liệu")</strong><p>@_ds.DanhGia.SoLuot đánh giá công khai trong kỳ</p></div>
+        </div>
+        <details class="tq-giai-thich"><summary>Mốc thời gian và giới hạn chỉ số</summary><p>Thời gian xử lý tính từ đặt đến hoàn tất, gồm cả chờ, giao hàng và xác nhận của khách; không phải thời gian máy chạy. Đúng hẹn so sánh ngày hoàn tất với giờ hẹn, không tự tạo SLA khi đơn thiếu giờ hẹn. Đánh giá lọc theo ngày đánh giá, không theo ngày hoàn tất đơn.</p></details>
+    </section>
+    <section class="the the-bang" aria-label="Giờ cao điểm">
+        <div class="bang-tieu-de"><div><h2>Giờ cao điểm</h2><p class="bang-mo-ta">Đơn đặt trong kỳ theo ngày/giờ, gồm đơn đã hủy; không tính in lại lỗi quầy.</p></div></div>
+        <div class="tq-danh-sach">
+            <div class="tq-khung-gio" aria-label="Chọn khung giờ">
+                @foreach (int dau in new[] { 0, 8, 16 })
+                {
+                    <button type="button" class="nut-nho" aria-pressed="@(_gioDau == dau ? "true" : "false")" @onclick="() => _gioDau = dau">@dau.ToString("00")–@((dau + 7).ToString("00")) giờ</button>
+                }
+            </div>
+            <div class="tq-nhiet" role="img" aria-label="Số đơn đặt theo ngày trong tuần và giờ; số lớn hơn có màu đậm hơn, bảng dữ liệu bên dưới">
+                <span></span>@for (int gio = _gioDau; gio < _gioDau + 8; gio++) { <span class="tq-nhiet-nhan">@gio.ToString("00")h</span> }
+                @for (int thu = 0; thu < 7; thu++)
+                {
+                    <span class="tq-nhiet-nhan">@TenThu(thu)</span>
+                    @for (int gio = _gioDau; gio < _gioDau + 8; gio++)
+                    {
+                        int dem = _ds.GioCaoDiem.Where(x => x.Thu == thu && x.Gio == gio).Sum(x => x.SoDon);
+                        int max = Math.Max(1, _ds.GioCaoDiem.Select(x => x.SoDon).DefaultIfEmpty(0).Max());
+                        <span class="tq-nhiet-o muc-@(dem == 0 ? 0 : dem * 3 <= max ? 1 : dem * 3 <= max * 2 ? 2 : 3)" title="@($"{TenThu(thu)}, {gio:00}h: {dem} đơn")">@dem</span>
+                    }
+                }
+            </div>
+            @if (_ds.GioCaoDiem.Count == 0) { <p class="nv-phu">Không có đơn đặt trong kỳ.</p> }
+            <details class="tq-giai-thich"><summary>Dữ liệu giờ cao điểm</summary><table class="bang" aria-label="Dữ liệu giờ cao điểm"><thead><tr><th scope="col">Ngày trong tuần</th><th scope="col">Giờ đặt</th><th scope="col">Số đơn</th></tr></thead><tbody>
+                @foreach (var dong in _ds.GioCaoDiem.OrderByDescending(x => x.SoDon).ThenBy(x => x.Thu).ThenBy(x => x.Gio)) { <tr><td data-nhan="Ngày trong tuần">@TenThu(dong.Thu)</td><td data-nhan="Giờ đặt">@dong.Gio.ToString("00")h</td><td data-nhan="Số đơn">@dong.SoDon</td></tr> }
+            </tbody></table></details>
+        </div>
+    </section>
+}
+
+@code {
+    [Parameter] public DateTime TuNgay { get; set; }
+    [Parameter] public DateTime DenNgay { get; set; }
+    private DateTime _tuDaTai, _denDaTai;
+    private bool _dangTai;
+    private int _gioDau = 8;
+    private string _loi;
+    private TongQuanPhanTichDto _ds;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (TuNgay == _tuDaTai && DenNgay == _denDaTai) return;
+        await TaiAsync();
+    }
+
+    private async Task TaiAsync()
+    {
+        _dangTai = true;
+        _loi = null;
+        DateTime tu = TuNgay, den = DenNgay;
+        try
+        {
+            _ds = await Http.GetFromJsonAsync<TongQuanPhanTichDto>($"api/quan-tri/bao-cao/phan-tich?tuNgay={tu:yyyy-MM-dd}&denNgay={den:yyyy-MM-dd}");
+            if (_ds == null) throw new InvalidOperationException();
+            _tuDaTai = tu;
+            _denDaTai = den;
+        }
+        catch { _ds = null; _loi = "Không tải được phân tích. Kiểm tra API và thử lại; báo cáo doanh thu vẫn xem được."; }
+        finally { _dangTai = false; }
+    }
+
+    private static string TenThu(int thu) => thu == 6 ? "CN" : "T" + (thu + 2);
+    private static string ThoiGian(decimal? phut) => phut == null ? "Chưa có dữ liệu" : phut >= 60 ? TongQuanBaoCao.So(phut.Value / 60) + " giờ" : TongQuanBaoCao.So(phut.Value) + " phút";
+}

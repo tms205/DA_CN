@@ -27,6 +27,7 @@ public class MaPhieuNhapWebTests
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton(http);
+        services.AddSingleton(new ThongBaoPheDuyet(http));
         services.AddSingleton(phamVi);
         services.AddSingleton(new PhienDangNhap(null, http, phamVi));
         await using var provider = services.BuildServiceProvider();

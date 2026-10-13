@@ -1,0 +1,280 @@
+@using PhotocopyShared.Dtos.MayInAo
+@inject HttpClient Http
+@inject IServiceProvider DichVu
+@implements IDisposable
+
+<section class="tq-van-hanh" aria-label="Vận hành hiện tại" aria-busy="@(_dangTai ? "true" : "false")">
+    <div class="tq-tieu-muc">
+        <div><h2>Vận hành hiện tại</h2><p>Cập nhật lúc @_lucTai.ToString("HH:mm:ss") · Không phụ thuộc bộ lọc ngày doanh thu.</p></div>
+        <button type="button" class="nut-nho" disabled="@(_dangTai || _tuDongDangTai)" @onclick="TaiAsync">@(_dangTai || _tuDongDangTai ? "Đang tải vận hành…" : "Làm mới vận hành")</button>
+    </div>
+    @if (_dangTai)
+    {
+        <div class="the bang-trong" role="status">Đang tải hàng đợi, máy in và tồn kho…</div>
+    }
+    else
+    {
+        @if (_loiDon != null)
+        {
+            <div class="o-loi" role="alert">@_loiDon</div>
+        }
+        else
+        {
+            @if (DemDon("CHO_XAC_NHAN") > 0 || _don.Any(QuaHan) || _don.Any(x => x.InHoaToc))
+            {
+            <div class="tq-viec-can-lam">
+                <div><h3>Ưu tiên xử lý</h3><p>Cần tiếp nhận: @DemCho("Cần tiếp nhận") đơn · Chờ thanh toán QR: @DemCho("Chờ thanh toán QR") đơn · Chờ hệ thống tiếp nhận: @DemCho("Chờ hệ thống tiếp nhận") đơn</p></div>
+                <a class="nut-nho" href="/">Mở hàng đợi →</a>
+            </div>
+            }
+            else
+            {
+                <p class="tq-trong">Không có đơn cần ưu tiên.</p>
+            }
+            <div class="tq-chi-so-vh">
+                <div class="the tq-so-vh" aria-label="@($"Chờ tiếp nhận: {DemDon("CHO_XAC_NHAN")} đơn")"><span>Chờ tiếp nhận</span><strong>@DemDon("CHO_XAC_NHAN")</strong><small>Đơn chưa được tiếp nhận</small></div>
+                <div class="the tq-so-vh" aria-label="@($"Đang in: {DemDon("DANG_IN")} đơn")"><span>Đang in</span><strong>@DemDon("DANG_IN")</strong><small>@DemDon("DA_XAC_NHAN") đơn đã tiếp nhận, chờ in</small></div>
+                <div class="the tq-so-vh" aria-label="@($"Chờ bàn giao: {DemDon("DA_IN")} đơn")"><span>Chờ bàn giao</span><strong>@DemDon("DA_IN")</strong><small>Đã in xong, quầy hoặc giao hàng</small></div>
+                <div class="the tq-so-vh" aria-label="@($"Hỏa tốc đang xử lý: {_don.Count(x => x.InHoaToc)} đơn")"><span>Hỏa tốc đang xử lý</span><strong>@_don.Count(x => x.InHoaToc)</strong><small>Không tính đơn đã kết thúc</small></div>
+                <div class="the tq-so-vh @(_don.Any(QuaHan) ? "tq-so-canh-bao" : "")" aria-label="@($"Quá hạn chưa hoàn tất: {_don.Count(QuaHan)} đơn")"><span>Quá hạn chưa hoàn tất</span><strong>@_don.Count(QuaHan)</strong><small>Quá giờ hẹn tại lúc tải số liệu</small></div>
+            </div>
+            <div class="tq-luoi-chinh">
+                <section class="the the-bang" aria-label="Đơn cần chú ý">
+                    <div class="bang-tieu-de"><div><h3>Đơn cần chú ý</h3><p class="bang-mo-ta">Tối đa 5 đơn · Quá hạn trước, rồi hỏa tốc và thời điểm đặt.</p></div><a class="nut-nho" href="/">Tất cả đơn →</a></div>
+                    @if (_don.Count == 0)
+                    {
+                        <p class="tq-trong">Không có đơn đang xử lý.</p>
+                    }
+                    else
+                    {
+                        <div class="bang-cuon"><table class="bang" aria-label="Đơn cần chú ý">
+                            <thead><tr><th scope="col">Đơn / khách</th><th scope="col">Chi nhánh</th><th scope="col">Giờ hẹn</th><th scope="col">Xử lý</th></tr></thead>
+                            <tbody>
+                                @foreach (var don in _don.OrderByDescending(QuaHan).ThenByDescending(x => x.InHoaToc).ThenBy(x => x.NgayDat).Take(5))
+                                {
+                                    <tr>
+                                        <td data-nhan="Đơn / khách"><b class="mono">@don.MaDonHangHienThi</b><div>@don.TenKhachHang</div>@if (don.InHoaToc) { <span class="nhan-mau nhan-cam">Hỏa tốc</span> }</td>
+                                        <td data-nhan="Chi nhánh">@don.TenChiNhanh</td>
+                                        <td data-nhan="Giờ hẹn">@(don.NgayHenTra?.ToString("HH:mm dd'/'MM'/'yyyy") ?? "Chưa có giờ hẹn")@if (QuaHan(don)) { <div class="tq-chu-canh-bao">Đã quá hạn</div> }</td>
+                                        <td data-nhan="Xử lý">@TrangThaiDonHang.TenHienThi(don.TrangThaiDonHang)@if (don.TrangThaiDonHang == "CHO_XAC_NHAN") { <div class="nv-phu">@QuyTacHangDoi.NhanCho(don)</div> }</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table></div>
+                    }
+                </section>
+                <section class="the the-bang" aria-label="Phân bố trạng thái">
+                    <div class="bang-tieu-de"><div><h3>Phân bố trạng thái</h3><p class="bang-mo-ta">@_don.Count đơn chưa kết thúc · Không phải lịch sử đơn theo kỳ.</p></div></div>
+                    <div class="tq-danh-sach">
+                        @foreach (var nhom in _don.GroupBy(x => x.TrangThaiDonHang).OrderByDescending(x => x.Count()))
+                        {
+                            <div class="tq-phan-bo"><div><span>@TrangThaiDonHang.TenHienThi(nhom.Key)</span><b>@nhom.Count() đơn</b></div><meter min="0" max="@_don.Count" value="@nhom.Count()" aria-label="@TrangThaiDonHang.TenHienThi(nhom.Key)">@nhom.Count() / @_don.Count</meter></div>
+                        }
+                        @if (_don.Count == 0) { <p class="nv-phu">Không có đơn đang xử lý.</p> }
+                    </div>
+                </section>
+            </div>
+        }
+
+        @if (_loiHienTai != null) { <div class="o-loi" role="alert">@_loiHienTai</div> }
+        else if (_hienTai != null)
+        {
+            <section class="the tq-ca-hien-tai" aria-label="Ca và phê duyệt">
+                <h3>Ca làm việc &amp; đối soát</h3>
+                <div class="tq-chi-so-vh">
+                    <div><span>Ca đang mở</span><strong>@_hienTai.SoCaDangMo</strong></div>
+                    <div><span>Ca chờ xác nhận</span><strong>@_hienTai.SoCaChoXacNhan</strong></div>
+                    <div><span>Phiếu chờ duyệt</span><strong>@_hienTai.SoPhieuChoDuyet</strong></div>
+                    <div><span>Ca lệch đã kiểm đếm</span><strong>@_hienTai.SoCaLech / @_hienTai.SoCaKiemDem</strong></div>
+                    <div><span>Tổng chênh lệch</span><strong>@(_hienTai.SoCaKiemDem == 0 ? "Chưa có" : TongQuanBaoCao.Tien(_hienTai.TienLech))</strong></div>
+                </div>
+                <p class="nv-phu">Đối soát ca đóng từ @_hienTai.TuNgayKiemDem.ToString("dd'/'MM'/'yyyy"); không tính chênh lệch ca đang mở. Tổng có thể bù trừ giữa các ca, xem chi tiết từng ca trước khi kết luận.</p>
+                <a class="nut-nho" href="ca-lam-viec">Xem ca và két tiền →</a>
+            </section>
+        }
+
+        <div class="tq-luoi-deu">
+            <section class="the the-bang" aria-label="Cảnh báo vật tư">
+                <div class="bang-tieu-de"><div><h3>Cảnh báo vật tư</h3><p class="bang-mo-ta">Tồn kho bằng hoặc dưới mức tối thiểu đã cấu hình.</p></div><a class="nut-nho" href="kho-vat-tu">Mở kho →</a></div>
+                @if (_loiKho != null) { <p class="o-loi" role="alert">@_loiKho</p> }
+                else
+                {
+                    <div class="tq-danh-sach">
+                        @foreach (var vatTu in _kho.Where(x => x.CanhBao).OrderBy(x => x.SoLuong).Take(5))
+                        {
+                            <div class="tq-dong-thong-tin"><div><b>@vatTu.TenVatTu</b><p>@vatTu.TenChiNhanh</p></div><div class="tq-ton"><strong>@vatTu.SoLuong @vatTu.DonViTinh</strong><small>Tối thiểu: @vatTu.MucToiThieu</small></div></div>
+                        }
+                        @if (!_kho.Any(x => x.CanhBao)) { <p class="nv-phu">Không có vật tư dưới mức tối thiểu.</p> }
+                        else { <p class="nv-phu">@_kho.Count(x => x.CanhBao) mục cần bổ sung · Hiển thị tối đa 5 mục.</p> }
+                    </div>
+                }
+            </section>
+            <section class="the the-bang" aria-label="Phiếu nhập chờ duyệt">
+                <div class="bang-tieu-de"><div><h3>Phiếu nhập chờ duyệt</h3><p class="bang-mo-ta">Đề nghị vật tư cần được CEO phê duyệt.</p></div><a class="nut-nho" href="kho-vat-tu">Xem phiếu →</a></div>
+                @if (_loiPhieu != null) { <p class="o-loi" role="alert">@_loiPhieu</p> }
+                else
+                {
+                    <div class="tq-danh-sach">
+                        <p class="tq-dem-phieu">Phiếu chờ duyệt: @_phieu.Count(x => x.TrangThai == "CHO_DUYET")</p>
+                        @foreach (var phieu in _phieu.Where(x => x.TrangThai == "CHO_DUYET").OrderBy(x => x.NgayLap).Take(5))
+                        {
+                            <div class="tq-dong-thong-tin"><div><b class="mono">@($"PN{phieu.MaPhieuNhap:0000}")</b><p>@phieu.TenVatTu · @phieu.TenChiNhanh</p></div><div class="tq-ton"><strong>@phieu.SoLuong đơn vị</strong><small>@phieu.TenNguoiLap</small></div></div>
+                        }
+                        @if (!_phieu.Any(x => x.TrangThai == "CHO_DUYET")) { <p class="nv-phu">Không có phiếu nhập chờ duyệt.</p> }
+                        else { <p class="nv-phu">Ưu tiên phiếu lập trước · Hiển thị tối đa 5 phiếu.</p> }
+                    </div>
+                }
+            </section>
+        </div>
+
+        <section class="the the-bang" aria-label="Tình trạng máy in">
+            <div class="bang-tieu-de"><div><h3>Tình trạng máy in</h3><p class="bang-mo-ta">Cấu hình máy và phản hồi connector là hai trạng thái khác nhau.</p></div><a class="nut-nho" href="quan-tri">Quản lý máy →</a></div>
+            @if (_loiMay != null) { <p class="o-loi" role="alert">@_loiMay</p> }
+            @if (_loiKetNoi != null) { <p class="o-loi" role="alert">@_loiKetNoi</p> }
+            @if (_may != null)
+            {
+                @if (_ketNoi != null) { <p class="tq-dem-may">Máy kết nối: @_may.Count(m => _ketNoi.Any(k => k.MaMayIn == m.MaMayIn && k.TrangThai != "MAT_KET_NOI")) / @_may.Count</p> }
+                @if (_may.Count == 0) { <p class="tq-trong">Chưa có máy in trong phạm vi.</p> }
+                else
+                {
+                    <div class="bang-cuon"><table class="bang" aria-label="Tình trạng máy in">
+                        <thead><tr><th scope="col">Máy / chi nhánh</th><th scope="col">Cấu hình</th><th scope="col">Kết nối</th><th scope="col">Lệnh báo gần nhất</th></tr></thead>
+                        <tbody>
+                            @foreach (var may in _may)
+                            {
+                                var kn = _ketNoi?.FirstOrDefault(x => x.MaMayIn == may.MaMayIn);
+                                <tr>
+                                    <td data-nhan="Máy / chi nhánh"><b>@may.TenMay</b><div class="nv-phu">@may.TenChiNhanh</div></td>
+                                    <td data-nhan="Cấu hình">@may.KhoGiay · @may.TocDo trang/phút<div class="nv-phu">@(may.TrangThai == "HOAT_DONG" ? "Hoạt động" : may.TrangThai == "BAO_TRI" ? "Bảo trì" : may.TrangThai == "HONG" ? "Hỏng" : may.TrangThai)</div></td>
+                                    <td data-nhan="Kết nối"><span class="nhan-mau @(kn?.TrangThai is "SAN_SANG" or "DANG_IN" ? "nhan-xanh" : "nhan-xam")">@(_loiKetNoi != null ? "Chưa xác định" : NhanKetNoi(kn))</span><div class="nv-phu">@(kn == null ? "" : kn.LanCuoiPhanHoi.ToString("HH:mm:ss dd'/'MM"))</div></td>
+                                    <td data-nhan="Lệnh báo gần nhất">@(_loiKetNoi != null ? "Chưa xác định" : kn?.MaDonHangDangIn != null ? $"DH{kn.MaDonHangDangIn:00000}" : "—")@if (!string.IsNullOrEmpty(kn?.Loi)) { <div class="tq-chu-canh-bao">@kn.Loi</div> }</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table></div>
+                }
+            }
+        </section>
+        <details class="tq-giai-thich"><summary>Nguồn và cách cập nhật</summary><p>Hàng đợi, kết nối và chỉ số ca tự cập nhật mỗi 60 giây khi phần vận hành đang mở và tab trình duyệt hiển thị. Kho và phiếu chi tiết tải lúc @_lucTaiChiTiet.ToString("HH:mm dd'/'MM'/'yyyy"); bấm Làm mới vận hành để tải lại. Không thay đổi trạng thái đơn hoặc tự duyệt phiếu.</p></details>
+    }
+</section>
+
+@code {
+    private bool _dangTai;
+    private bool _tuDongDangTai;
+    private DateTime _lucTai;
+    private DateTime _lucTaiChiTiet;
+    private TongQuanHienTaiDto _hienTai;
+    private string _loiHienTai;
+    private readonly CancellationTokenSource _dung = new();
+    private List<HangDoiDonDto> _don;
+    private List<TonKhoDto> _kho;
+    private List<PhieuNhapDto> _phieu;
+    private List<MayInQuanTriDto> _may;
+    private List<TrangThaiKetNoiMayInDto> _ketNoi;
+    private string _loiDon, _loiKho, _loiPhieu, _loiMay, _loiKetNoi;
+
+    protected override async Task OnInitializedAsync() => await TaiAsync();
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) _ = TuCapNhatAsync();
+        return Task.CompletedTask;
+    }
+
+    private async Task TuCapNhatAsync()
+    {
+        using var dongHo = new PeriodicTimer(TimeSpan.FromSeconds(60));
+        try
+        {
+            while (await dongHo.WaitForNextTickAsync(_dung.Token))
+            {
+                await InvokeAsync(async () => {
+                    var js = DichVu.GetService(typeof(IJSRuntime)) as IJSRuntime;
+                    if (_dangTai || _dung.IsCancellationRequested || (js != null && !await js.InvokeAsync<bool>("dashboardDangHienThi"))) return;
+                    _tuDongDangTai = true;
+                    StateHasChanged();
+                    try
+                    {
+                        var don = Doc<HangDoiDonDto>("api/don-hang/hang-doi", "hàng đợi");
+                        var ketNoi = Doc<TrangThaiKetNoiMayInDto>("api/may-in-ao/trang-thai", "kết nối máy");
+                        var ca = DocHienTai();
+                        await Task.WhenAll(don, ketNoi, ca);
+                        if (_dung.IsCancellationRequested) return;
+                        (_don, _loiDon) = await don;
+                        (_ketNoi, _loiKetNoi) = await ketNoi;
+                        _don = _don?.Where(x => x.TrangThaiDonHang is not ("HOAN_THANH" or "DA_HUY")).ToList();
+                        _lucTai = DateTime.Now;
+                    }
+                    finally
+                    {
+                        _tuDongDangTai = false;
+                        if (!_dung.IsCancellationRequested) StateHasChanged();
+                    }
+                });
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (JSDisconnectedException) { }
+    }
+
+    private async Task TaiAsync()
+    {
+        if (_dangTai || _tuDongDangTai) return;
+        _dangTai = true;
+        var don = Doc<HangDoiDonDto>("api/don-hang/hang-doi", "hàng đợi");
+        var kho = Doc<TonKhoDto>("api/quan-tri/kho", "tồn kho");
+        var phieu = Doc<PhieuNhapDto>("api/quan-tri/phieu-nhap", "phiếu nhập");
+        var may = Doc<MayInQuanTriDto>("api/quan-tri/may-in", "danh sách máy");
+        var ketNoi = Doc<TrangThaiKetNoiMayInDto>("api/may-in-ao/trang-thai", "kết nối máy");
+        var hienTai = DocHienTai();
+        await Task.WhenAll(don, kho, phieu, may, ketNoi, hienTai);
+        (_don, _loiDon) = await don;
+        (_kho, _loiKho) = await kho;
+        (_phieu, _loiPhieu) = await phieu;
+        (_may, _loiMay) = await may;
+        (_ketNoi, _loiKetNoi) = await ketNoi;
+        // API hàng đợi có cả đơn kết thúc gần đây; không cộng chúng vào việc đang xử lý.
+        _don = _don?.Where(x => x.TrangThaiDonHang is not ("HOAN_THANH" or "DA_HUY")).ToList();
+        _lucTai = DateTime.Now;
+        _lucTaiChiTiet = _lucTai;
+        _dangTai = false;
+    }
+
+    private async Task<(List<T> Ds, string Loi)> Doc<T>(string duongDan, string ten)
+    {
+        try { return (await Http.GetFromJsonAsync<List<T>>(duongDan, _dung.Token) ?? new(), null); }
+        catch { return (null, $"Không tải được {ten}. Kiểm tra API và quyền truy cập, rồi bấm Làm mới vận hành."); }
+    }
+
+    private async Task DocHienTai()
+    {
+        try
+        {
+            var ds = await Http.GetFromJsonAsync<TongQuanHienTaiDto>("api/quan-tri/bao-cao/hien-tai", _dung.Token);
+            if (_dung.IsCancellationRequested) return;
+            _hienTai = ds;
+            _loiHienTai = ds == null ? "Không tải được chỉ số ca/phê duyệt." : null;
+            if (ds != null)
+            {
+                var thongBao = DichVu.GetService(typeof(ThongBaoPheDuyet)) as ThongBaoPheDuyet;
+                thongBao?.CapNhat(ds.SoPhieuChoDuyet + ds.SoHoanTienChoDuyet);
+            }
+        }
+        catch
+        {
+            _hienTai = null;
+            _loiHienTai = "Không tải được chỉ số ca/phê duyệt. Các nguồn vận hành khác vẫn xem được.";
+        }
+    }
+
+    public void Dispose() { _dung.Cancel(); _dung.Dispose(); }
+
+    private int DemDon(string trangThai) => _don.Count(x => x.TrangThaiDonHang == trangThai);
+    private int DemCho(string nhan) => _don.Count(x => QuyTacHangDoi.NhanCho(x) == nhan);
+    private bool QuaHan(HangDoiDonDto don) => don.NgayHenTra.HasValue && don.NgayHenTra.Value < _lucTai;
+    private static string NhanKetNoi(TrangThaiKetNoiMayInDto kn) => kn?.TrangThai switch {
+        null => "Chưa có phản hồi", "SAN_SANG" => "Sẵn sàng", "DANG_IN" => "Đang in",
+        "MAT_KET_NOI" => "Mất kết nối", "LOI" => "Báo lỗi", _ => kn.TrangThai
+    };
+}

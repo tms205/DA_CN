@@ -1,6 +1,6 @@
 namespace PhotocopyAdmin.Components;
 
-/// <summary>Icon nét (stroke) lấy đúng từ file Figma trong GiaoDien/*.dc.html.</summary>
+/// <summary>Icon nét (stroke) dùng chung, giữ cùng phong cách với bộ icon Figma.</summary>
 public static class Svg
 {
     private static string Tao(int co, string duong, double net = 1.7) =>
@@ -28,6 +28,16 @@ public static class Svg
     public static string DangXuat(int co = 16) => Tao(co, """<path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>""", 1.8);
 
     // Menu sidebar (Figma HangDoiDon)
+    public static string BangDieuKhien(int co = 18) => Tao(co, """<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>""");
+    public static string DongHoDo(int co = 18) => Tao(co, """<path d="M4.5 19a9 9 0 1115 0"/><path d="M12 3v3M3 12h3M18 12h3"/><path d="M12 12l4-4"/><circle cx="12" cy="12" r="1"/><path d="M7 19h10"/>""");
+    public static string QuyTrinh(int co = 18) => Tao(co, """<rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="15" width="6" height="6" rx="1"/><path d="M9 6h6a3 3 0 013 3v6M15 12l3 3 3-3M6 9v12h6"/>""");
+    public static string SoDoQuanLy(int co = 18) => Tao(co, """<rect x="9" y="3" width="6" height="5" rx="1"/><rect x="2" y="16" width="6" height="5" rx="1"/><rect x="16" y="16" width="6" height="5" rx="1"/><path d="M12 8v4M5 16v-4h14v4"/>""");
+    public static string CaiDat(int co = 18) => Tao(co, """<path d="M10 2h4v2.5l2 1 2-2 2.5 2.5-2 2 1 2H22v4h-2.5l-1 2 2 2-2.5 2.5-2-2-2 1V22h-4v-2.5l-2-1-2 2-2.5-2.5 2-2-1-2H2v-4h2.5l1-2-2-2L6 3.5l2 2 2-1z"/><circle cx="12" cy="12" r="3"/>""");
+    public static string ViTien(int co = 18) => Tao(co, """<path d="M20 7V5a2 2 0 00-2-2H5a3 3 0 000 6h15v11H5a3 3 0 01-3-3V6"/><path d="M20 11h-5a2 2 0 000 4h5"/><path d="M16 13h.01"/>""");
+    public static string LichSu(int co = 18) => Tao(co, """<path d="M3 11a9 9 0 112.6 7"/><path d="M3 4v7h7M12 7v5l3 2"/>""");
+    public static string NgoiSao(int co = 18) => Tao(co, """<path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9z"/>""");
+    public static string NhanGia(int co = 18) => Tao(co, """<path d="M3 3h8l10 10-8 8L3 11z"/><circle cx="7" cy="7" r="1"/>""");
+    public static string VeKhuyenMai(int co = 18) => Tao(co, """<path d="M3 5h18v5a2 2 0 000 4v5H3v-5a2 2 0 000-4z"/><path d="M9 15l6-6"/><circle cx="9" cy="9" r="1"/><circle cx="15" cy="15" r="1"/>""");
     public static string DanhSach(int co = 17) => Tao(co, """<path d="M3 5h18"/><path d="M3 12h18"/><path d="M3 19h12"/>""", 1.8);
     public static string TaiLieu(int co = 17) => Tao(co, """<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/>""");
     public static string CapTap(int co = 17) => Tao(co, """<path d="M20 7H4a2 2 0 00-2 2v8a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/>""");

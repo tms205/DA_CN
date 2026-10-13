@@ -1,0 +1,240 @@
+@page "/tong-quan"
+@attribute [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN")]
+@inject HttpClient Http
+
+<PageTitle>Tổng quan · PhotocopyChain</PageTitle>
+<TieuDeTrang TieuDe="Tổng quan" MoTa="Theo dõi kinh doanh và công việc cần xử lý" />
+
+<div class="than-trang tq-trang">
+    <div class="tq-tab" role="tablist" aria-label="Nội dung tổng quan">
+        <button id="tab-kinh-doanh" type="button" role="tab" aria-controls="panel-kinh-doanh" aria-selected="@(_phan == "kinh-doanh" ? "true" : "false")" tabindex="@(_phan == "kinh-doanh" ? 0 : -1)" @ref="_nutKinhDoanh" @onclick='() => DoiPhan("kinh-doanh")' @onkeydown="PhimTab">Kinh doanh</button>
+        <button id="tab-van-hanh" type="button" role="tab" aria-controls="panel-van-hanh" aria-selected="@(_phan == "van-hanh" ? "true" : "false")" tabindex="@(_phan == "van-hanh" ? 0 : -1)" @ref="_nutVanHanh" @onclick='() => DoiPhan("van-hanh")' @onkeydown="PhimTab">Vận hành</button>
+    </div>
+
+    @if (_phan == "van-hanh")
+    {
+        <div id="panel-van-hanh" role="tabpanel" aria-labelledby="tab-van-hanh"><TongQuanVanHanh /></div>
+    }
+    else
+    {
+    <div id="panel-kinh-doanh" role="tabpanel" aria-labelledby="tab-kinh-doanh" class="tq-kinh-doanh" aria-busy="@(_dangTai ? "true" : "false")">
+        <section class="the tq-bo-loc" aria-label="Bộ lọc tổng quan">
+            <fieldset class="tq-loc-luoi" disabled="@_dangTai">
+                <div class="truong"><label class="nhan" for="tq-khoang">Khoảng thời gian</label>
+                    <select id="tq-khoang" class="ca-o-loc" value="@_khoang" @onchange="DoiKhoang"><option value="ngay">Hôm nay</option><option value="tuan">Tuần này</option><option value="thang">Tháng này</option><option value="tuy-chon">Tùy chọn ngày</option></select>
+                </div>
+                <div class="truong"><label class="nhan" for="tq-tu">Từ ngày</label><input id="tq-tu" class="ca-o-loc" type="text" inputmode="numeric" placeholder="dd/MM/yyyy" maxlength="10" @bind="_tuNhap" @bind:after="ChonTuyChon" /></div>
+                <div class="truong"><label class="nhan" for="tq-den">Đến ngày</label><input id="tq-den" class="ca-o-loc" type="text" inputmode="numeric" placeholder="dd/MM/yyyy" maxlength="10" @bind="_denNhap" @bind:after="ChonTuyChon" /></div>
+                <div class="truong"><label class="nhan" for="tq-nhom">Nhóm báo cáo</label><select id="tq-nhom" class="ca-o-loc" @bind="_nhomTheo"><option value="ngay">Theo ngày</option><option value="tuan">Theo tuần</option><option value="thang">Theo tháng</option></select></div>
+                <button type="button" class="nut-chinh" @onclick="TaiAsync">@(_dangTai ? "Đang tải…" : "Xem tổng quan")</button>
+            </fieldset>
+            <p class="nv-phu">Preset ngày/tuần/tháng tự áp dụng · Ngày nhập dd/MM/yyyy · Tối đa 366 ngày.</p>
+        </section>
+        <p class="tq-dinh-nghia">Doanh thu đơn hoàn tất, không tính in lại lỗi quầy; không phải tiền nhận hay lợi nhuận.</p>
+        @if (_loi != null) { <div class="o-loi" role="alert">@_loi</div> }
+        @if (_dangTai) { <div class="the bang-trong" role="status">Đang tải tổng quan…</div> }
+        else if (_ds != null && _loi == null)
+        {
+            decimal doanhThu = _ds.Sum(x => x.DoanhThu), doanhThuTruoc = _truoc.Sum(x => x.DoanhThu);
+            int soDon = _ds.Sum(x => x.SoDon), soDonTruoc = _truoc.Sum(x => x.SoDon);
+            decimal aov = soDon == 0 ? 0 : doanhThu / soDon, aovTruoc = soDonTruoc == 0 ? 0 : doanhThuTruoc / soDonTruoc;
+            <div class="tq-ky-da-tai"><span>@_tuDaTai.ToString("dd'/'MM'/'yyyy") – @_denDaTai.ToString("dd'/'MM'/'yyyy")</span><span>Cập nhật lúc @_lucTai.ToString("HH:mm:ss")</span></div>
+            <div class="tq-kpi" aria-label="Chỉ số doanh thu">
+                <section class="the tq-kpi-o tq-kpi-chinh"><h2>Doanh thu kỳ đã chọn</h2><div class="tq-kpi-tien mono">@Tien(doanhThu)</div><p>@ThayDoi(doanhThu, doanhThuTruoc) so với kỳ đối chiếu</p></section>
+                <section class="the tq-kpi-o"><h2>Số đơn hoàn tất</h2><div class="tq-kpi-tien mono">@soDon</div><p>@ThayDoi(soDon, soDonTruoc) so với kỳ đối chiếu</p></section>
+                <section class="the tq-kpi-o"><h2>Giá trị trung bình/đơn</h2><div class="tq-kpi-tien mono">@(soDon == 0 ? "Chưa có đơn" : Tien(aov))</div><p>@(soDon == 0 || soDonTruoc == 0 ? "Chưa đủ đơn để so sánh" : ThayDoi(aov, aovTruoc) + " so với kỳ đối chiếu")</p></section>
+            </div>
+            <section class="the the-bang" aria-label="Xu hướng doanh thu">
+                <div class="bang-tieu-de"><div><h2>Xu hướng doanh thu</h2><p class="bang-mo-ta">Đối chiếu cùng số ngày liền trước: @_tuTruoc.ToString("dd'/'MM'/'yyyy") – @_denTruoc.ToString("dd'/'MM'/'yyyy")</p></div><a class="nut-nho" href="bao-cao">Báo cáo chi nhánh →</a></div>
+                <div class="tq-noi-bieu-do">
+                    @if (soDon == 0) { <p class="tq-trong">Chưa có đơn hoàn tất trong kỳ đã chọn.</p> }
+                    <BieuDoDoanhThu HienTai="_ky" KyTruoc="_kyTruoc" NhomTheo="_nhomDaTai" />
+                </div>
+            </section>
+            @if (_chiNhanh.Count > 1)
+            {
+                <section class="the the-bang" aria-label="So sánh doanh thu chi nhánh">
+                    <div class="bang-tieu-de"><div><h2>So sánh chi nhánh</h2><p class="bang-mo-ta">Chi nhánh có doanh thu trong kỳ, theo phạm vi được phép xem.</p></div></div>
+                    <div class="tq-chi-nhanh">
+                        @foreach (var cn in _chiNhanh)
+                        {
+                            <div class="tq-cn-o"><div class="tq-cn-ten"><strong>@cn.TenChiNhanh</strong><span class="mono">@Tien(cn.DoanhThu)</span></div><div class="tq-thanh" role="img" aria-label="@($"{cn.TenChiNhanh}: {Tien(cn.DoanhThu)}")"><div style="@DoRongCot(cn.DoanhThu)"></div></div><p class="nv-phu">@cn.SoDon đơn · @(doanhThu == 0 ? "0" : TongQuanBaoCao.So(cn.DoanhThu / doanhThu * 100))% trong phạm vi xem</p></div>
+                        }
+                    </div>
+                </section>
+            }
+            <TongQuanPhanTich @key="_lucTai" TuNgay="_tuDaTai" DenNgay="_denDaTai" />
+            <section class="the the-bang" aria-label="Chi tiết doanh thu">
+                <div class="bang-tieu-de"><div><h2>Chi tiết doanh thu</h2><p class="bang-mo-ta">Ngày không có đơn tính 0; kỳ đầu/cuối chỉ tính ngày trong khoảng chọn.</p></div><span class="bang-dem">@_ky.Count kỳ</span></div>
+                <div class="bang-cuon"><table class="bang" aria-label="Chi tiết doanh thu">
+                    <thead><tr><th scope="col">Kỳ thống kê</th><th scope="col">Đơn hoàn tất</th><th scope="col">Doanh thu</th><th scope="col">Kỳ đối chiếu</th><th scope="col">Thay đổi</th></tr></thead>
+                    <tbody>
+                        @for (int i = _ky.Count - 1 - (_trangBaoCao - 1) * _soDong; i >= Math.Max(0, _ky.Count - _trangBaoCao * _soDong); i--)
+                        {
+                            var ky = _ky[i]; var truoc = _kyTruoc[i];
+                            <tr><td data-nhan="Kỳ thống kê"><b>@NhanKy(ky.Ngay)</b></td><td data-nhan="Đơn hoàn tất">@ky.SoDon đơn</td><td data-nhan="Doanh thu" class="mono">@Tien(ky.DoanhThu)</td><td data-nhan="Kỳ đối chiếu" class="mono">@Tien(truoc.DoanhThu)<div class="nv-phu">@NhanNgayDoiChieu(ky.Ngay)</div></td><td data-nhan="Thay đổi">@ThayDoi(ky.DoanhThu, truoc.DoanhThu)</td></tr>
+                        }
+                    </tbody>
+                </table></div>
+                <div class="tq-phan-trang"><div class="tq-dong-moi-trang"><label for="tq-so-dong">Số dòng báo cáo</label><select id="tq-so-dong" class="ca-o-loc" value="@_soDong" @onchange="DoiSoDong"><option value="10">10 dòng</option><option value="20">20 dòng</option><option value="50">50 dòng</option></select></div><span aria-live="polite">Trang @_trangBaoCao / @TongTrangBaoCao</span><div class="tq-nut-trang"><button type="button" class="nut-nho" disabled="@(_trangBaoCao <= 1)" @onclick="() => _trangBaoCao--">Trang trước</button><button type="button" class="nut-nho" disabled="@(_trangBaoCao >= TongTrangBaoCao)" @onclick="() => _trangBaoCao++">Trang sau</button></div></div>
+            </section>
+            <details class="tq-giai-thich"><summary>Cách tính và kỳ đối chiếu</summary><p>Tuần bắt đầu thứ Hai. Kỳ đối chiếu là @_soNgayDaTai ngày liền trước, không mặc định toàn tháng trước. Khi kỳ trước bằng 0, không tính tỷ lệ tăng trưởng. Chọn nhóm rồi bấm Xem tổng quan; báo cáo không tự chuyển trạng thái đơn.</p></details>
+        }
+    </div>
+    }
+</div>
+
+@code {
+    private string _khoang = "thang";
+    private string _nhomTheo = "ngay";
+    private string _nhomDaTai = "ngay";
+    private DateTime _tuNgay = new(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private DateTime _denNgay = DateTime.Today;
+    private DateTime _tuDaTai;
+    private DateTime _denDaTai;
+    private DateTime _tuTruoc;
+    private DateTime _denTruoc;
+    private DateTime _lucTai;
+    private int _soNgayDaTai;
+    private int _trangBaoCao = 1;
+    private int _soDong = 10;
+    private int TongTrangBaoCao => Math.Max(1, (_ky.Count + _soDong - 1) / _soDong);
+    private bool _dangTai;
+    private string _loi;
+    private List<BaoCaoDoanhThuDto> _ds;
+    private List<BaoCaoDoanhThuDto> _truoc = new();
+    private List<BaoCaoDoanhThuDto> _ky = new();
+    private List<BaoCaoDoanhThuDto> _kyTruoc = new();
+    private List<BaoCaoDoanhThuDto> _chiNhanh = new();
+    private static readonly System.Globalization.NumberFormatInfo KieuSo = new() { NumberGroupSeparator = ".", NumberDecimalSeparator = "," };
+
+    [CascadingParameter] private Task<AuthenticationState> TrangThaiDangNhap { get; set; }
+    private string _phan = "kinh-doanh";
+    private string _tuNhap = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture);
+    private string _denNhap = DateTime.Today.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture);
+    private ElementReference _nutKinhDoanh, _nutVanHanh;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (TrangThaiDangNhap != null && (await TrangThaiDangNhap).User.IsInRole("BRANCH_ADMIN")) _phan = "van-hanh";
+        if (_phan == "kinh-doanh") await TaiAsync();
+    }
+
+    private async Task DoiPhan(string phan)
+    {
+        _phan = phan;
+        if (_phan == "kinh-doanh" && _ds == null && !_dangTai) await TaiAsync();
+    }
+
+    private async Task PhimTab(KeyboardEventArgs e)
+    {
+        if (e.Key is not ("ArrowLeft" or "ArrowRight" or "Home" or "End")) return;
+        await DoiPhan(e.Key == "Home" ? "kinh-doanh" : e.Key == "End" ? "van-hanh" : _phan == "kinh-doanh" ? "van-hanh" : "kinh-doanh");
+        if (_phan == "kinh-doanh") await _nutKinhDoanh.FocusAsync();
+        else await _nutVanHanh.FocusAsync();
+    }
+
+    private async Task DoiKhoang(ChangeEventArgs e)
+    {
+        _khoang = e.Value?.ToString() ?? "tuy-chon";
+        if (_khoang == "tuy-chon") return;
+        _denNgay = DateTime.Today;
+        _tuNgay = TongQuanBaoCao.DauKy(_denNgay, _khoang);
+        _tuNhap = _tuNgay.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture);
+        _denNhap = _denNgay.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture);
+        await TaiAsync();
+    }
+
+    private void ChonTuyChon() => _khoang = "tuy-chon";
+
+    private async Task<List<BaoCaoDoanhThuDto>> DocDoanhThu(DateTime tu, DateTime den)
+    {
+        var ds = await Http.GetFromJsonAsync<List<BaoCaoDoanhThuDto>>($"api/quan-tri/bao-cao/doanh-thu?tuNgay={tu:yyyy-MM-dd}&denNgay={den:yyyy-MM-dd}&nhomTheo=ngay") ?? new();
+        return ds.Where(x => x.Ngay.Date >= tu.Date && x.Ngay.Date <= den.Date).ToList();
+    }
+
+    private async Task TaiAsync()
+    {
+        if (_dangTai) return;
+        _loi = null;
+        if (!DateTime.TryParseExact(_tuNhap, "dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out _tuNgay)
+            || !DateTime.TryParseExact(_denNhap, "dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out _denNgay))
+        {
+            _loi = "Nhập ngày đúng định dạng dd/MM/yyyy, ví dụ 13/10/2026.";
+            return;
+        }
+        DateTime tu = _tuNgay.Date, den = _denNgay.Date;
+        (DateTime TuNgay, DateTime DenNgay) truoc;
+        try { truoc = TongQuanBaoCao.KyTruoc(tu, den); }
+        catch (ArgumentException ex) { _loi = ex.Message; return; }
+
+        _dangTai = true;
+        try
+        {
+            var hienTai = DocDoanhThu(tu, den);
+            var doiChieu = DocDoanhThu(truoc.TuNgay, truoc.DenNgay);
+            await Task.WhenAll(hienTai, doiChieu);
+            _ds = await hienTai;
+            _truoc = await doiChieu;
+            _tuDaTai = tu;
+            _denDaTai = den;
+            _tuTruoc = truoc.TuNgay;
+            _denTruoc = truoc.DenNgay;
+            _lucTai = DateTime.Now;
+            _soNgayDaTai = (den - tu).Days + 1;
+            _nhomDaTai = _nhomTheo;
+            _trangBaoCao = 1;
+            _ky = TongQuanBaoCao.NhomKy(_ds, tu, den, _nhomDaTai);
+            // Dịch kỳ trước sang cùng vị trí ngày của kỳ này trước khi nhóm tuần/tháng.
+            var canNgay = _truoc.Select(x => new BaoCaoDoanhThuDto { Ngay = x.Ngay.AddDays(_soNgayDaTai), SoDon = x.SoDon, DoanhThu = x.DoanhThu });
+            _kyTruoc = TongQuanBaoCao.NhomKy(canNgay, tu, den, _nhomDaTai);
+            _chiNhanh = _ds.GroupBy(x => x.MaChiNhanh).Select(g => new BaoCaoDoanhThuDto {
+                MaChiNhanh = g.Key, TenChiNhanh = g.First().TenChiNhanh, SoDon = g.Sum(x => x.SoDon), DoanhThu = g.Sum(x => x.DoanhThu)
+            }).OrderByDescending(x => x.DoanhThu).ToList();
+        }
+        catch
+        {
+            _ds = null;
+            _loi = "Không tải được tổng quan. Kiểm tra kết nối API, phiên đăng nhập và quyền xem báo cáo rồi thử lại.";
+        }
+        finally { _dangTai = false; }
+    }
+
+    private static string Tien(decimal tien) => tien.ToString("#,##0", KieuSo) + "₫";
+
+    private void DoiSoDong(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int soDong) && soDong is 10 or 20 or 50)
+        {
+            _soDong = soDong;
+            _trangBaoCao = 1;
+        }
+    }
+    private static string ThayDoi(decimal nay, decimal truoc)
+    {
+        decimal? tyLe = TongQuanBaoCao.TyLeThayDoi(nay, truoc);
+        return tyLe == null ? "—" : (tyLe > 0 ? "+" : "") + tyLe.Value.ToString("0.#", KieuSo) + "%";
+    }
+
+    private string DoRongCot(decimal tien)
+    {
+        decimal tran = Math.Max(1, _chiNhanh.Select(x => x.DoanhThu).DefaultIfEmpty(0).Max());
+        return "width:" + Math.Clamp(tien / tran * 100, 0, 100).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "%";
+    }
+
+    private DateTime CuoiKy(DateTime ngay) => _nhomDaTai == "thang" ? new DateTime(ngay.Year, ngay.Month, DateTime.DaysInMonth(ngay.Year, ngay.Month))
+        : _nhomDaTai == "tuan" ? ngay.AddDays(Math.Min(6, (DateTime.MaxValue.Date - ngay).Days)) : ngay;
+    private string NhanKy(DateTime ngay)
+    {
+        DateTime dau = ngay < _tuDaTai ? _tuDaTai : ngay;
+        DateTime cuoi = CuoiKy(ngay) > _denDaTai ? _denDaTai : CuoiKy(ngay);
+        return dau == cuoi ? dau.ToString("dd'/'MM'/'yyyy") : $"{dau:dd'/'MM'/'yyyy} – {cuoi:dd'/'MM'/'yyyy}";
+    }
+
+    private string NhanNgayDoiChieu(DateTime ngay)
+    {
+        DateTime dau = (ngay < _tuDaTai ? _tuDaTai : ngay).AddDays(-_soNgayDaTai);
+        DateTime cuoi = (CuoiKy(ngay) > _denDaTai ? _denDaTai : CuoiKy(ngay)).AddDays(-_soNgayDaTai);
+        return dau == cuoi ? dau.ToString("dd'/'MM'/'yyyy") : $"{dau:dd'/'MM'/'yyyy} – {cuoi:dd'/'MM'/'yyyy}";
+    }
+}

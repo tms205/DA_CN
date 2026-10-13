@@ -20,6 +20,7 @@ builder.Services.AddMudServices();
 builder.Services.AddAuthorizationCore();
 builder.Services.AddScoped<PhamViChiNhanh>();
 builder.Services.AddScoped<PhienDangNhap>();
+builder.Services.AddScoped<ThongBaoPheDuyet>();
 builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredService<PhienDangNhap>());
 
 await builder.Build().RunAsync();

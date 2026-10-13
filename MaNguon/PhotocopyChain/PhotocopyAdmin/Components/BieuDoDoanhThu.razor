@@ -1,0 +1,64 @@
+@using System.Globalization
+
+<div class="tq-bieu-do">
+    <svg viewBox="0 0 760 280" role="img" aria-label="Xu hướng doanh thu kỳ đã chọn so với cùng số ngày liền trước">
+        <title>Doanh thu theo kỳ, đơn vị đồng</title>
+        <desc>Cột hoặc đường đậm là kỳ đã chọn; viền hoặc đường đứt là kỳ đối chiếu. Số tiền chính xác nằm trong bảng Chi tiết doanh thu.</desc>
+        @for (int muc = 0; muc <= 4; muc++)
+        {
+            double y = 225 - muc * 50;
+            <g><line x1="168" x2="736" y1="@So(y)" y2="@So(y)" class="tq-vach-bieu-do" />
+            <text x="156" y="@So(y + 4)" text-anchor="end" class="tq-nhan-truc">@TongQuanBaoCao.Tien(_buoc * muc)</text></g>
+        }
+        @if (NhomTheo != "ngay")
+        {
+            @if (_coDoiChieu) { <polyline points="@Duong(KyTruoc)" class="tq-duong-truoc" /> }
+            <polyline points="@Duong(HienTai)" class="tq-duong-nay" />
+        }
+        @for (int i = 0; i < HienTai.Count; i++)
+        {
+            var diem = HienTai[i];
+            <g>
+                @if (NhomTheo == "ngay")
+                {
+                    @if (_coDoiChieu && i < KyTruoc.Count)
+                    {
+                        <rect x="@So(X(i) - _rongCot)" y="@So(Y(KyTruoc[i].DoanhThu))" width="@So(Math.Max(0.3, _rongCot - 1))" height="@So(225 - Y(KyTruoc[i].DoanhThu))" class="tq-cot-truoc"><title>Đối chiếu: @TongQuanBaoCao.Tien(KyTruoc[i].DoanhThu)</title></rect>
+                    }
+                    <rect x="@So(X(i))" y="@So(Y(diem.DoanhThu))" width="@So(Math.Max(0.3, _rongCot - 1))" height="@So(225 - Y(diem.DoanhThu))" class="tq-cot-nay"><title>@diem.Ngay.ToString("dd'/'MM'/'yyyy"): @TongQuanBaoCao.Tien(diem.DoanhThu)</title></rect>
+                }
+                else if (HienTai.Count <= 31)
+                {
+                    @if (_coDoiChieu && i < KyTruoc.Count) { <circle cx="@So(X(i))" cy="@So(Y(KyTruoc[i].DoanhThu))" r="4" class="tq-diem-truoc"><title>Đối chiếu: @TongQuanBaoCao.Tien(KyTruoc[i].DoanhThu)</title></circle> }
+                    <circle cx="@So(X(i))" cy="@So(Y(diem.DoanhThu))" r="4" class="tq-diem"><title>@diem.Ngay.ToString("dd'/'MM'/'yyyy"): @TongQuanBaoCao.Tien(diem.DoanhThu)</title></circle>
+                }
+                @if (i == 0 || i == HienTai.Count - 1 || i % Math.Max(1, (HienTai.Count + 3) / 4) == 0)
+                {
+                    <g><text x="@So(X(i))" y="253" text-anchor="@(HienTai.Count == 1 ? "middle" : i == 0 ? "start" : i == HienTai.Count - 1 ? "end" : "middle")" class="tq-nhan-truc">@diem.Ngay.ToString(NhomTheo == "thang" ? "MM'/'yy" : "dd'/'MM")</text></g>
+                }
+            </g>
+        }
+    </svg>
+    <div class="tq-chu-giai"><span><i class="tq-mau-nay"></i>Kỳ đã chọn</span>@if (_coDoiChieu) { <span><i class="tq-mau-truoc"></i>Kỳ đối chiếu</span> } else { <span>Kỳ đối chiếu chưa có doanh thu</span> }</div>
+</div>
+
+@code {
+    [Parameter] public List<BaoCaoDoanhThuDto> HienTai { get; set; } = new();
+    [Parameter] public List<BaoCaoDoanhThuDto> KyTruoc { get; set; } = new();
+    [Parameter] public string NhomTheo { get; set; } = "ngay";
+    private decimal _buoc;
+    private bool _coDoiChieu;
+    private double _rongCot;
+
+    protected override void OnParametersSet()
+    {
+        _buoc = TongQuanBaoCao.BuocTruc(HienTai.Concat(KyTruoc).Select(x => x.DoanhThu).DefaultIfEmpty(0).Max());
+        _coDoiChieu = KyTruoc.Any(x => x.DoanhThu != 0);
+        _rongCot = Math.Min(24, 550.0 / Math.Max(1, HienTai.Count) / 2.5);
+    }
+
+    private double X(int i) => HienTai.Count <= 1 ? 452 : 196 + 512.0 * i / (HienTai.Count - 1);
+    private double Y(decimal tien) => 225 - (double)(tien / (_buoc * 4)) * 200;
+    private static string So(double n) => n.ToString("0.##", CultureInfo.InvariantCulture);
+    private string Duong(List<BaoCaoDoanhThuDto> ds) => string.Join(" ", ds.Select((x, i) => $"{So(X(i))},{So(Y(x.DoanhThu))}"));
+}

@@ -3,6 +3,8 @@
 @inject PhamViChiNhanh PhamVi
 @inject HttpClient Http
 @inject NavigationManager Nav
+@inject ThongBaoPheDuyet ThongBao
+@implements IDisposable
 
 @* AppShell dùng chung: sidebar desktop, sidebar thu gọn và drawer trên màn hình nhỏ. *@
 <div class="@LopKhung">
@@ -29,22 +31,32 @@
         @* Menu: mỗi mục chỉ hiện với vai trò dùng được nó.
            Ẩn menu chỉ để gọn giao diện — API vẫn tự kiểm quyền trên từng request. *@
         <nav class="tb-menu">
+            @if (LaQuanLy())
+            {
+                <section class="tb-nhom" aria-labelledby="nhom-bao-cao">
+                    <button type="button" id="nhom-bao-cao" class="tb-nhom-tieu-de" aria-expanded="@(_cacNhomDangMo.Contains("bao-cao") ? "true" : "false")" aria-controls="menu-bao-cao" @onclick='() => DoiNhom("bao-cao")'>@((MarkupString)Svg.BangDieuKhien(20)) <span>Dashboard</span><span class="tb-nhom-mui-ten" aria-hidden="true"></span></button>
+                    <div id="menu-bao-cao" class="tb-nhom-noi-dung @(_cacNhomDangMo.Contains("bao-cao") ? "" : "dong")">
+                        <NavLink class="tb-muc" href="tong-quan" title="Tổng quan" @onclick="DongMenu">@((MarkupString)Svg.DongHoDo()) <span>Tổng quan</span></NavLink>
+                        <NavLink class="tb-muc" href="bao-cao" title="Báo cáo doanh thu" @onclick="DongMenu">@((MarkupString)Svg.BieuDoCot(18)) <span>Báo cáo doanh thu</span></NavLink>
+                    </div>
+                </section>
+            }
             <section class="tb-nhom" aria-labelledby="nhom-van-hanh">
                 <button type="button" id="nhom-van-hanh" class="tb-nhom-tieu-de"
                         aria-expanded="@(_cacNhomDangMo.Contains("van-hanh") ? "true" : "false")" aria-controls="menu-van-hanh"
                         @onclick='() => DoiNhom("van-hanh")'>
-                    @((MarkupString)Svg.DanhSach(20))
+                    @((MarkupString)Svg.QuyTrinh(20))
                     <span>Vận hành</span>
                     <span class="tb-nhom-mui-ten" aria-hidden="true"></span>
                 </button>
                 <div id="menu-van-hanh" class="tb-nhom-noi-dung @(_cacNhomDangMo.Contains("van-hanh") ? "" : "dong")">
-                    <NavLink class="tb-muc" href="" Match="NavLinkMatch.All" title="Hàng đợi đơn hàng" @onclick="DongMenu">@((MarkupString)Svg.DanhSach()) <span>Hàng đợi đơn</span></NavLink>
+                    <NavLink class="tb-muc" href="" Match="NavLinkMatch.All" title="Hàng đợi đơn hàng" @onclick="DongMenu">@((MarkupString)Svg.DanhSach(18)) <span>Hàng đợi đơn</span></NavLink>
                     @if (VaiTroLa("BRANCH_ADMIN") || VaiTroLa("STAFF") || CeoDangXemChiNhanh())
                     {
-                        <NavLink class="tb-muc" href="lap-don-tai-quay" title="Lập đơn tại quầy" @onclick="DongMenu">@((MarkupString)Svg.HoaDon()) <span>Lập đơn tại quầy</span></NavLink>
-                        <NavLink class="tb-muc" href="ban-giao" title="Bàn giao tại quầy" @onclick="DongMenu">@((MarkupString)Svg.CapTap()) <span>Bàn giao tại quầy</span></NavLink>
+                        <NavLink class="tb-muc" href="lap-don-tai-quay" title="Lập đơn tại quầy" @onclick="DongMenu">@((MarkupString)Svg.HoaDon(18)) <span>Lập đơn tại quầy</span></NavLink>
+                        <NavLink class="tb-muc" href="ban-giao" title="Bàn giao tại quầy" @onclick="DongMenu">@((MarkupString)Svg.CapTap(18)) <span>Bàn giao tại quầy</span></NavLink>
                     }
-                    <NavLink class="tb-muc" href="kho-file" title="Kho file in" @onclick="DongMenu">@((MarkupString)Svg.TaiLieu()) <span>Kho file in</span></NavLink>
+                    <NavLink class="tb-muc" href="kho-file" title="Kho file in" @onclick="DongMenu">@((MarkupString)Svg.TaiLieu(18)) <span>Kho file in</span></NavLink>
                 </div>
             </section>
 
@@ -52,15 +64,15 @@
                 <button type="button" id="nhom-ca-tien" class="tb-nhom-tieu-de"
                         aria-expanded="@(_cacNhomDangMo.Contains("ca-tien") ? "true" : "false")" aria-controls="menu-ca-tien"
                         @onclick='() => DoiNhom("ca-tien")'>
-                    @((MarkupString)Svg.DongHo(20))
+                    @((MarkupString)Svg.TienMat(20))
                     <span>Ca &amp; tiền</span>
                     <span class="tb-nhom-mui-ten" aria-hidden="true"></span>
                 </button>
                 <div id="menu-ca-tien" class="tb-nhom-noi-dung @(_cacNhomDangMo.Contains("ca-tien") ? "" : "dong")">
-                    <NavLink class="tb-muc" href="ca-lam-viec" title="Ca làm việc & két tiền" @onclick="DongMenu">@((MarkupString)Svg.DongHo()) <span>Ca làm việc &amp; két tiền</span></NavLink>
+                    <NavLink class="tb-muc" href="ca-lam-viec" title="Ca làm việc & két tiền" @onclick="DongMenu">@((MarkupString)Svg.ViTien()) <span>Ca làm việc &amp; két tiền</span></NavLink>
                     @if (VaiTroLa("SUPER_ADMIN") || VaiTroLa("BRANCH_ADMIN") || VaiTroLa("STAFF"))
                     {
-                        <NavLink class="tb-muc" href="don-hang-trong-ca" title="Lịch sử đơn theo ca" @onclick="DongMenu">@((MarkupString)Svg.HoaDon()) <span>Lịch sử đơn theo ca</span></NavLink>
+                        <NavLink class="tb-muc" href="don-hang-trong-ca" title="Lịch sử đơn theo ca" @onclick="DongMenu">@((MarkupString)Svg.LichSu()) <span>Lịch sử đơn theo ca</span></NavLink>
                     }
                 </div>
             </section>
@@ -69,34 +81,32 @@
                 <button type="button" id="nhom-quan-ly" class="tb-nhom-tieu-de"
                         aria-expanded="@(_cacNhomDangMo.Contains("quan-ly") ? "true" : "false")" aria-controls="menu-quan-ly"
                         @onclick='() => DoiNhom("quan-ly")'>
-                    @((MarkupString)Svg.CuaHang(20))
+                    @((MarkupString)Svg.SoDoQuanLy(20))
                     <span>Quản lý</span>
                     <span class="tb-nhom-mui-ten" aria-hidden="true"></span>
                 </button>
                 <div id="menu-quan-ly" class="tb-nhom-noi-dung @(_cacNhomDangMo.Contains("quan-ly") ? "" : "dong")">
                     @if (LaQuanLy())
                     {
-                        <NavLink class="tb-muc" href="kho-vat-tu" title="Kho vật tư" @onclick="DongMenu">@((MarkupString)Svg.LopKho()) <span>Kho vật tư</span></NavLink>
-                    }
-                    <NavLink class="tb-muc" href="bang-gia" title="Bảng giá in ấn" @onclick="DongMenu">@((MarkupString)Svg.BieuDoCot()) <span>Bảng giá in ấn</span></NavLink>
-                    @if (VaiTroLa("SUPER_ADMIN"))
-                    {
-                        <NavLink class="tb-muc" href="khuyen-mai" title="Quản lý khuyến mãi" @onclick="DongMenu">@((MarkupString)Svg.DauTich(16)) <span>Khuyến mãi</span></NavLink>
+                        <NavLink class="tb-muc" href="kho-vat-tu" title="Kho vật tư" @onclick="DongMenu">@((MarkupString)Svg.LopKho(18)) <span>Kho vật tư</span></NavLink>
                     }
                     @if (LaQuanLy())
                     {
-                        <NavLink class="tb-muc" href="nhan-vien" title="Nhân viên" @onclick="DongMenu">@((MarkupString)Svg.NguoiDung()) <span>Nhân viên</span></NavLink>
-                        <NavLink class="tb-muc" href="danh-gia" title="Đánh giá khách hàng" @onclick="DongMenu">@((MarkupString)Svg.DauTich(16)) <span>Đánh giá khách hàng</span></NavLink>
+                        <NavLink class="tb-muc" href="nhan-vien" title="Nhân viên" @onclick="DongMenu">@((MarkupString)Svg.NguoiDung(18)) <span>Nhân viên</span></NavLink>
+                        <NavLink class="tb-muc" href="danh-gia" title="Đánh giá khách hàng" @onclick="DongMenu">@((MarkupString)Svg.NgoiSao()) <span>Đánh giá khách hàng</span></NavLink>
                     }
                     @if (VaiTroLa("SUPER_ADMIN"))
                     {
-                        <NavLink class="tb-muc" href="phe-duyet" title="Phê duyệt" @onclick="DongMenu">@((MarkupString)Svg.DuyetHoSo()) <span>Phê duyệt</span></NavLink>
+                        <NavLink class="tb-muc" href="phe-duyet" title="Phê duyệt phiếu nhập và hoàn tiền" @onclick="DongMenu">@((MarkupString)Svg.DuyetHoSo(18)) <span>Phê duyệt</span>@if (ThongBao.SoCho != 0) { <span class="tb-badge" aria-label="@(ThongBao.SoCho == null ? "Số yêu cầu chờ duyệt chưa tải được" : $"{ThongBao.SoCho} yêu cầu chờ duyệt")">@(ThongBao.SoCho?.ToString() ?? "?")</span> }</NavLink>
                     }
-                    @if (LaQuanLy())
-                    {
-                        <NavLink class="tb-muc" href="bao-cao" title="Báo cáo doanh thu" @onclick="DongMenu">@((MarkupString)Svg.BieuDoDuong()) <span>Báo cáo doanh thu</span></NavLink>
-                        <NavLink class="tb-muc" href="quan-tri" title="Chi nhánh & máy in" @onclick="DongMenu">@((MarkupString)Svg.CuaHang()) <span>Chi nhánh &amp; máy in</span></NavLink>
-                    }
+                </div>
+            </section>
+            <section class="tb-nhom" aria-labelledby="nhom-cau-hinh">
+                <button type="button" id="nhom-cau-hinh" class="tb-nhom-tieu-de" aria-expanded="@(_cacNhomDangMo.Contains("cau-hinh") ? "true" : "false")" aria-controls="menu-cau-hinh" @onclick='() => DoiNhom("cau-hinh")'>@((MarkupString)Svg.CaiDat(20)) <span>Cấu hình</span><span class="tb-nhom-mui-ten" aria-hidden="true"></span></button>
+                <div id="menu-cau-hinh" class="tb-nhom-noi-dung @(_cacNhomDangMo.Contains("cau-hinh") ? "" : "dong")">
+                    <NavLink class="tb-muc" href="bang-gia" title="Bảng giá in ấn" @onclick="DongMenu">@((MarkupString)Svg.NhanGia()) <span>Bảng giá in ấn</span></NavLink>
+                    @if (VaiTroLa("SUPER_ADMIN")) { <NavLink class="tb-muc" href="khuyen-mai" title="Quản lý khuyến mãi" @onclick="DongMenu">@((MarkupString)Svg.VeKhuyenMai()) <span>Khuyến mãi</span></NavLink> }
+                    @if (LaQuanLy()) { <NavLink class="tb-muc" href="quan-tri" title="Chi nhánh & máy in" @onclick="DongMenu">@((MarkupString)Svg.CuaHang(18)) <span>Chi nhánh &amp; máy in</span></NavLink> }
                 </div>
             </section>
         </nav>
@@ -117,20 +127,20 @@
     </aside>
 
     <section class="vung-lam-viec">
-        <header class="thanh-tren">
+        <header class="thanh-tren" role="banner" aria-label="Thanh điều hướng">
             <div class="tt-trai">
                 <button type="button" class="tt-menu tt-menu-desktop" title="Thu gọn hoặc mở rộng menu"
                         aria-label="Thu gọn hoặc mở rộng menu" aria-controls="menu-chinh"
-                        aria-expanded="@(!_menuThuGon)" @onclick="ThuGonMenu">
+                        aria-expanded="@(_menuThuGon ? "false" : "true")" @onclick="ThuGonMenu">
                     @((MarkupString)Svg.DanhSach(20))
                 </button>
                 <button type="button" class="tt-menu tt-menu-mobile" aria-label="Mở menu điều hướng"
-                        aria-controls="menu-chinh" aria-expanded="@_menuMo" @onclick="MoDongMenu">
+                        aria-controls="menu-chinh" aria-expanded="@(_menuMo ? "true" : "false")" @onclick="MoDongMenu">
                     @((MarkupString)Svg.DanhSach(20))
                 </button>
                 <div class="tt-ngu-canh">
-                    <span>Hệ thống vận hành</span>
-                    <strong>@TenPhamVi</strong>
+                    <span>PhotocopyChain · @TrangDangMo.Nhom</span>
+                    <strong>@TrangDangMo.Ten</strong>
                 </div>
             </div>
 
@@ -154,8 +164,27 @@
         </header>
 
         <main class="noi-dung">
-            @Body
+            <div class="noi-dung-trang">@Body</div>
         </main>
+        <footer class="chan-trang" role="contentinfo" aria-label="Thông tin hệ thống">
+            <div class="ct-thuong-hieu">
+                <div class="ct-dong-thuong-hieu">
+                    <strong>PhotocopyChain</strong>
+                    <small class="ct-ban-quyen">© @DateTime.Now.Year</small>
+                </div>
+                <span class="ct-slogan">In rõ nét — Nhận đúng hẹn.</span>
+            </div>
+            <address class="ct-lien-he" aria-label="Thông tin liên hệ">
+                <a href="mailto:manh27062005@gmail.com" aria-label="Email liên hệ: manh27062005@gmail.com">
+                    <span class="ct-lien-he-icon" aria-hidden="true">@((MarkupString)Svg.Thu(18))</span>
+                    <span class="ct-lien-he-chu"><span class="ct-nhan">Email liên hệ</span><span class="ct-gia-tri">manh27062005&#64;<wbr />gmail.com</span></span>
+                </a>
+                <a href="tel:0769479813" aria-label="Điện thoại: 0769479813">
+                    <span class="ct-lien-he-icon" aria-hidden="true">@((MarkupString)Svg.DienThoai(18))</span>
+                    <span class="ct-lien-he-chu"><span class="ct-nhan">Điện thoại</span><span class="ct-gia-tri">0769479813</span></span>
+                </a>
+            </address>
+        </footer>
     </section>
 </div>
 
@@ -171,6 +200,34 @@
     private HashSet<string> _cacNhomDangMo = new();
 
     private string GiaTriPhamVi => PhamVi.MaChiNhanh?.ToString() ?? "";
+
+    // Chỉ là nhãn giao diện; quyền truy cập vẫn do trang và API kiểm tra.
+    private (string Nhom, string Ten) TrangDangMo
+    {
+        get
+        {
+            string trang = Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].Trim('/');
+            return trang switch {
+                "tong-quan" => ("Dashboard", "Tổng quan"),
+                "bao-cao" => ("Dashboard", "Báo cáo doanh thu"),
+                "" => ("Vận hành", "Hàng đợi đơn hàng"),
+                "lap-don-tai-quay" => ("Vận hành", "Lập đơn tại quầy"),
+                "ban-giao" => ("Vận hành", "Bàn giao tại quầy"),
+                "kho-file" => ("Vận hành", "Kho file in"),
+                "ca-lam-viec" => ("Ca & tiền", "Ca làm việc & két tiền"),
+                "don-hang-trong-ca" => ("Ca & tiền", "Lịch sử đơn theo ca"),
+                "kho-vat-tu" => ("Quản lý", "Kho vật tư"),
+                "nhan-vien" => ("Quản lý", "Nhân viên"),
+                "danh-gia" => ("Quản lý", "Đánh giá khách hàng"),
+                "phe-duyet" => ("Quản lý", "Phê duyệt"),
+                "bang-gia" => ("Cấu hình", "Bảng giá in ấn"),
+                "khuyen-mai" => ("Cấu hình", "Khuyến mãi"),
+                "quan-tri" => ("Cấu hình", "Chi nhánh & máy in"),
+                "thong-tin-ca-nhan" => ("Tài khoản", "Thông tin cá nhân"),
+                _ => ("PhotocopyChain", "Không gian quản trị")
+            };
+        }
+    }
 
     private string LopKhung => $"khung{(_menuMo ? " menu-dang-mo" : "")}{(_menuThuGon ? " menu-thu-gon" : "")}";
 
@@ -190,7 +247,11 @@
         MoNhomCuaTrang();
         await PhamVi.KhoiTaoAsync();
         await TrangThaiDangNhap;
+        Nav.LocationChanged += DoiTrang;
         if (!VaiTroLa(VaiTro.SuperAdmin)) return;
+
+        ThongBao.ThayDoi += VeBadge;
+        await ThongBao.TaiAsync();
 
         try
         {
@@ -251,9 +312,11 @@
         string duongDan = Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].Trim('/');
         if (duongDan == "ca-lam-viec" || duongDan == "don-hang-trong-ca")
             _cacNhomDangMo.Add("ca-tien");
-        else if (duongDan == "kho-vat-tu" || duongDan == "bang-gia" || duongDan == "khuyen-mai"
-                 || duongDan == "nhan-vien" || duongDan == "danh-gia" || duongDan == "phe-duyet"
-                 || duongDan == "bao-cao" || duongDan == "quan-tri")
+        else if (duongDan == "tong-quan" || duongDan == "bao-cao")
+            _cacNhomDangMo.Add("bao-cao");
+        else if (duongDan == "bang-gia" || duongDan == "khuyen-mai" || duongDan == "quan-tri")
+            _cacNhomDangMo.Add("cau-hinh");
+        else if (duongDan == "kho-vat-tu" || duongDan == "nhan-vien" || duongDan == "danh-gia" || duongDan == "phe-duyet")
             _cacNhomDangMo.Add("quan-ly");
         else
             _cacNhomDangMo.Add("van-hanh");
@@ -277,5 +340,18 @@
     {
         await Phien.DangXuat();
         Nav.NavigateTo("dang-nhap", replace: true);
+    }
+
+    private void VeBadge() => _ = InvokeAsync(StateHasChanged);
+    private void DoiTrang(object sender, LocationChangedEventArgs e)
+    {
+        MoNhomCuaTrang();
+        _ = InvokeAsync(StateHasChanged);
+        if (VaiTroLa(VaiTro.SuperAdmin)) _ = ThongBao.TaiAsync();
+    }
+    public void Dispose()
+    {
+        ThongBao.ThayDoi -= VeBadge;
+        Nav.LocationChanged -= DoiTrang;
     }
 }
