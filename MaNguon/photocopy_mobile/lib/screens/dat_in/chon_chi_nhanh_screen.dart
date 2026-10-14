@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../../api.dart';
 import '../../dinh_dang.dart';
 import '../../models.dart';
+import '../../giao_hang.dart';
+import '../../widgets/dia_chi_giao.dart';
 import '../../phien.dart';
 import '../../theme.dart';
 import '../../widgets/icons.dart';
@@ -25,6 +27,7 @@ class ChonChiNhanhScreen extends StatefulWidget {
     required this.hoaToc,
     this.huongGiay = 'DUNG',
     this.ghiChu,
+    this.guiYeuCau,
   });
 
   final FileIn file;
@@ -35,12 +38,15 @@ class ChonChiNhanhScreen extends StatefulWidget {
   final bool hoaToc;
   final String huongGiay;
   final String? ghiChu;
+  final Future<KetQuaApi> Function(String, Map<String, dynamic>)? guiYeuCau;
 
   @override
   State<ChonChiNhanhScreen> createState() => _ChonChiNhanhScreenState();
 }
 
 class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
+  Future<KetQuaApi> _post(String path, Map<String, dynamic> body) =>
+      widget.guiYeuCau?.call(path, body) ?? Api.post(path, body);
   // Dữ liệu tải từ API
   List<ChiNhanh>? _dsChiNhanh;    // null = đang tải
   String? _loiTai;
@@ -48,7 +54,7 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
   // Lựa chọn của khách
   int? _maChiNhanh;
   String _hinhThucNhan = 'TAI_QUAY';
-  final TextEditingController _oDiaChi = TextEditingController();
+  DiaChiNhan _diaChiNhan = const DiaChiNhan();
   final TextEditingController _oSdt = TextEditingController();
   final TextEditingController _oMaGiam = TextEditingController();
 
@@ -66,7 +72,7 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
   void initState() {
     super.initState();
     // Điền sẵn địa chỉ nhận hàng mặc định + số điện thoại đã lưu ở tab Tôi
-    _oDiaChi.text = Phien.nguoiDung?.diaChiMacDinh ?? '';
+    _diaChiNhan = DiaChiNhan(diaChi: Phien.nguoiDung?.diaChiMacDinh ?? '');
     _oSdt.text = Phien.nguoiDung?.soDienThoai ?? '';
     _taiChiNhanh();
   }
@@ -74,7 +80,6 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
   @override
   void dispose() {
     _hen?.cancel();
-    _oDiaChi.dispose();
     _oSdt.dispose();
     _oMaGiam.dispose();
     super.dispose();
@@ -87,7 +92,7 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
       _loiTai = null;
     });
 
-    KetQuaApi kq = await Api.post('/api/don-hang/chi-nhanh-phu-hop', {
+    KetQuaApi kq = await _post('/api/don-hang/chi-nhanh-phu-hop', {
       'dsMaDichVu': [widget.maDichVu],
     });
     if (!mounted) return;
@@ -125,7 +130,13 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
 
   // Đổi lựa chọn: vẽ lại ngay, đợi 0,35 giây rồi mới gọi báo giá (gõ địa chỉ không gọi API liên tục)
   void _doiLuaChon(VoidCallback thayDoi) {
-    setState(thayDoi);
+    _lanGoi++; // Kết quả cũ không được quay lại sau khi đổi địa chỉ/chi nhánh.
+    setState(() {
+      thayDoi();
+      _baoGia = null;
+      _dangTinh = false;
+      _loiBaoGia = null;
+    });
     _hen?.cancel();
     _hen = Timer(const Duration(milliseconds: 350), _goiBaoGia);
   }
@@ -140,10 +151,10 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
       return;
     }
     // Giao tận nơi mà chưa nhập địa chỉ thì chưa tính được phí ship
-    if (_hinhThucNhan == 'GIAO_HANG' && _oDiaChi.text.trim().isEmpty) {
+    if (_hinhThucNhan == 'GIAO_HANG' && !_diaChiNhan.daChon) {
       setState(() {
         _baoGia = null;
-        _loiBaoGia = 'Nhập địa chỉ giao hàng để tính phí giao.';
+        _loiBaoGia = 'Tìm và chọn đúng điểm nhận để tính phí giao hàng.';
       });
       return;
     }
@@ -153,12 +164,13 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
     setState(() {
       _dangTinh = true;
       _loiBaoGia = null;
+      _loiDatDon = null;
     });
 
-    KetQuaApi kq = await Api.post('/api/bao-gia', {
+    KetQuaApi kq = await _post('/api/bao-gia', {
       'maChiNhanh': _maChiNhanh,
       'hinhThucNhan': _hinhThucNhan,
-      'diaChiGiao': _hinhThucNhan == 'GIAO_HANG' ? _oDiaChi.text.trim() : null,
+      if (_hinhThucNhan == 'GIAO_HANG') ..._diaChiNhan.duLieu,
       'inGap': widget.hoaToc,
       'maCodeKhuyenMai': _oMaGiam.text.trim().isEmpty ? null : _oMaGiam.text.trim(),
       'fileIn': [
@@ -187,16 +199,18 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
 
   // POST /api/don-hang — F-09: tạo đơn thật
   Future<void> _datDon() async {
+    if (_baoGia == null || _dangTinh || _dangDatDon) return;
     setState(() {
       _dangDatDon = true;
       _loiDatDon = null;
     });
 
-    KetQuaApi kq = await Api.post('/api/don-hang', {
+    KetQuaApi kq = await _post('/api/don-hang', {
       'maChiNhanh': _maChiNhanh,
       'hinhThucNhan': _hinhThucNhan,
-      'diaChiGiao': _hinhThucNhan == 'GIAO_HANG' ? _oDiaChi.text.trim() : null,
+      if (_hinhThucNhan == 'GIAO_HANG') ..._diaChiNhan.duLieu,
       'sdtNhan': _oSdt.text.trim().isEmpty ? null : _oSdt.text.trim(),
+      'maBaoGiaGiao': _hinhThucNhan == 'GIAO_HANG' ? _baoGia!.maBaoGiaGiao : null,
       'inGap': widget.hoaToc,
       'maCodeKhuyenMai': _oMaGiam.text.trim().isEmpty ? null : _oMaGiam.text.trim(),
       'ghiChu': widget.ghiChu,
@@ -249,65 +263,56 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
         ),
       );
     } else {
-      noiDung = Stack(
-        children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 300),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _theTomTatDon(),
-                const SizedBox(height: 14),
-                const NhanTruong('Hình thức nhận hàng'),
-                const SizedBox(height: 6),
-                _chonHinhThucNhan(),
-                if (_hinhThucNhan == 'GIAO_HANG') ...[
-                  const SizedBox(height: 12),
-                  const NhanTruong('Địa chỉ giao hàng'),
-                  const SizedBox(height: 6),
-                  ONhap(
-                    controller: _oDiaChi,
-                    hint: 'Số nhà, đường, phường, quận',
-                    icon: Ico.ghim,
-                    onChanged: (chu) => _doiLuaChon(() {}),
-                  ),
-                  const SizedBox(height: 8),
-                  const NhanTruong('Số điện thoại người nhận'),
-                  const SizedBox(height: 6),
-                  ONhap(controller: _oSdt, hint: '09xx xxx xxx', icon: Ico.dienThoai, keyboardType: TextInputType.phone),
-                ],
-                const SizedBox(height: 14),
-                const NhanTruong('Chi nhánh in'),
-                const SizedBox(height: 6),
-                for (ChiNhanh cn in _dsChiNhanh!) ...[
-                  _theChiNhanh(cn),
-                  const SizedBox(height: 8),
-                ],
-                const SizedBox(height: 4),
-                const NhanTruong('Mã giảm giá'),
-                const SizedBox(height: 6),
-                ONhap(
-                  controller: _oMaGiam,
-                  hint: 'Nhập mã nếu có, vd MUATHI2026',
-                  icon: Ico.theTien,
-                  laMono: true,
-                  onChanged: (chu) => _doiLuaChon(() {}),
-                ),
-                if (_baoGia != null && _baoGia!.khuyenMaiHopLe == false)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: HopThongBao(_baoGia!.lyDoKhuyenMai ?? 'Mã giảm giá không dùng được.',
-                        loai: LoaiThongBao.canhBao),
-                  ),
-                const SizedBox(height: 14),
-                const NhanTruong('Thanh toán'),
-                const SizedBox(height: 6),
-                _oThanhToan(),
-              ],
+      noiDung = SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _theTomTatDon(),
+            const SizedBox(height: 14),
+            const NhanTruong('Hình thức nhận hàng'),
+            const SizedBox(height: 6),
+            _chonHinhThucNhan(),
+            if (_hinhThucNhan == 'GIAO_HANG') ...[
+              const SizedBox(height: 12),
+              DiaChiGiao(
+                giaTri: _diaChiNhan,
+                onChanged: (diaChi) => _doiLuaChon(() => _diaChiNhan = diaChi),
+              ),
+              const SizedBox(height: 8),
+              const NhanTruong('Số điện thoại người nhận'),
+              const SizedBox(height: 6),
+              ONhap(controller: _oSdt, hint: '09xx xxx xxx', icon: Ico.dienThoai, keyboardType: TextInputType.phone),
+            ],
+            const SizedBox(height: 14),
+            const NhanTruong('Chi nhánh in'),
+            const SizedBox(height: 6),
+            for (ChiNhanh cn in _dsChiNhanh!) ...[
+              _theChiNhanh(cn),
+              const SizedBox(height: 8),
+            ],
+            const SizedBox(height: 4),
+            const NhanTruong('Mã giảm giá'),
+            const SizedBox(height: 6),
+            ONhap(
+              controller: _oMaGiam,
+              hint: 'Nhập mã nếu có, vd MUATHI2026',
+              icon: Ico.theTien,
+              laMono: true,
+              onChanged: (chu) => _doiLuaChon(() {}),
             ),
-          ),
-          Positioned(left: 0, right: 0, bottom: 0, child: _bangTongTien()),
-        ],
+            if (_baoGia != null && _baoGia!.khuyenMaiHopLe == false)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: HopThongBao(_baoGia!.lyDoKhuyenMai ?? 'Mã giảm giá không dùng được.',
+                    loai: LoaiThongBao.canhBao),
+              ),
+            const SizedBox(height: 14),
+            const NhanTruong('Thanh toán'),
+            const SizedBox(height: 6),
+            _oThanhToan(),
+          ],
+        ),
       );
     }
 
@@ -320,6 +325,12 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
         buocHienTai: 3,
       ),
       body: noiDung,
+      bottomNavigationBar: _dsChiNhanh != null && _loiTai == null
+          ? ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .45),
+              child: SingleChildScrollView(child: _bangTongTien()),
+            )
+          : null,
     );
   }
 
@@ -474,7 +485,7 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
               ),
               if (_hinhThucNhan == 'GIAO_HANG') ...[
                 const SizedBox(height: 5),
-                Text('Giao trong ${cn.banKinhGiao.toStringAsFixed(0)} km · phí tính theo Ahamove',
+                Text('Giao trong ${cn.banKinhGiao.toStringAsFixed(0)} km · phí theo quãng đường',
                     style: AppTheme.font(size: 11, weight: FontWeight.w600, color: AppColors.thanhCong)),
               ],
               if (!inDuoc) ...[
@@ -564,9 +575,10 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
                   const SizedBox(width: 8),
                   const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 1.6, color: AppColors.accent)),
                 ],
-                const Spacer(),
-                Text(cn?.tenChiNhanh ?? '—',
-                    style: AppTheme.font(size: 10.5, color: AppColors.chuPhu)),
+                const SizedBox(width: 12),
+                Expanded(child: Text(cn?.tenChiNhanh ?? '—', textAlign: TextAlign.right,
+                    maxLines: 2, overflow: TextOverflow.ellipsis,
+                    style: AppTheme.font(size: 10.5, color: AppColors.chuPhu))),
               ],
             ),
             const SizedBox(height: 8),
@@ -576,7 +588,8 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
               _dongTien('Tiền in', widget.file.laAnhThe ? widget.file.moTaSoLuong : '${widget.file.soTrang ?? 0} trang × ${widget.soBan} bản', tien(b.tienIn)),
               if (b.tienGiaCong > 0) _dongTien('Tiền gia công', null, tien(b.tienGiaCong)),
               if (b.phuPhiGap > 0) _dongTien('Phụ phí in hỏa tốc', null, '+${tien(b.phuPhiGap)}', mau: AppColors.hoaToc),
-              if (b.phiShip > 0) _dongTien('Phí giao hàng', null, '+${tien(b.phiShip)}'),
+              if (b.phiShip > 0)
+                _dongTien('Phí giao nội bộ', b.khoangCachKm == null ? null : '${b.khoangCachKm!.toStringAsFixed(2)} km · khoảng ${b.phutDiChuyen ?? 0} phút di chuyển', '+${tien(b.phiShip)}'),
               if (b.giamGia > 0) _dongTien('Mã khuyến mãi', null, '−${tien(b.giamGia)}', mau: AppColors.thanhCong),
             ] else
               const Padding(
@@ -611,6 +624,11 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
               const SizedBox(height: 8),
               HopThongBao(_loiDatDon!),
             ],
+            Align(alignment: Alignment.centerRight, child: TextButton.icon(
+              onPressed: _dangTinh || _dangDatDon ? null : _goiBaoGia,
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('Tính lại phí'),
+            )),
             const SizedBox(height: 12),
             NutChinh(
               nhan: 'Đặt đơn và chuyển khoản',
@@ -638,7 +656,7 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
                 TextSpan(text: nhan),
                 if (phu != null) TextSpan(text: ' $phu', style: AppTheme.font(size: 11, color: AppColors.chuPhu)),
               ]),
-              maxLines: 1,
+              maxLines: 3,
               overflow: TextOverflow.ellipsis,
               style: AppTheme.font(size: 12, color: AppColors.chuNhan),
             ),

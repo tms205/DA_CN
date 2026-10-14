@@ -44,6 +44,8 @@ dependencies:
   signalr_netcore: ^1.4.4
   url_launcher: ^6.3.3
   qr_flutter: ^4.1.0
+  # Chỉ lấy vị trí một lần khi khách bấm, không theo dõi chạy nền.
+  geolocator: ^14.1.1
 
 dev_dependencies:
   flutter_test:

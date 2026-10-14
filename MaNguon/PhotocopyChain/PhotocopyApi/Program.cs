@@ -61,6 +61,7 @@ builder.Services.AddControllers()
 
 // Bộ nhớ tạm của API: giữ mã OTP, đếm số lần nhập sai mật khẩu, quãng đường đã hỏi bản đồ (tắt API là mất)
 builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<PhotocopyApi.GiaoHang.GeoapifyService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<OtpDatLaiStore>();
 builder.Services.AddSingleton<IGoogleTokenVerifier>(sp => new GoogleTokenVerifier(sp.GetRequiredService<IConfiguration>()));

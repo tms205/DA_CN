@@ -73,7 +73,11 @@ public sealed partial class DatDonHangRequest
     /// <summary>Bắt buộc khi GIAO_HANG.</summary>
     [MaxLength(255, ErrorMessage = "Địa chỉ giao tối đa 255 ký tự.")]
     public string? DiaChiGiao { get; set; }
-    /// <summary>Tọa độ GPS khách bấm "Dùng vị trí hiện tại" — gửi cho Ahamove định vị chính xác hơn.</summary>
+    [MaxLength(100)] public string? DiaChiChiTiet { get; set; }
+    [MaxLength(100)] public string? GhiChuGiao { get; set; }
+    [RegularExpression(@"^[a-f0-9]{32}$", ErrorMessage = "Mã báo giá giao hàng không hợp lệ.")]
+    public string? MaBaoGiaGiao { get; set; }
+    /// <summary>Tọa độ điểm nhận khách đã chọn.</summary>
     [Range(typeof(decimal), "-90", "90", ErrorMessage = "Vĩ độ phải từ -90 đến 90.")]
     public decimal? ViDoGiao { get; set; }
     [Range(typeof(decimal), "-180", "180", ErrorMessage = "Kinh độ phải từ -180 đến 180.")]

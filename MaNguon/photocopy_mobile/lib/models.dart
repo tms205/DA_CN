@@ -170,6 +170,9 @@ class ChiNhanh {
 
 // ============================================================ Kết quả báo giá (sp_BaoGia)
 class BaoGia {
+  String? maBaoGiaGiao;
+  double? khoangCachKm;
+  int? phutDiChuyen;
   double tienIn = 0;
   double tienGiaCong = 0;
   double phuPhiGap = 0;
@@ -182,6 +185,9 @@ class BaoGia {
   DateTime? ngayHenTra; // giờ in xong dự kiến
 
   BaoGia.fromJson(Map<String, dynamic> json) {
+    maBaoGiaGiao = json['maBaoGiaGiao'];
+    khoangCachKm = (json['khoangCachKm'] as num?)?.toDouble();
+    phutDiChuyen = json['phutDiChuyenDuKien'];
     tienIn = soThuc(json['tienIn']);
     tienGiaCong = soThuc(json['tienGiaCong']);
     phuPhiGap = soThuc(json['phuPhiGap']);

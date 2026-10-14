@@ -24,11 +24,16 @@ public sealed partial class BaoGiaRequest
     [Required(ErrorMessage = "Vui lòng nhập giá trị.")]
     [RegularExpression(@"^(TAI_QUAY|GIAO_HANG)$", ErrorMessage = "Lựa chọn không hợp lệ.")]
     public string HinhThucNhan { get; set; } = "TAI_QUAY";
-    /// <summary>Bắt buộc khi GIAO_HANG — Backend gọi Ahamove lấy quãng đường và phí giao dự kiến.</summary>
+    /// <summary>Bắt buộc khi GIAO_HANG — Geoapify lấy đường đi, backend tính phí của cửa hàng.</summary>
     [MaxLength(255, ErrorMessage = "Địa chỉ giao tối đa 255 ký tự.")]
     public string? DiaChiGiao { get; set; }
 
-    /// <summary>Tọa độ GPS khi khách bấm "Dùng vị trí hiện tại" — gửi cho Ahamove định vị chính xác hơn.</summary>
+    [MaxLength(100)] public string? DiaChiChiTiet { get; set; }
+    [MaxLength(100)] public string? GhiChuGiao { get; set; }
+    [RegularExpression(@"^[a-f0-9]{32}$", ErrorMessage = "Điểm nhận không hợp lệ. Hãy tìm lại địa chỉ.")]
+    public string? MaViTriGiao { get; set; }
+
+    /// <summary>Tọa độ điểm nhận khách đã chọn; không bắt buộc lấy GPS.</summary>
     [Range(typeof(decimal), "-90", "90", ErrorMessage = "Vĩ độ phải từ -90 đến 90.")]
     public decimal? ViDoGiao { get; set; }
     [Range(typeof(decimal), "-180", "180", ErrorMessage = "Kinh độ phải từ -180 đến 180.")]
@@ -63,6 +68,9 @@ public sealed class DongInRequest
 /// <summary>Kết quả sp_BaoGia — cùng công thức với sp_TaoDonHang.</summary>
 public sealed class BaoGiaResponse
 {
+    public string? MaBaoGiaGiao { get; set; }
+    public decimal? KhoangCachKm { get; set; }
+    public int? PhutDiChuyenDuKien { get; set; }
     public decimal TienIn { get; set; }
     public decimal TienGiaCong { get; set; }
     public decimal PhuPhiGap { get; set; }

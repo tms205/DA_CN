@@ -1,6 +1,7 @@
 @echo off
 setlocal
-rem Bam dup de chay Web + API + may in ao. Go chay_web.cmd app de chay Flutter qua USB.
+rem Bam dup chay Web + API + may in ao va tu giu ket noi Android (USB/Wi-Fi ADB).
+rem Go chay_web.cmd app de chay Flutter tren dien thoai da ket noi.
 rem PowerShell duoc giu ngay trong file nay, khong can bat ky script phu nao.
 set "PHOTOCOPY_LAUNCHER=%~f0"
 set "PHOTOCOPY_MODE=%~1"
@@ -16,8 +17,10 @@ exit /b 0
 
 # POWERSHELL-BEGIN
 param(
-    [ValidateSet('web', 'app')][string]$Mode = 'web',
-    [string]$LauncherPath
+    [ValidateSet('web', 'app', 'ket-noi')][string]$Mode = 'web',
+    [string]$LauncherPath,
+    [int]$ApiProcessId,
+    [long]$ApiStartTicks
 )
 $ErrorActionPreference = 'Stop'
 
@@ -139,24 +142,102 @@ function Get-PhotocopyAppDrive {
     throw 'Khong con o dia trong P-Z de tao duong dan Android tam.'
 }
 
-function Start-PhotocopyApp {
-    param([string]$Solution)
+function Invoke-PhotocopyAdb {
+    param([string]$Adb, [string[]]$Arguments)
+    try {
+        $taskOutput = @(& $Adb @Arguments 2>$null)
+        return [pscustomobject]@{ ExitCode=$LASTEXITCODE; Output=$taskOutput }
+    }
+    catch { return [pscustomobject]@{ ExitCode=1; Output=@() } }
+}
+
+function Get-PhotocopyAndroidDevices {
+    param([string]$Adb)
+    $taskResult = Invoke-PhotocopyAdb -Adb $Adb -Arguments @('devices', '-l')
+    if ($taskResult.ExitCode -ne 0) { return }
+    foreach ($taskLine in $taskResult.Output) {
+        if ($taskLine -match '^(\S+)\s+device(?:\s|$)') { $Matches[1] }
+    }
+}
+
+function Sync-PhotocopyAdbReverse {
+    param([string]$Adb)
+    foreach ($taskSerial in @(Get-PhotocopyAndroidDevices -Adb $Adb)) {
+        $taskList = Invoke-PhotocopyAdb -Adb $Adb -Arguments @('-s', $taskSerial, 'reverse', '--list')
+        if ($taskList.ExitCode -ne 0) { continue } # Thiết bị có thể vừa mất kết nối.
+        if (($taskList.Output -join "`n") -notmatch '(?m)(^|\s)tcp:5268\s+tcp:5268(\s|$)') {
+            $taskReverse = Invoke-PhotocopyAdb -Adb $Adb -Arguments @('-s', $taskSerial, 'reverse', 'tcp:5268', 'tcp:5268')
+            if ($taskReverse.ExitCode -ne 0) { continue }
+            $taskList = Invoke-PhotocopyAdb -Adb $Adb -Arguments @('-s', $taskSerial, 'reverse', '--list')
+            if ($taskList.ExitCode -ne 0 -or ($taskList.Output -join "`n") -notmatch '(?m)(^|\s)tcp:5268\s+tcp:5268(\s|$)') { continue }
+        }
+        $taskSerial
+    }
+}
+
+function Watch-PhotocopyAdbReverse {
+    param([int]$ApiProcessId, [long]$ApiStartTicks)
     $taskAdb = Join-Path $env:LOCALAPPDATA 'Android\Sdk\platform-tools\adb.exe'
-    if (-not (Test-Path -LiteralPath $taskAdb)) { throw 'Khong thay adb trong Android SDK.' }
-    if (-not ((& $taskAdb devices) -match "`tdevice$")) { throw 'Cam dien thoai USB, mo khoa va cho phep go loi USB truoc.' }
-    Wait-PhotocopyHttp 'http://localhost:5268/swagger/v1/swagger.json'
-    & $taskAdb reverse tcp:5268 tcp:5268 | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw 'Khong tao duoc adb reverse.' }
-    $taskKeep = Start-Job -ArgumentList $taskAdb -ScriptBlock {
-        param($taskAdb)
+    if (-not (Test-Path -LiteralPath $taskAdb)) { return }
+    # Một monitor cho API cổng 5268, tồn tại độc lập với cửa sổ launcher/Flutter.
+    $taskMutex = New-Object Threading.Mutex($false, 'Local\PhotocopyChain-Adb5268')
+    $taskLocked = $false
+    try {
+        try { $taskLocked = $taskMutex.WaitOne(5000) }
+        catch [Threading.AbandonedMutexException] { $taskLocked = $true }
+        if (-not $taskLocked) { return }
         while ($true) {
-            if ((& $taskAdb devices) -match "`tdevice$" -and
-                -not ((& $taskAdb reverse --list) -match 'tcp:5268 tcp:5268')) {
-                & $taskAdb reverse tcp:5268 tcp:5268 | Out-Null
-            }
+            $taskApi = Get-Process -Id $ApiProcessId -ErrorAction SilentlyContinue
+            if (-not $taskApi -or $taskApi.StartTime.Ticks -ne $ApiStartTicks) { return }
+            Sync-PhotocopyAdbReverse -Adb $taskAdb | Out-Null
             Start-Sleep -Seconds 3
         }
     }
+    finally {
+        if ($taskLocked) { $taskMutex.ReleaseMutex() }
+        $taskMutex.Dispose()
+    }
+}
+
+function Start-PhotocopyAdbMonitor {
+    param([string]$Solution, [string]$LauncherPath)
+    $taskAdb = Join-Path $env:LOCALAPPDATA 'Android\Sdk\platform-tools\adb.exe'
+    if (-not (Test-Path -LiteralPath $taskAdb)) {
+        Write-Warning 'Khong thay Android SDK/adb; Web van chay, Android chua duoc tao reverse.'
+        return
+    }
+    $taskOwners = @(Get-NetTCPConnection -State Listen -LocalPort 5268 -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty OwningProcess -Unique)
+    if ($taskOwners.Count -ne 1) { throw 'Khong xac dinh duoc API de giu ket noi Android.' }
+    $taskApi = @(Get-PhotocopyWebProcesses -Solution $Solution -Processus @(
+        Get-CimInstance Win32_Process -Filter ('ProcessId=' + $taskOwners[0])
+    ) | Where-Object Name -eq 'PhotocopyApi.exe')
+    if ($taskApi.Count -ne 1) { throw 'Cong API khong thuoc PhotocopyApi cua du an nay.' }
+    $taskStart = (Get-Process -Id $taskOwners[0]).StartTime.Ticks
+    $taskConnected = @(Sync-PhotocopyAdbReverse -Adb $taskAdb)
+    Write-Host ('Android: ' + $taskConnected.Count + ' thiet bi da tao reverse; tu khoi phuc moi 3 giay khi ket noi lai.')
+    $env:PHOTOCOPY_LAUNCHER = [IO.Path]::GetFullPath($LauncherPath)
+    $taskCommand = '$taskCode=[regex]::Split([IO.File]::ReadAllText($env:PHOTOCOPY_LAUNCHER),''(?m)^# POWERSHELL-BEGIN\r?$'')[1]; & ([scriptblock]::Create($taskCode)) -Mode ket-noi -LauncherPath $env:PHOTOCOPY_LAUNCHER -ApiProcessId ' + $taskOwners[0] + ' -ApiStartTicks ' + $taskStart
+    $taskEncoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($taskCommand))
+    Start-Process powershell.exe -WorkingDirectory $Solution -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', $taskEncoded) -WindowStyle Hidden
+}
+
+function Start-PhotocopyApp {
+    param([string]$Solution, [string]$LauncherPath)
+    $taskAdb = Join-Path $env:LOCALAPPDATA 'Android\Sdk\platform-tools\adb.exe'
+    if (-not (Test-Path -LiteralPath $taskAdb)) { throw 'Khong thay adb trong Android SDK.' }
+    $taskDevices = @(Get-PhotocopyAndroidDevices -Adb $taskAdb)
+    if ($taskDevices.Count -eq 0) { throw 'Chua co dien thoai ADB san sang. Ket noi USB/Wi-Fi, mo khoa va cho phep go loi truoc.' }
+    $taskSerial = $taskDevices[0]
+    if ($taskDevices.Count -gt 1) {
+        for ($taskIndex = 0; $taskIndex -lt $taskDevices.Count; $taskIndex++) { Write-Host (($taskIndex + 1).ToString() + '. ' + $taskDevices[$taskIndex]) }
+        $taskChoice = 0
+        if (-not [int]::TryParse((Read-Host 'Chon so dien thoai de chay app'), [ref]$taskChoice) -or $taskChoice -lt 1 -or $taskChoice -gt $taskDevices.Count) { throw 'Lua chon dien thoai khong hop le.' }
+        $taskSerial = $taskDevices[$taskChoice - 1]
+    }
+    Wait-PhotocopyHttp 'http://localhost:5268/swagger/v1/swagger.json'
+    Start-PhotocopyAdbMonitor -Solution $Solution -LauncherPath $LauncherPath
+    if ($taskSerial -notin @(Sync-PhotocopyAdbReverse -Adb $taskAdb)) { throw 'Chua tao duoc reverse cho dien thoai da chon. Kiem tra ADB va thu lai.' }
     $taskMobilePath = [IO.Path]::GetFullPath((Join-Path $Solution '..\photocopy_mobile'))
     $taskMappedDrive = $null
     $taskPushed = $false
@@ -172,13 +253,11 @@ function Start-PhotocopyApp {
         }
         Push-Location $taskRunPath
         $taskPushed = $true
-        flutter run
+        flutter run -d $taskSerial
         if ($LASTEXITCODE -ne 0) { throw 'Flutter run khong thanh cong.' }
     }
     finally {
         if ($taskPushed) { Pop-Location }
-        Stop-Job $taskKeep -ErrorAction SilentlyContinue
-        Remove-Job $taskKeep -Force -ErrorAction SilentlyContinue
         # Chi go o tam da tao thanh cong; khong go cac o ton tai tu truoc.
         if ($taskMappedDrive) {
             subst $taskMappedDrive /D
@@ -188,8 +267,13 @@ function Start-PhotocopyApp {
 
 try {
     $taskSolution = [IO.Path]::GetFullPath((Join-Path ([IO.Path]::GetDirectoryName($LauncherPath)) '..\PhotocopyChain'))
+    if ($Mode -eq 'ket-noi') {
+        if ($ApiProcessId -gt 0) { Watch-PhotocopyAdbReverse -ApiProcessId $ApiProcessId -ApiStartTicks $ApiStartTicks }
+        else { Start-PhotocopyAdbMonitor -Solution $taskSolution -LauncherPath $LauncherPath }
+        exit 0
+    }
     $env:PHOTOCOPY_ENV_FILE = Join-Path $taskSolution '.env'
-    if ($Mode -eq 'app') { Start-PhotocopyApp $taskSolution; exit 0 }
+    if ($Mode -eq 'app') { Start-PhotocopyApp -Solution $taskSolution -LauncherPath $LauncherPath; exit 0 }
     Test-PhotocopyDatabase $env:PHOTOCOPY_ENV_FILE
     Write-Host 'Khoi dong lai API, Admin va may in ao cua dung du an...'
     Stop-PhotocopyWebServices $taskSolution
@@ -199,6 +283,7 @@ try {
     }
     Start-PhotocopyService $taskSolution 'PhotocopyApi\PhotocopyApi.csproj' 'API' -Http
     Wait-PhotocopyHttp 'http://localhost:5268/swagger/v1/swagger.json'
+    Start-PhotocopyAdbMonitor -Solution $taskSolution -LauncherPath $LauncherPath
     Start-PhotocopyService $taskSolution 'PhotocopyAdmin\PhotocopyAdmin.csproj' 'Admin' -Http
     Start-PhotocopyService $taskSolution 'PhotocopyPrinterSimulator\PhotocopyPrinterSimulator.csproj' 'Printer Simulator'
     Wait-PhotocopyHttp 'http://localhost:5064/'

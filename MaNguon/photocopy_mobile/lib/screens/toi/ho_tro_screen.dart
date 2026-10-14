@@ -144,7 +144,7 @@ class _HoTroScreenState extends State<HoTroScreen> {
           Row(
             children: [
               Flexible(
-                child: NhanNho('Giao trong ${cn.banKinhGiao.toStringAsFixed(0)} km · phí tính theo Ahamove',
+                child: NhanNho('Giao trong ${cn.banKinhGiao.toStringAsFixed(0)} km · shipper nội bộ',
                     mau: AppColors.thanhCong, nen: AppColors.xanhNhat),
               ),
               const Spacer(),

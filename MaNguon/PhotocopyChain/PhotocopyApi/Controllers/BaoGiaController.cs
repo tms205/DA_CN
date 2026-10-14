@@ -1,9 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Data;
-using System.Net.Http.Headers;
-using System.Text;
-using System.Text.Json;
-using System.Text.Json.Nodes;
+using PhotocopyApi.GiaoHang;
 using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -23,16 +20,11 @@ namespace PhotocopyApi.Controllers;
 public class BaoGiaController : ControllerBase
 {
     private readonly string _chuoiKetNoi;
-    private readonly IConfiguration _config;
-    private readonly IMemoryCache _boNhoTam;
+    private readonly GeoapifyService _giaoHang;
 
-    // Dùng chung 1 HttpClient để gọi Ahamove (tạo mới liên tục dễ hết cổng mạng).
-    private static readonly HttpClient _http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-
-    public BaoGiaController(IConfiguration config, IMemoryCache boNhoTam)
+    public BaoGiaController(IConfiguration config, IMemoryCache boNhoTam, GeoapifyService giaoHang = null)
     {
-        _config = config;
-        _boNhoTam = boNhoTam;
+        _giaoHang = giaoHang ?? new GeoapifyService(config, boNhoTam);
         _chuoiKetNoi = config.GetConnectionString("PhotocopyChain");
     }
 
@@ -43,6 +35,12 @@ public class BaoGiaController : ControllerBase
         string vaiTro = User.FindFirst(TenClaim.VaiTro).Value;
         int maNguoiDung = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
         int maKhachHangBaoGia = maNguoiDung;
+
+        if (req.HinhThucNhan == "GIAO_HANG")
+        {
+            try { _giaoHang.KiemTraViTri(req.MaViTriGiao, maNguoiDung, req.DiaChiGiao, req.ViDoGiao, req.KinhDoGiao); }
+            catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+        }
 
         if (vaiTro != VaiTro.Customer)
         {
@@ -103,6 +101,8 @@ public class BaoGiaController : ControllerBase
         //Bước 2: giao tận nơi thì tính quãng đường từ chi nhánh tới nhà khách (để tính phí ship)
         decimal? khoangCachKm = null;
         decimal? phiShipApi = null;
+        KetQuaPhiGiaoHang phiGiao = null;
+        string diaChiDayDu = null;
         if (req.HinhThucNhan == "GIAO_HANG")
         {
             if (string.IsNullOrWhiteSpace(req.DiaChiGiao))
@@ -119,15 +119,10 @@ public class BaoGiaController : ControllerBase
 
             try
             {
-                NguoiDung khach = await conn.QueryFirstAsync<NguoiDung>(
-                    "SELECT HoTen, SoDienThoai FROM NguoiDung WHERE MaNguoiDung = @MaNguoiDung",
-                    new { MaNguoiDung = maKhachHangBaoGia });
-
-                KetQuaPhiGiaoHang baoGiaGiaoHang = await TinhPhiGiaoHangAhamove(
-                    chiNhanh, req.DiaChiGiao.Trim(), req.ViDoGiao, req.KinhDoGiao,
-                    khach.HoTen, khach.SoDienThoai);
-                khoangCachKm = baoGiaGiaoHang.KhoangCachKm;
-                phiShipApi = baoGiaGiaoHang.PhiShip;
+                diaChiDayDu = QuyTacGiaoHang.GhepDiaChi(req.DiaChiGiao, req.DiaChiChiTiet, req.GhiChuGiao);
+                phiGiao = await _giaoHang.TinhPhi(chiNhanh, req.DiaChiGiao.Trim(), req.ViDoGiao, req.KinhDoGiao, HttpContext.RequestAborted);
+                khoangCachKm = phiGiao.KhoangCachKm;
+                phiShipApi = phiGiao.PhiShip;
             }
             catch (Exception ex)
             {
@@ -154,6 +149,13 @@ public class BaoGiaController : ControllerBase
                 DsGiaCong = bangGiaCong.AsTableValuedParameter("Kieu_DongGiaCong")
             }, commandType: CommandType.StoredProcedure);
 
+            if (phiGiao != null)
+            {
+                ketQua.MaBaoGiaGiao = _giaoHang.GiuBaoGia(maKhachHangBaoGia, req.MaChiNhanh,
+                    diaChiDayDu, req.ViDoGiao, req.KinhDoGiao, phiGiao);
+                ketQua.KhoangCachKm = phiGiao.KhoangCachKm;
+                ketQua.PhutDiChuyenDuKien = (int)Math.Ceiling(phiGiao.ThoiGianDuKienGiay / 60.0);
+            }
             return Ok(ketQua);
         }
         catch (SqlException ex)
@@ -163,100 +165,4 @@ public class BaoGiaController : ControllerBase
         }
     }
 
-    // TUẦN 3 — gọi API giao hàng Ahamove để lấy CẢ quãng đường lẫn phí giao dự kiến.
-    // Dùng group_services = BIKE để Ahamove tự chọn mã xe máy đúng khu vực (SGN-BIKE, HAN-BIKE...).
-    // Kết quả chỉ nhớ 10 phút vì giá giao hàng có thể thay đổi theo thời điểm.
-    private async Task<KetQuaPhiGiaoHang> TinhPhiGiaoHangAhamove(ChiNhanh chiNhanh, string diaChiKhach,
-        decimal? viDoKhach, decimal? kinhDoKhach, string tenKhach, string sdtKhach)
-    {
-        if (string.IsNullOrWhiteSpace(chiNhanh.SoDienThoai) || string.IsNullOrWhiteSpace(sdtKhach))
-            throw new Exception("Chi nhánh hoặc người nhận chưa có số điện thoại để Ahamove báo giá.");
-
-        string khoaNho;
-        if (viDoKhach != null && kinhDoKhach != null)
-            khoaNho = $"ahamove|{chiNhanh.MaChiNhanh}|{Math.Round(viDoKhach.Value, 5)},{Math.Round(kinhDoKhach.Value, 5)}";
-        else
-            khoaNho = "ahamove|" + chiNhanh.MaChiNhanh + "|" + DonHangController.ChuanHoaDiaChi(diaChiKhach);
-
-        if (_boNhoTam.TryGetValue(khoaNho, out KetQuaPhiGiaoHang ketQuaDaNho))
-            return ketQuaDaNho;
-
-        string token = _config["GiaoHang:AhamoveToken"];
-        if (string.IsNullOrWhiteSpace(token))
-        {
-            // Chỉ dùng khi demo nội bộ; phải cấu hình cả km và phí để không vô tình dùng giá cố định thật.
-            decimal? kmGiaLap = _config.GetValue<decimal?>("GiaoHang:QuangDuongGiaLapKm");
-            decimal? phiGiaLap = _config.GetValue<decimal?>("GiaoHang:PhiShipGiaLap");
-            if (kmGiaLap != null && phiGiaLap != null)
-                return new KetQuaPhiGiaoHang(kmGiaLap.Value, phiGiaLap.Value, 0);
-            throw new Exception("Máy chủ chưa cấu hình token Ahamove nên chưa lấy được phí giao hàng. Vui lòng chọn nhận tại quầy.");
-        }
-
-        string nhomDichVu = _config["GiaoHang:NhomDichVu"] ?? "BIKE";
-        string baseUrl = (_config["GiaoHang:AhamoveBaseUrl"] ?? "https://partner-apistg.ahamove.com/v3").TrimEnd('/');
-
-        // Ahamove bắt buộc có địa chỉ, tên và SĐT ở cả điểm lấy lẫn điểm giao.
-        // lat/lng là dữ liệu khuyến nghị: có tọa độ khách thì gửi, không có thì Ahamove tự định vị từ địa chỉ.
-        var diemLay = new Dictionary<string, object>
-        {
-            ["lat"] = chiNhanh.ViDo.Value,
-            ["lng"] = chiNhanh.KinhDo.Value,
-            ["address"] = chiNhanh.DiaChi,
-            ["name"] = chiNhanh.TenChiNhanh,
-            ["mobile"] = chiNhanh.SoDienThoai
-        };
-        var diemGiao = new Dictionary<string, object>
-        {
-            ["address"] = diaChiKhach,
-            ["name"] = string.IsNullOrWhiteSpace(tenKhach) ? "Khách hàng" : tenKhach,
-            ["mobile"] = sdtKhach
-        };
-        if (viDoKhach != null && kinhDoKhach != null)
-        {
-            diemGiao["lat"] = viDoKhach.Value;
-            diemGiao["lng"] = kinhDoKhach.Value;
-        }
-
-        var duLieuGui = new
-        {
-            order_time = 0,
-            path = new[] { diemLay, diemGiao },
-            group_services = new[] { new { _id = nhomDichVu, group_requests = Array.Empty<object>() } },
-            payment_method = "CASH",
-            remarks = "Giao tài liệu in"
-        };
-
-        using var request = new HttpRequestMessage(HttpMethod.Post, baseUrl + "/orders/estimates");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        request.Content = new StringContent(JsonSerializer.Serialize(duLieuGui), Encoding.UTF8, "application/json");
-
-        HttpResponseMessage response;
-        try
-        {
-            response = await _http.SendAsync(request);
-        }
-        catch
-        {
-            throw new Exception("Dịch vụ giao hàng Ahamove đang không phản hồi, vui lòng thử lại sau.");
-        }
-
-        string json = await response.Content.ReadAsStringAsync();
-        if (!response.IsSuccessStatusCode)
-            throw new Exception(response.StatusCode == System.Net.HttpStatusCode.Unauthorized
-                ? "Token Ahamove không hợp lệ hoặc đã hết hạn."
-                : "Ahamove không tính được phí cho địa chỉ này. Vui lòng kiểm tra lại địa chỉ giao hàng.");
-
-        JsonArray danhSach = JsonNode.Parse(json)?.AsArray();
-        JsonNode duLieu = danhSach?.FirstOrDefault()?["data"];
-        if (duLieu?["distance"] == null || duLieu["total_price"] == null)
-            throw new Exception("Ahamove trả về kết quả không đầy đủ, vui lòng thử lại sau.");
-
-        var ketQua = new KetQuaPhiGiaoHang(
-            Math.Round(duLieu["distance"].GetValue<decimal>(), 2),
-            Math.Round(duLieu["total_price"].GetValue<decimal>(), 0),
-            duLieu["duration"]?.GetValue<int>() ?? 0);
-
-        _boNhoTam.Set(khoaNho, ketQua, TimeSpan.FromMinutes(10));
-        return ketQua;
-    }
 }

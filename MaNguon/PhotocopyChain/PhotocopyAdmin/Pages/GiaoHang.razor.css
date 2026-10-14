@@ -1,0 +1,11 @@
+.gh-cong-cu { display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
+.gh-cong-cu > input { flex:1 1 240px; min-width:0; max-width:420px; }
+table { width:100%; table-layout:fixed; }
+td, th { overflow-wrap:anywhere; vertical-align:top; }
+td > div { margin-top:6px; }
+.gh-dia-chi { margin:10px 0; }
+.gh-ly-do { color:var(--canh-bao-chu, #8a480b); line-height:1.5; }
+.gh-nut-giao { margin-top:8px; width:100%; white-space:normal; }
+.gh-trong { padding:24px; text-align:center; }
+select { width:100%; min-width:0; }
+@media(max-width:1000px) { table { table-layout:auto; } thead { display:none; } tbody, tr, td { display:block; width:100%; box-sizing:border-box; } tr { border-bottom:1px solid #dbe3eb; padding:8px 12px; } td { border:0; padding:10px 0; } td::before { content:attr(data-nhan); display:block; font-weight:600; color:#52657b; margin-bottom:8px; } }
