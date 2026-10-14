@@ -23,6 +23,32 @@ class KetQuaApi {
 //   KetQuaApi kq = await Api.post('/api/auth/login', {'taiKhoan': ..., 'matKhau': ...});
 //   if (kq.thanhCong) { ... kq.duLieu ... } else { ... kq.loi ... }
 class Api {
+  // Ảnh xem trước lấy từ PDF có sẵn trên máy chủ; gửi token trong header, không đưa vào URL.
+  static Future<KetQuaApi> getAnhMau(String maMau, int soTrang) async {
+    try {
+      final res = await http.get(
+        Uri.parse('$diaChiApi/api/file-in/mau/${Uri.encodeComponent(maMau)}/trang/$soTrang'),
+        headers: _taoHeader(),
+      ).timeout(const Duration(seconds: 30));
+      if (res.statusCode != 200) {
+        if (res.headers['content-type']?.contains('json') == true) return _docKetQua(res);
+        return KetQuaApi()..maHttp = res.statusCode..loi = 'Chưa tải được bản xem trước (${res.statusCode}).';
+      }
+      const png = [137, 80, 78, 71, 13, 10, 26, 10];
+      final bytes = res.bodyBytes;
+      bool dungPng = bytes.length >= png.length;
+      for (int i = 0; dungPng && i < png.length; i++) {
+        dungPng = bytes[i] == png[i];
+      }
+      if (res.headers['content-type']?.split(';').first != 'image/png' || bytes.length > 4 * 1024 * 1024 || !dungPng) {
+        return KetQuaApi()..loi = 'Bản xem trước không hợp lệ. Vui lòng thử lại sau.';
+      }
+      return KetQuaApi()..thanhCong = true..maHttp = 200..duLieu = bytes;
+    } catch (_) {
+      return _loiKetNoi();
+    }
+  }
+
   static Future<KetQuaApi> get(String duongDan) async {
     try {
       http.Response res = await http

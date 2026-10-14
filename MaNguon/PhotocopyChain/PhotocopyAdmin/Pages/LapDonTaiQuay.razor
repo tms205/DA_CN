@@ -3,6 +3,7 @@
 @inject HttpClient Http
 @inject PhienDangNhap Phien
 @inject PhamViChiNhanh PhamVi
+@inject IJSRuntime Js
 @using PhotocopyShared.QuyCachIn
 
 <PageTitle>Lập đơn tại quầy · PhotocopyChain</PageTitle>
@@ -95,14 +96,34 @@
             {
                 @if (_loaiTai == "MAU_DON")
                 {
-                    @foreach (var mau in _dsMau)
-                    {
-                        <div class="hd-dong-in"><b>@mau.TenMau</b><span class="nv-phu">@mau.MoTa</span>
-                            <button class="nut-nho" disabled="@(_dangGui || _dangTaiFile)" @onclick="() => XemMauAsync(mau)">Xem mẫu</button>
-                            <button class="nut-nho chinh" disabled="@(_dangGui || _dangTaiFile)" @onclick="() => ChonMauAsync(mau)">Chọn để in</button>
+                    <p class="the-mo-ta">Chọn bản trống từ file tải sẵn. Xem đúng biểu mẫu và nguồn trước khi đặt in.</p>
+                    <div class="mau-bo-loc">
+                        <div class="truong"><label class="nhan" for="mau-tu-khoa">Tìm mẫu đơn</label>
+                            <input id="mau-tu-khoa" class="ca-o-loc" placeholder="Tên mẫu hoặc nơi công bố" @bind="_timMau" @bind:event="oninput" />
                         </div>
+                        <div class="truong"><label class="nhan" for="mau-nhom">Nhóm mẫu</label>
+                            <select id="mau-nhom" class="ca-o-loc" @bind="_nhomMau"><option value="">Tất cả</option>
+                                @foreach (var nhom in _dsMau.Select(x => x.Nhom).Distinct()) { <option value="@nhom">@nhom</option> }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mau-thu-vien">
+                    @foreach (var mau in MauDaLoc)
+                    {
+                        <article class="mau-the" @key="mau.MaMau">
+                            <span class="nv-phu">@mau.Nhom · @mau.SoTrang trang</span>
+                            <h3>@mau.TenMau</h3>
+                            <p>@mau.Nguon</p>
+                            <details><summary>Phạm vi sử dụng & nguồn</summary>
+                                <p>@mau.PhamVi</p><a href="@mau.UrlNguon" target="_blank" rel="noopener noreferrer">Xem nguồn công bố</a>
+                            </details>
+                            <button class="nut-nho" disabled="@(_dangGui || _dangTaiFile || _dangXemMau)" @onclick="() => XemMauAsync(mau)">Xem mẫu</button>
+                        </article>
                     }
+                    </div>
                     @if (_dsMau.Count == 0) { <button class="nut-nho" @onclick="DoiLoaiTaiAsync">Tải lại mẫu đơn</button> }
+                    else if (!MauDaLoc.Any()) { <p role="status">Không có mẫu phù hợp. Thử tên khác hoặc chọn tất cả nhóm.</p> }
+                    @if (_dangXemMau) { <p role="status">Đang mở bản xem trước…</p> }
                 }
                 else
                 {
@@ -110,8 +131,7 @@
                 }
                 @if (_mauXem != null)
                 {
-                    <button class="nut-nho" @onclick="() => _mauXem = null">Đóng bản xem trước</button>
-                    <iframe title="Bản xem trước mẫu đơn" src="@_mauXem" style="width:100%;height:560px;border:0"></iframe>
+                    <p class="nv-phu">Mẫu vừa xem: @_mauDangXem.TenMau</p>
                 }
                 @if (_dangTaiFile) { <p class="the-mo-ta nho">Đang chuẩn hóa PDF và đếm trang…</p> }
                 @foreach (FileInDto file in _dsFile)
@@ -272,6 +292,35 @@
     }
 </div>
 
+<dialog class="mau-xem-truoc" @ref="_hopMau" aria-label="Bản xem trước mẫu đơn" aria-labelledby="mau-xem-tieu-de">
+    @if (_mauDangXem != null)
+    {
+        <div class="mau-thanh-cong-cu">
+        <h3 id="mau-xem-tieu-de">@_mauDangXem.TenMau · @_mauDangXem.SoTrang trang</h3>
+        <p>@_mauDangXem.PhamVi</p>
+        @if (_loi != null) { <div class="o-loi" role="alert">@_loi</div> }
+        <button class="nut-nho chinh" disabled="@(_dangGui || _dangTaiFile || _dangXemMau || _mauXem == null)" @onclick="() => ChonMauAsync(_mauDangXem)">Chọn mẫu này để in</button>
+        <button class="nut-nho" autofocus @onclick="DongXemMauAsync">Đóng bản xem trước</button>
+        <div class="mau-dieu-khien">
+            <button class="nut-nho" disabled="@(_dangXemMau || _trangMau <= 1)" @onclick="() => TaiTrangMauAsync(_trangMau - 1)">Trang trước</button>
+            <span aria-live="polite">Trang @_trangMau / @_mauDangXem.SoTrang</span>
+            <button class="nut-nho" disabled="@(_dangXemMau || _trangMau >= _mauDangXem.SoTrang)" @onclick="() => TaiTrangMauAsync(_trangMau + 1)">Trang sau</button>
+            <button class="nut-nho" @onclick="() => _phongMau = Math.Max(1, _phongMau - 0.5)">Thu nhỏ</button>
+            <button class="nut-nho" @onclick="() => _phongMau = Math.Min(3, _phongMau + 0.5)">Phóng to</button>
+        </div>
+        </div>
+        <div class="mau-anh-khung">
+            @if (_dangXemMau) { <p role="status">Đang tải trang mẫu…</p> }
+            else if (_mauXem != null)
+            {
+                <img class="mau-anh" src="@_mauXem" alt="@(_mauDangXem.TenMau + ", trang " + _trangMau)"
+                     style="width:auto;height:@(_phongMau * 100)%" />
+            }
+            else { <button class="nut-nho" @onclick="() => TaiTrangMauAsync(_trangMau)">Thử tải lại trang</button> }
+        </div>
+    }
+</dialog>
+
 @code {
     [Parameter]
     [SupplyParameterFromQuery(Name = "maDonHang")]
@@ -287,10 +336,23 @@
     private bool LaAnhThe => _loaiTai == "ANH_THE";
     private List<MauDonDto> _dsMau = new();
     private string _mauXem;
+    private MauDonDto _mauDangXem;
+    private ElementReference _hopMau;
+    private bool _canMoMau;
+    private int _trangMau = 1;
+    private double _phongMau = 1.5;
+    private bool _dangXemMau;
+    private string _timMau = "";
+    private string _nhomMau = "";
+    private IEnumerable<MauDonDto> MauDaLoc => _dsMau.Where(x =>
+        (_nhomMau == "" || x.Nhom == _nhomMau) &&
+        (x.TenMau.Contains(_timMau.Trim(), StringComparison.CurrentCultureIgnoreCase)
+         || x.Nguon.Contains(_timMau.Trim(), StringComparison.CurrentCultureIgnoreCase)));
 
     private async Task DoiLoaiTaiAsync()
     {
-        _mauXem = null; _loi = null; _soBan = 1; _huongGiay = "DUNG"; _dsGiaCong.Clear();
+        _mauXem = null; _mauDangXem = null; _timMau = ""; _nhomMau = "";
+        _loi = null; _soBan = 1; _huongGiay = "DUNG"; _dsGiaCong.Clear();
         DoiQuyCachAnh();
         if (_loaiTai != "MAU_DON") return;
         try { _dsMau = await Http.GetFromJsonAsync<List<MauDonDto>>("api/file-in/mau") ?? new(); }
@@ -309,18 +371,52 @@
 
     private async Task XemMauAsync(MauDonDto mau)
     {
-        try { _mauXem = "data:application/pdf;base64," + Convert.ToBase64String(await Http.GetByteArrayAsync("api/file-in/mau/" + mau.MaMau + "/pdf")); }
+        if (_dangXemMau) return;
+        _mauDangXem = mau; _canMoMau = true; _phongMau = 1.5;
+        await TaiTrangMauAsync(1);
+    }
+
+    private async Task TaiTrangMauAsync(int trang)
+    {
+        if (_dangXemMau || _mauDangXem == null || trang < 1 || trang > _mauDangXem.SoTrang) return;
+        string maMau = _mauDangXem.MaMau;
+        _dangXemMau = true; _loi = null; _mauXem = null;
+        _trangMau = trang; _phongMau = 1.5;
+        try
+        {
+            byte[] bytes = await Http.GetByteArrayAsync("api/file-in/mau/" + maMau + "/trang/" + trang);
+            if (_loaiTai != "MAU_DON" || _mauDangXem?.MaMau != maMau) return;
+            _mauXem = "data:image/png;base64," + Convert.ToBase64String(bytes);
+        }
         catch { _loi = "Không mở được bản xem trước mẫu đơn."; }
+        finally { _dangXemMau = false; }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_canMoMau) return;
+        _canMoMau = false;
+        await Js.InvokeVoidAsync("moMauDon", _hopMau);
+    }
+
+    private async Task DongXemMauAsync()
+    {
+        await Js.InvokeVoidAsync("dongMauDon", _hopMau);
+        _mauXem = null; _mauDangXem = null;
     }
 
     private async Task ChonMauAsync(MauDonDto mau)
     {
-        if (_khach == null || _dangGui || _dangTaiFile) return;
+        if (_khach == null || mau == null || _loaiTai != "MAU_DON" || _dangGui || _dangTaiFile) return;
         _dangTaiFile = true; _loi = null; XoaBaoGia();
         try
         {
             using var res = await Http.PostAsync("api/file-in/mau/" + mau.MaMau + "?maKhachHang=" + _khach.MaKhachHang, null);
-            if (res.IsSuccessStatusCode) _dsFile.Add(await res.Content.ReadFromJsonAsync<FileInDto>());
+            if (res.IsSuccessStatusCode)
+            {
+                _dsFile.Add(await res.Content.ReadFromJsonAsync<FileInDto>());
+                await DongXemMauAsync();
+            }
             else _loi = (await res.Content.ReadFromJsonAsync<ApiError>()).Message;
         }
         catch { _loi = "Không tạo được file mẫu đơn."; }

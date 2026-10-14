@@ -2319,6 +2319,12 @@ a:hover {
     white-space: normal;
 }
 
+/* Bảng giá, chi nhánh và máy in: nút cùng mép trái với tiêu đề Thao tác. */
+.bang.bang-thao-tac-trai th.cot-hanh-dong,
+.bang.bang-thao-tac-trai td.cot-hanh-dong {
+    text-align: left;
+}
+
 .bg-hanh-dong-phat-sinh {
     display: inline-flex;
     align-items: center;

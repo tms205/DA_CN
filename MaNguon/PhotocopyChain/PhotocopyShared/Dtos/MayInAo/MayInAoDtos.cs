@@ -37,6 +37,8 @@ public sealed class CauHinhTocDoMayIn
     public double TocDoA3 { get; set; }
     public double TocDoHaiMat { get; set; }
     public double SoGiayRaTrangDau { get; set; }
+    public string CheDo { get; set; } = "AO";
+    public string TenHangDoiWindows { get; set; } = "";
 }
 
 /// <summary>Nội dung connector gửi khi hoàn thành hoặc gặp lỗi.</summary>
@@ -47,6 +49,15 @@ public sealed class BaoCaoMayInRequest
     public int MaMayIn { get; set; }
     public string TrangThai { get; set; } = "SAN_SANG";
     public string? Loi { get; set; }
+    public string CheDo { get; set; } = "AO";
+    public string? TenHangDoi { get; set; }
+    public int TongTrang { get; set; }
+    public int? TrangDaIn { get; set; }
+    public int? SoGiayConLai { get; set; }
+    public string? TenFileDangIn { get; set; }
+    public string? QuyCach { get; set; }
+    public bool TamDung { get; set; }
+    public string? ThongDiep { get; set; }
 }
 
 public sealed class TrangThaiKetNoiMayInDto
@@ -56,4 +67,30 @@ public sealed class TrangThaiKetNoiMayInDto
     public string TrangThai { get; set; } = "SAN_SANG";
     public int? MaDonHangDangIn { get; set; }
     public string? Loi { get; set; }
+    public string CheDo { get; set; } = "AO";
+    public string? TenHangDoi { get; set; }
+    public int TongTrang { get; set; }
+    public int? TrangDaIn { get; set; }
+    public int? SoGiayConLai { get; set; }
+    public string? TenFileDangIn { get; set; }
+    public string? QuyCach { get; set; }
+    public bool TamDung { get; set; }
+    public string? ThongDiep { get; set; }
+}
+
+public sealed class DieuKhienMayInRequest
+{
+    [System.ComponentModel.DataAnnotations.Required]
+    [System.ComponentModel.DataAnnotations.RegularExpression("^(TAM_DUNG|TIEP_TUC|HET_GIAY|KET_GIAY|OFFLINE|KHOI_PHUC|XAC_NHAN_BAN_GIAY)$")]
+    public string ThaoTac { get; set; } = "";
+    [System.ComponentModel.DataAnnotations.Range(1, int.MaxValue)]
+    public int? MaDonHang { get; set; }
+}
+
+// Chỉ trả cho connector qua khóa riêng, tuyệt đối không trả mã lệnh này ra web.
+public sealed class DieuKhienMayInDto
+{
+    public bool TamDung { get; set; }
+    public string? LoiMoPhong { get; set; }
+    public string? MaLenhXacNhan { get; set; }
 }

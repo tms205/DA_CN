@@ -82,11 +82,19 @@ public class KiemTraHttpNhapTests
         using var unknownTemplate = await http.GetAsync("api/file-in/mau/KHONG_CO/pdf");
         Assert.Equal(HttpStatusCode.NotFound, unknownTemplate.StatusCode);
         var templates = await http.GetFromJsonAsync<List<PhotocopyShared.Dtos.DatIn.MauDonDto>>("api/file-in/mau");
-        Assert.Equal(3, templates.Count);
+        Assert.True(templates.Count >= 10, "Thư viện phải chứa các PDF tải sẵn, không còn ba mẫu tự dựng.");
         using var preview = await http.GetAsync("api/file-in/mau/DON_XIN_VIEC/pdf");
         Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
         Assert.Equal("application/pdf", preview.Content.Headers.ContentType.MediaType);
         Assert.StartsWith("%PDF", System.Text.Encoding.ASCII.GetString(await preview.Content.ReadAsByteArrayAsync()));
+        using var image = await http.GetAsync("api/file-in/mau/DON_XIN_VIEC/trang/1");
+        Assert.Equal(HttpStatusCode.OK, image.StatusCode);
+        Assert.Equal("image/png", image.Content.Headers.ContentType.MediaType);
+        foreach (string path in new[] { "DON_XIN_VIEC/trang/0", "DON_XIN_VIEC/trang/99", "KHONG_CO/trang/1" })
+        {
+            using var invalidPage = await http.GetAsync("api/file-in/mau/" + path);
+            Assert.Equal(HttpStatusCode.NotFound, invalidPage.StatusCode);
+        }
         await app.StopAsync();
     }
 

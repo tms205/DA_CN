@@ -1,0 +1,153 @@
+@page "/may-in"
+@attribute [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
+@using PhotocopyShared.Dtos.MayInAo
+@inject HttpClient Http
+@implements IAsyncDisposable
+
+<PageTitle>Bảng điều khiển máy in · PhotocopyChain</PageTitle>
+<TieuDeTrang TieuDe="Bảng điều khiển máy in" MoTa="Theo dõi thiết bị và xử lý lệnh in trong chi nhánh đang chọn" />
+
+<div class="than-trang mi-trang">
+    <div class="mi-toolbar">
+        <span>@_danhMuc.Count máy · cập nhật @(_capNhat?.ToString("HH:mm:ss") ?? "—")</span>
+        <button type="button" class="nut-phu" disabled="@_dangTai" @onclick="TaiAsync">Làm mới trạng thái</button>
+    </div>
+    @if (_loi != null) { <div class="o-loi" role="alert">@_loi</div> }
+    @if (_thongBao != null) { <div class="o-thanh-cong" role="status">@_thongBao</div> }
+    @if (_dangTai && _danhMuc.Count == 0) { <div class="the">Đang tải danh sách máy…</div> }
+    else if (_danhMuc.Count == 0 && _loi == null) { <div class="the">Chi nhánh chưa đăng ký máy in. CEO có thể thêm máy trong Chi nhánh &amp; máy in.</div> }
+    else
+    {
+        <div class="mi-layout">
+            <section class="mi-danh-sach" aria-label="Chọn máy in">
+                @foreach (var m in _danhMuc)
+                {
+                    var tt = TrangThai(m.MaMayIn);
+                    <button type="button" class="mi-may @(_maMay == m.MaMayIn ? "chon" : "")" aria-pressed="@(_maMay == m.MaMayIn ? "true" : "false")" @onclick="() => ChonMay(m.MaMayIn)">
+                        <span class="mi-icon">@((MarkupString)Svg.MayIn(24))</span>
+                        <span class="mi-may-chu"><strong>@m.TenMay</strong><small>@m.TenChiNhanh</small><span>@TenTrangThai(tt.TrangThai)</span></span>
+                        <span class="mi-led @(SanSang(tt) ? "online" : "")" aria-hidden="true"></span>
+                    </button>
+                }
+            </section>
+            @if (MayDaChon is { } may)
+            {
+                var tt = TrangThai(may.MaMayIn);
+                bool ngoaiTuyen = tt.TrangThai == "MAT_KET_NOI";
+                bool that = tt.CheDo == "THAT";
+                <section class="mi-console the" aria-label="Điều khiển máy đã chọn">
+                    <div class="mi-console-dau"><div><span class="mi-nhan">THIẾT BỊ #@may.MaMayIn</span><h2>@may.TenMay</h2><p>@may.TenChiNhanh</p></div><span class="nhan-mau @(that ? "nhan-xanh" : "nhan-xam")">@(that ? "Máy thật · Windows" : "Máy ảo · Mô phỏng")</span></div>
+                    <div class="mi-lcd" aria-label="Màn hình trạng thái">
+                        <div class="mi-lcd-dau"><span>TRẠNG THÁI</span><strong>@TenTrangThai(tt.TrangThai)</strong></div>
+                        @if (tt.MaDonHangDangIn != null)
+                        {
+                            <h3>Đơn DH@(tt.MaDonHangDangIn.Value.ToString("D5"))</h3>
+                            <p class="mi-ten-file">@(tt.TenFileDangIn ?? "Đang chuẩn bị tài liệu…")</p>
+                            <p>@tt.QuyCach</p>
+                            @if (!that && tt.TrangDaIn != null && tt.TongTrang > 0)
+                            {
+                                <progress max="@tt.TongTrang" value="@tt.TrangDaIn" aria-label="Tiến độ in"></progress>
+                                <div class="mi-tien-do"><span>@tt.TrangDaIn / @tt.TongTrang trang @(that ? "(driver)" : "(mô phỏng)")</span><span>@(tt.SoGiayConLai != null ? $"Còn khoảng {tt.SoGiayConLai} giây" : "")</span></div>
+                            }
+                            else if (that)
+                            {
+                                <p>Tổng đơn: @tt.TongTrang trang. @(tt.TrangDaIn != null ? $"Driver đang ghi nhận {tt.TrangDaIn} trang ở các job còn trong queue." : "Driver chưa cung cấp số trang đã in.")</p>
+                            }
+                            else { <p>Đang tính tiến độ mô phỏng…</p> }
+                        }
+                        else { <h3>@(ngoaiTuyen ? "Chưa có kết nối" : "Chưa có lệnh đang xử lý")</h3><p>@(ngoaiTuyen ? "Chạy launcher và kiểm tra cấu hình connector." : "Lệnh đủ điều kiện sẽ được nhận theo hàng đợi hiện có.")</p> }
+                        @if (!string.IsNullOrWhiteSpace(tt.Loi)) { <p class="mi-lcd-loi">@tt.Loi</p> }
+                        @if (!string.IsNullOrWhiteSpace(tt.ThongDiep)) { <p>@tt.ThongDiep</p> }
+                    </div>
+                    <div class="mi-nut-dieu-khien">
+                        <button type="button" class="nut-phu" disabled="@(_dangGui || ngoaiTuyen || tt.TamDung)" @onclick='() => GuiAsync("TAM_DUNG")'>Tạm dừng</button>
+                        <button type="button" class="nut-chinh" disabled="@(_dangGui || ngoaiTuyen || !tt.TamDung)" @onclick='() => GuiAsync("TIEP_TUC")'>Tiếp tục</button>
+                        <a class="nut-phu" href="/">Xem hàng đợi đơn</a>
+                    </div>
+                    <dl class="mi-thong-so"><div><dt>Khổ giấy tối đa</dt><dd>@may.KhoGiay</dd></div><div><dt>Tốc độ danh mục</dt><dd>@may.TocDo trang/phút</dd></div><div><dt>Màu / hai mặt</dt><dd>@(may.InMau ? "Có màu" : "Đen trắng") · @(may.In2Mat ? "Hai mặt" : "Một mặt")</dd></div><div><dt>Counter đã hoàn tất</dt><dd>@may.SoTrangDaIn trang</dd></div></dl>
+                    @if (that)
+                    {
+                        <div class="mi-ghi-chu"><strong>Queue Windows: @(tt.TenHangDoi ?? "Chưa cấu hình")</strong><p>USB và mạng dùng driver đã cài trên máy connector. Tạm dừng không thu hồi những trang đã vào máy; kiểm tra tại thiết bị nếu driver không nhận diện được job.</p></div>
+                        @if (tt.TrangThai == "CHO_XAC_NHAN")
+                        {
+                            <div class="mi-xac-nhan"><strong>Cần kiểm tra bản giấy</strong><p>Đối chiếu đủ tất cả file, trang, số bản và quy cách. Job biến mất khỏi Windows không chứng minh giấy đã in đủ.</p>
+                                <label><input type="checkbox" @bind="_daKiemTra" /> Tôi đã kiểm tra toàn bộ bản giấy của đơn DH@(tt.MaDonHangDangIn?.ToString("D5"))</label>
+                                <button type="button" class="nut-chinh" disabled="@(!_daKiemTra || _dangGui)" @onclick='() => GuiAsync("XAC_NHAN_BAN_GIAY")'>Xác nhận đã kiểm tra bản giấy</button>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <fieldset class="mi-mo-phong" disabled="@(_dangGui || ngoaiTuyen)"><legend>Mô phỏng sự cố · không tác động máy thật</legend>
+                            <button type="button" class="nut-phu" @onclick='() => GuiAsync("HET_GIAY")'>Hết giấy</button>
+                            <button type="button" class="nut-phu" @onclick='() => GuiAsync("KET_GIAY")'>Kẹt giấy</button>
+                            <button type="button" class="nut-phu" @onclick='() => GuiAsync("OFFLINE")'>Mất kết nối máy</button>
+                            <button type="button" class="nut-phu" @onclick='() => GuiAsync("KHOI_PHUC")'>Nạp giấy / khôi phục</button>
+                            <p>Tiến độ dừng khi có lỗi hoặc tạm dừng; tiếp tục từ phần đã lưu, không nhận lại đơn. Thời gian được tính theo cấu hình tốc độ máy ảo.</p>
+                        </fieldset>
+                    }
+                </section>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<MayInQuanTriDto> _danhMuc = new();
+    private List<TrangThaiKetNoiMayInDto> _trangThai = new();
+    private readonly CancellationTokenSource _dung = new();
+    private Task _poll;
+    private int _maMay;
+    private bool _dangTai, _dangGui, _daKiemTra;
+    private string _loi, _thongBao;
+    private DateTime? _capNhat;
+    private MayInQuanTriDto MayDaChon => _danhMuc.FirstOrDefault(x => x.MaMayIn == _maMay);
+    private TrangThaiKetNoiMayInDto TrangThai(int ma) => _trangThai.FirstOrDefault(x => x.MaMayIn == ma) ?? new() { MaMayIn = ma, TrangThai = "MAT_KET_NOI" };
+    private bool SanSang(TrangThaiKetNoiMayInDto t) => t.TrangThai is "SAN_SANG" or "DANG_IN" or "CHO_XAC_NHAN";
+    private static string TenTrangThai(string s) => s switch {
+        "SAN_SANG" => "Sẵn sàng", "DANG_IN" => "Đang xử lý / in", "TAM_DUNG" => "Đã tạm dừng",
+        "HET_GIAY" => "Hết giấy", "KET_GIAY" => "Kẹt giấy", "OFFLINE" => "Máy offline (mô phỏng)",
+        "CHO_XAC_NHAN" => "Chờ kiểm tra bản giấy", "LOI" => "Cần xử lý lỗi", _ => "Mất kết nối connector" };
+    protected override async Task OnInitializedAsync() { await TaiAsync(); _poll = PollAsync(); }
+    private void ChonMay(int ma) { _maMay = ma; _daKiemTra = false; _thongBao = null; }
+    private async Task TaiAsync()
+    {
+        if (_dangTai) return;
+        _dangTai = true;
+        try
+        {
+            var ds = await Http.GetFromJsonAsync<List<MayInQuanTriDto>>("api/may-in-ao/danh-sach", _dung.Token) ?? new();
+            var tt = await Http.GetFromJsonAsync<List<TrangThaiKetNoiMayInDto>>("api/may-in-ao/trang-thai", _dung.Token) ?? new();
+            int? donCu = TrangThai(_maMay).MaDonHangDangIn;
+            _danhMuc = ds; _trangThai = tt;
+            if (!_danhMuc.Any(x => x.MaMayIn == _maMay)) _maMay = _danhMuc.FirstOrDefault()?.MaMayIn ?? 0;
+            if (donCu != TrangThai(_maMay).MaDonHangDangIn || TrangThai(_maMay).TrangThai != "CHO_XAC_NHAN") _daKiemTra = false;
+            _capNhat = DateTime.Now; _loi = null;
+        }
+        catch (OperationCanceledException) when (_dung.IsCancellationRequested) { }
+        catch { _loi = "Không tải được trạng thái máy. Kiểm tra API; các nút sẽ bị khóa cho tới khi có dữ liệu mới."; _trangThai.Clear(); _daKiemTra = false; }
+        finally { _dangTai = false; }
+    }
+    private async Task PollAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(3));
+        try { while (await timer.WaitForNextTickAsync(_dung.Token)) await InvokeAsync(async () => { await TaiAsync(); StateHasChanged(); }); }
+        catch (OperationCanceledException) when (_dung.IsCancellationRequested) { }
+    }
+    private async Task GuiAsync(string thaoTac)
+    {
+        if (_dangGui || _maMay == 0) return;
+        _dangGui = true; _loi = _thongBao = null;
+        try
+        {
+            using var res = await Http.PostAsJsonAsync($"api/may-in-ao/{_maMay}/dieu-khien", new DieuKhienMayInRequest {
+                ThaoTac = thaoTac, MaDonHang = thaoTac == "XAC_NHAN_BAN_GIAY" ? TrangThai(_maMay).MaDonHangDangIn : null }, _dung.Token);
+            if (!res.IsSuccessStatusCode) { _loi = await DocLoiApi.TuPhanHoiAsync(res, "Không gửi được thao tác máy in."); return; }
+            _thongBao = "Đã gửi thao tác. Trạng thái đổi sau khi connector thực hiện và phản hồi."; _daKiemTra = false;
+        }
+        catch (OperationCanceledException) when (_dung.IsCancellationRequested) { }
+        catch { _loi = "Mất kết nối API. Làm mới trạng thái trước khi thử lại."; }
+        finally { _dangGui = false; }
+    }
+    public async ValueTask DisposeAsync() { _dung.Cancel(); if (_poll != null) await _poll; _dung.Dispose(); }
+}

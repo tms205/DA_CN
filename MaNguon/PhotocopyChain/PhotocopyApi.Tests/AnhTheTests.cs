@@ -59,7 +59,7 @@ public class AnhTheTests
         using var pdf = UglyToad.PdfPig.PdfDocument.Open(bytes);
         Assert.Equal(1, pdf.NumberOfPages);
         Assert.Contains("ĐƠN XIN VIỆC", pdf.GetPage(1).Text);
-        Assert.Contains("Họ và tên", pdf.GetPage(1).Text);
+        Assert.Contains("Tên tôi là", pdf.GetPage(1).Text);
         string output = Environment.GetEnvironmentVariable("PHOTOCOPY_PDF_TEST_OUTPUT");
         if (output != null)
         {

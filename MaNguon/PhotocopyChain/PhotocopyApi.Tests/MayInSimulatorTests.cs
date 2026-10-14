@@ -13,6 +13,37 @@ namespace PhotocopyApi.Tests;
 public class MayInSimulatorTests
 {
     [Fact]
+    public async Task MayTamDung_KhongNhanDonMoi()
+    {
+        using var handler = new ApiTamDung();
+        using var http = new HttpClient(handler) { BaseAddress = new Uri("http://localhost/") };
+        using var simulator = new MayInSimulator(http, Options.Create(new CauHinhSimulator {
+            ThuMucTrangThai = Path.Combine(Path.GetTempPath(), "photocopy-pause-" + Guid.NewGuid()),
+            MayIn = new() { new() { MaMayIn = 1, TocDoA4 = 30 } }
+        }), NullLogger<MayInSimulator>.Instance);
+        await simulator.StartAsync(CancellationToken.None);
+        await handler.DaHeartbeat.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await simulator.StopAsync(CancellationToken.None);
+        Assert.Equal(0, handler.SoLanNhanLenh);
+        Assert.Equal("TAM_DUNG", handler.TrangThai);
+    }
+
+    private sealed class ApiTamDung : HttpMessageHandler
+    {
+        public int SoLanNhanLenh;
+        public string TrangThai;
+        public TaskCompletionSource<bool> DaHeartbeat = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage req, CancellationToken token)
+        {
+            if (req.RequestUri.AbsolutePath.EndsWith("dieu-khien")) return new(HttpStatusCode.OK) { Content = JsonContent.Create(new DieuKhienMayInDto { TamDung = true }) };
+            if (req.RequestUri.AbsolutePath.EndsWith("lenh-tiep-theo")) { SoLanNhanLenh++; return new(HttpStatusCode.NoContent); }
+            var body = await req.Content.ReadFromJsonAsync<BaoCaoMayInRequest>(token);
+            TrangThai = body.TrangThai;
+            DaHeartbeat.TrySetResult(true);
+            return new(HttpStatusCode.OK);
+        }
+    }
+    [Fact]
     public async Task TatBatGiuaLucIn_PhucHoiCungLenhVaKhongTaiInLai()
     {
         string thuMuc = Path.Combine(Path.GetTempPath(), "photocopy-simulator-" + Guid.NewGuid());
@@ -108,6 +139,7 @@ public class MayInSimulatorTests
             Assert.True(Guid.TryParse(id, out _));
             ConnectorIds.Add(id);
             string duongDan = req.RequestUri.AbsolutePath;
+            if (duongDan.EndsWith("dieu-khien")) return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new DieuKhienMayInDto()) };
             if (duongDan.EndsWith("lenh-tiep-theo"))
             {
                 if (SoLanNhanLenh > 0) return new HttpResponseMessage(HttpStatusCode.NoContent);

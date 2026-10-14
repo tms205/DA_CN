@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="_content/MudBlazor/MudBlazor.min.css" />
     <link rel="stylesheet" href="css/app.css" />
     <link rel="stylesheet" href="PhotocopyAdmin.styles.css" />
-    <link rel="stylesheet" href="css/app-ui-v2.css?v=20261013-gia-cong-layout" />
+    <link rel="stylesheet" href="css/app-ui-v2.css?v=20261014-preview-align" />
     <link rel="icon" type="image/png" href="icon-192.png" />
 </head>
 
@@ -32,7 +32,9 @@
 
     <script src="_framework/blazor.webassembly.js"></script>
     <script>window.moLienHeFooter = hop => hop.showModal();
-        window.dashboardDangHienThi = () => document.visibilityState === 'visible';</script>
+        window.dashboardDangHienThi = () => document.visibilityState === 'visible';
+        window.moMauDon = hop => hop.showModal();
+        window.dongMauDon = hop => hop.close();</script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
 </body>
 

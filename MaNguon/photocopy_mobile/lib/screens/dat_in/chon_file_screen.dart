@@ -10,6 +10,7 @@ import '../../theme.dart';
 import '../../widgets/icons.dart';
 import '../../widgets/widgets.dart';
 import 'cau_hinh_in_screen.dart';
+import 'xem_mau_don_screen.dart';
 
 // Các đuôi file máy chủ nhận (trùng danh sách trong FileInController của API) — mọi loại đều được đổi sang PDF
 const List<String> dinhDangDuocChon = [
@@ -33,6 +34,21 @@ class _ChonFileScreenState extends State<ChonFileScreen> {
   String _kichThuoc = '3X4';
   final _soAnh = TextEditingController(text: '8');
   List<Map<String, dynamic>> _mauDon = [];
+  String _timMau = '';
+  String _nhomMau = '';
+  List<Map<String, dynamic>> get _mauDaLoc => _mauDon.where((mau) {
+    final tuKhoa = _timMau.trim().toLowerCase();
+    return (_nhomMau.isEmpty || mau['nhom'] == _nhomMau) &&
+      ('${mau['tenMau']} ${mau['nguon']}'.toLowerCase().contains(tuKhoa));
+  }).toList();
+
+  Future<void> _xemMau(Map<String, dynamic> mau) async {
+    if (_dangTai) return;
+    final chon = await Navigator.push<bool>(context,
+      MaterialPageRoute(builder: (context) => XemMauDonScreen(mau: mau)));
+    if (!mounted || chon != true) return;
+    await _chonMau(mau);
+  }
 
   @override
   void dispose() {
@@ -183,6 +199,8 @@ class _ChonFileScreenState extends State<ChonFileScreen> {
                       setState(() {
                         _loai = v!;
                         _loi = null;
+                        _timMau = '';
+                        _nhomMau = '';
                       });
                       if (_loai == 'MAU_DON') _taiMauDon();
                     },
@@ -227,17 +245,30 @@ class _ChonFileScreenState extends State<ChonFileScreen> {
             ],
             if (_loai == 'MAU_DON') ...[
               const Text(
-                'Mẫu tham khảo để in và viết tay. Nếu nơi nhận yêu cầu biểu mẫu riêng, hãy tải mẫu của nơi đó.',
+                'Xem bản trống tải sẵn, kiểm tra nguồn rồi chọn để in. Dùng mẫu riêng nếu nơi nhận yêu cầu.',
               ),
               const SizedBox(height: 12),
               if (_dangTai) const LinearProgressIndicator(),
-              for (final mau in _mauDon)
+              TextField(
+                decoration: const InputDecoration(labelText: 'Tìm mẫu đơn', hintText: 'Tên mẫu hoặc nơi công bố', prefixIcon: Icon(Icons.search)),
+                onChanged: (value) => setState(() => _timMau = value),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: _nhomMau, isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Nhóm mẫu'),
+                items: [const DropdownMenuItem(value: '', child: Text('Tất cả')),
+                  ..._mauDon.map((m) => m['nhom'] as String? ?? '').where((n) => n.isNotEmpty).toSet().map((n) => DropdownMenuItem(value: n, child: Text(n)))],
+                onChanged: (value) => setState(() => _nhomMau = value ?? ''),
+              ),
+              const SizedBox(height: 12),
+              for (final mau in _mauDaLoc)
                 Card(
                   child: ListTile(
                     title: Text(mau['tenMau']),
-                    subtitle: Text(mau['moTa']),
+                    subtitle: Text('${mau['nguon'] ?? mau['moTa']} · ${mau['soTrang'] ?? 1} trang\nXem mẫu trước khi in'),
                     trailing: const Icon(Icons.chevron_right),
-                    onTap: _dangTai ? null : () => _chonMau(mau),
+                    onTap: _dangTai ? null : () => _xemMau(mau),
                   ),
                 ),
               if (!_dangTai && _mauDon.isEmpty)
@@ -245,6 +276,8 @@ class _ChonFileScreenState extends State<ChonFileScreen> {
                   onPressed: _taiMauDon,
                   child: const Text('Thử lại'),
                 ),
+              if (!_dangTai && _mauDon.isNotEmpty && _mauDaLoc.isEmpty)
+                const Padding(padding: EdgeInsets.all(16), child: Text('Không có mẫu phù hợp. Thử tên khác hoặc chọn tất cả nhóm.')),
             ] else
               GestureDetector(
                 onTap: _dangTai ? null : _chonFile,

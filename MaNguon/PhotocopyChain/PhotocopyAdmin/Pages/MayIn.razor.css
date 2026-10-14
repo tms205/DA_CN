@@ -1,0 +1,41 @@
+.mi-trang { display: grid; gap: 16px; }
+.mi-toolbar, .mi-console-dau, .mi-tien-do { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.mi-toolbar { color: var(--chu-phu); }
+.mi-layout { display: grid; grid-template-columns: minmax(220px, 30%) minmax(0, 1fr); gap: 20px; align-items: start; }
+.mi-danh-sach { display: grid; gap: 10px; min-width: 0; }
+.mi-may { display: flex; align-items: center; gap: 12px; padding: 18px; border: 1px solid var(--vien); border-radius: 8px; background: var(--trang); color: var(--chu); text-align: left; width: 100%; font: inherit; cursor: pointer; }
+.mi-may.chon { border-color: var(--accent); background: var(--accent-nhat); box-shadow: inset 4px 0 var(--accent); }
+.mi-may-chu { display: grid; gap: 6px; min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.mi-may-chu small { color: var(--chu-phu); }
+.mi-icon { color: var(--accent); flex-shrink: 0; }
+.mi-led { width: 9px; height: 9px; border-radius: 50%; background: var(--chu-mo); flex-shrink: 0; }
+.mi-led.online { background: var(--thanh-cong); }
+.mi-console { min-width: 0; display: grid; gap: 20px; padding: 24px; }
+.mi-console h2 { font-size: 22px; margin: 4px 0; }
+.mi-console-dau p { margin: 0; color: var(--chu-phu); }
+.mi-nhan { font-size: 12px; letter-spacing: .1em; color: var(--chu-phu); }
+.mi-lcd { background: var(--accent-sau); color: var(--trang); border: 5px solid var(--accent-dam); border-radius: 10px; padding: 24px; min-height: 230px; overflow-wrap: anywhere; }
+.mi-lcd-dau { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-bottom: 16px; border-bottom: 1px solid var(--accent); }
+.mi-lcd-dau span { font-size: 12px; letter-spacing: .14em; }
+.mi-lcd h3 { font-size: 25px; margin: 20px 0 12px; }
+.mi-lcd p { margin: 10px 0; line-height: 1.7; }
+.mi-lcd progress { width: 100%; height: 14px; margin-top: 16px; accent-color: var(--thanh-cong); }
+.mi-tien-do { font-size: 13px; margin-top: 8px; }
+.mi-nut-dieu-khien { display: flex; flex-wrap: wrap; gap: 10px; }
+.mi-nut-dieu-khien button, .mi-nut-dieu-khien a { min-height: 44px; }
+.mi-thong-so { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; gap: 16px; }
+.mi-thong-so div { border-bottom: 1px solid var(--vien); padding-bottom: 14px; }
+.mi-thong-so dt { color: var(--chu-phu); font-size: 13px; margin-bottom: 6px; }
+.mi-thong-so dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.mi-mo-phong { border: 1px dashed var(--vien-dam); border-radius: 8px; padding: 16px; display: flex; gap: 10px; flex-wrap: wrap; }
+.mi-mo-phong legend { color: var(--chu-nhan); font-weight: 600; font-size: 13px; padding: 0 6px; }
+.mi-mo-phong p, .mi-ghi-chu p, .mi-xac-nhan p { font-size: 13px; line-height: 1.7; margin: 8px 0 0; }
+.mi-mo-phong p { flex-basis: 100%; color: var(--chu-phu); }
+.mi-mo-phong button { min-height: 44px; }
+.mi-ghi-chu { overflow-wrap: anywhere; }
+.mi-xac-nhan { display: grid; gap: 14px; padding: 18px; background: var(--cb-nen); border: 1px solid var(--cb-vien); border-radius: 8px; color: var(--cb-chu); }
+.mi-xac-nhan label { display: flex; align-items: start; gap: 10px; font-size: 14px; }
+.mi-xac-nhan input { width: 18px; height: 18px; flex-shrink: 0; }
+.mi-may:focus-visible, .mi-console button:focus-visible, .mi-console a:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+@media (max-width: 1100px) { .mi-layout { grid-template-columns: 1fr; } .mi-danh-sach { grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr)); } }
+@media (max-width: 600px) { .mi-console { padding: 16px; } .mi-lcd { padding: 16px; } .mi-lcd h3 { font-size: 21px; } .mi-thong-so { grid-template-columns: 1fr; } .mi-toolbar button { width: 100%; } .mi-nut-dieu-khien > * { flex: 1 1 100%; text-align: center; } }

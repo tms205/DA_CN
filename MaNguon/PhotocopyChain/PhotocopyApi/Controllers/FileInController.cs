@@ -184,7 +184,19 @@ public class FileInController : ControllerBase
     public IActionResult XemMau(string maMau)
     {
         if (!MauDonPdf.DanhSach.Any(x => x.MaMau == maMau)) return NotFound(new { message = "Mẫu đơn không tồn tại." });
-        return File(MauDonPdf.Tao(maMau), "application/pdf");
+        try { return File(MauDonPdf.Tao(maMau), "application/pdf"); }
+        catch (Exception ex) when (ex is IOException or InvalidDataException)
+        { return StatusCode(503, new { message = "File mẫu chưa sẵn sàng. Vui lòng liên hệ cửa hàng." }); }
+    }
+
+    [HttpGet("mau/{maMau}/trang/{soTrang:int}")]
+    public IActionResult XemTrangMau(string maMau, int soTrang)
+    {
+        var mau = MauDonPdf.DanhSach.FirstOrDefault(x => x.MaMau == maMau);
+        if (mau == null || soTrang < 1 || soTrang > mau.SoTrang)
+            return NotFound(new { message = "Trang mẫu đơn không tồn tại." });
+        try { return File(MauDonPdf.DocAnhTrang(maMau, soTrang), "image/png"); }
+        catch (IOException) { return StatusCode(503, new { message = "Bản xem trước chưa sẵn sàng. Vui lòng thử lại sau." }); }
     }
 
     [HttpPost("mau/{maMau}")]
@@ -192,7 +204,11 @@ public class FileInController : ControllerBase
     {
         var mau = MauDonPdf.DanhSach.FirstOrDefault(x => x.MaMau == maMau);
         if (mau == null) return NotFound(new { message = "Mẫu đơn không tồn tại." });
-        using var stream = new MemoryStream(MauDonPdf.Tao(maMau));
+        byte[] bytes;
+        try { bytes = MauDonPdf.Tao(maMau); }
+        catch (Exception ex) when (ex is IOException or InvalidDataException)
+        { return StatusCode(503, new { message = "File mẫu chưa sẵn sàng. Vui lòng liên hệ cửa hàng." }); }
+        using var stream = new MemoryStream(bytes);
         // Dùng đúng quyền và cách lưu file tại quầy / khách hàng, không bỏ qua kiểm tra chủ sở hữu.
         return await TaiLen(new FormFile(stream, 0, stream.Length, "file", mau.TenMau + ".pdf"), maKhachHang);
     }

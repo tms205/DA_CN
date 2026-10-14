@@ -25,4 +25,9 @@
     <Compile Include="..\CauHinh\DocFileEnv.cs" Link="CauHinh\DocFileEnv.cs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Chỉ đóng gói tài nguyên đang dùng; bản Word nguồn giữ trong repo. -->
+    <None Update="TaiNguyen\MauDon\catalog.json;TaiNguyen\MauDon\*.pdf;TaiNguyen\MauDon\XemTruoc\*.png"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

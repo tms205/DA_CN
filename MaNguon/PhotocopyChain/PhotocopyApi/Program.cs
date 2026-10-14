@@ -95,7 +95,9 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddSignalR();
 
 // Máy in mô phỏng và máy in vật lý sau này dùng chung luồng tự động này.
-builder.Services.AddSingleton<TrangThaiMayInAoStore>();
+builder.Services.AddSingleton(new TrangThaiMayInAoStore(TimeProvider.System,
+    builder.Configuration["PrinterConnector:ThuMucDieuKhien"] ?? Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PhotocopyChain", "PrinterControls")));
 builder.Services.AddSingleton(new QuyenNhanLenhInStore(
     builder.Configuration["PrinterConnector:ThuMucLenh"] ?? Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),

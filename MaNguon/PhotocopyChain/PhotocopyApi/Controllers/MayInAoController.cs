@@ -12,6 +12,7 @@ using PhotocopyApi.MayInAo;
 using PhotocopyShared.Constants;
 using PhotocopyShared.Dtos;
 using PhotocopyShared.Dtos.MayInAo;
+using PhotocopyShared.Dtos.Tuan3;
 
 namespace PhotocopyApi.Controllers;
 
@@ -64,8 +65,41 @@ public sealed class MayInAoController : ControllerBase
         string trangThai = string.IsNullOrWhiteSpace(req.Loi)
             ? (string.IsNullOrWhiteSpace(req.TrangThai) ? "SAN_SANG" : req.TrangThai.Trim().ToUpperInvariant())
             : "LOI";
-        _trangThai.CapNhat(maMayIn, trangThai, lenhDangIn?.MaDonHang, req.Loi);
+        _trangThai.CapNhat(maMayIn, trangThai, lenhDangIn?.MaDonHang, req.Loi, req);
         return Ok(new KetQuaDto { Message = "Đã nhận heartbeat." });
+    }
+
+    [HttpGet("{maMayIn:int}/dieu-khien")]
+    [AllowAnonymous]
+    public IActionResult LayDieuKhien([Range(1, int.MaxValue)] int maMayIn)
+    {
+        var loi = KiemTraKhoa();
+        if (loi != null) return loi;
+        var lenh = _quyenNhanLenh.LayLenhDangIn(maMayIn);
+        if (lenh != null && lenh.ConnectorId != ConnectorId()) return Conflict();
+        return Ok(_trangThai.LayDieuKhien(maMayIn));
+    }
+
+    [HttpPost("{maMayIn:int}/dieu-khien")]
+    [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
+    public async Task<IActionResult> DieuKhien([Range(1, int.MaxValue)] int maMayIn, DieuKhienMayInRequest req)
+    {
+        int? chiNhanh = int.TryParse(User.FindFirst(TenClaim.MaChiNhanh)?.Value, out int ma) ? ma : null;
+        if (!User.IsInRole(VaiTro.SuperAdmin) && chiNhanh == null) return StatusCode(403);
+        using var conn = new SqlConnection(_chuoiKetNoi);
+        int? chiNhanhMay = await conn.ExecuteScalarAsync<int?>("SELECT MaChiNhanh FROM MayIn WHERE MaMayIn=@maMayIn", new { maMayIn });
+        if (chiNhanhMay == null) return NotFound(new { message = "Không tìm thấy máy in." });
+        if (chiNhanh != null && chiNhanh != chiNhanhMay) return StatusCode(403);
+        var tt = _trangThai.LayTatCa().FirstOrDefault(x => x.MaMayIn == maMayIn);
+        if (tt == null || tt.TrangThai == "MAT_KET_NOI") return Conflict(new { message = "Connector chưa kết nối. Không gửi thao tác khi chưa biết trạng thái máy." });
+        var lenh = _quyenNhanLenh.LayLenhDangIn(maMayIn);
+        if (req.ThaoTac == "XAC_NHAN_BAN_GIAY" && (lenh == null || lenh.MaDonHang != req.MaDonHang))
+            return Conflict(new { message = "Lệnh đang giữ đã thay đổi. Tải lại trạng thái và kiểm tra đúng đơn." });
+        string loi = _trangThai.DieuKhien(maMayIn, req, lenh?.MaLenh);
+        if (loi != null) return BadRequest(new { message = loi });
+        _logger.LogInformation("Nhân sự {NguoiDung} gửi thao tác {ThaoTac} cho máy {MaMayIn}, đơn {MaDonHang}.",
+            User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, req.ThaoTac, maMayIn, req.MaDonHang);
+        return Ok(new KetQuaDto { Message = "Đã gửi thao tác; chờ connector phản hồi." });
     }
 
     [HttpGet("{maMayIn:int}/lenh-tiep-theo")]
@@ -236,6 +270,19 @@ public sealed class MayInAoController : ControllerBase
         var maMay = (await conn.QueryAsync<int>("SELECT MaMayIn FROM MayIn WHERE MaChiNhanh=@MaChiNhanh",
             new { MaChiNhanh = int.Parse(claim.Value) })).ToHashSet();
         return Ok(_trangThai.LayTatCa().Where(x => maMay.Contains(x.MaMayIn)));
+    }
+
+    [HttpGet("danh-sach")]
+    [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
+    public async Task<IActionResult> DanhSachMay()
+    {
+        int? chiNhanh = int.TryParse(User.FindFirst(TenClaim.MaChiNhanh)?.Value, out int ma) ? ma : null;
+        if (!User.IsInRole(VaiTro.SuperAdmin) && chiNhanh == null) return StatusCode(403);
+        using var conn = new SqlConnection(_chuoiKetNoi);
+        var ds = await conn.QueryAsync<MayInQuanTriDto>(
+            @"SELECT m.*, cn.TenChiNhanh FROM MayIn m JOIN ChiNhanh cn ON cn.MaChiNhanh=m.MaChiNhanh
+              WHERE @chiNhanh IS NULL OR m.MaChiNhanh=@chiNhanh ORDER BY m.MaChiNhanh,m.MaMayIn", new { chiNhanh });
+        return Ok(ds);
     }
 
     private string ConnectorId() => Request.Headers["X-Printer-Connector-Id"].ToString();

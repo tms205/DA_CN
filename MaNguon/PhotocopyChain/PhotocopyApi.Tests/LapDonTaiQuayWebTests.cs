@@ -175,7 +175,9 @@ public class LapDonTaiQuayWebTests
         await using var renderer = new HtmlRenderer(provider, provider.GetRequiredService<ILoggerFactory>());
         var html = await renderer.Dispatcher.InvokeAsync(async () => {
             var ketQua = await renderer.RenderComponentAsync<LapDonTaiQuay>();
-            return WebUtility.HtmlDecode(ketQua.ToHtmlString());
+            // CSS isolation thêm b-xxxxxxxxxx, không thay đổi ý nghĩa của form.
+            string markup = System.Text.RegularExpressions.Regex.Replace(ketQua.ToHtmlString(), @" b-[a-z0-9]{10}(="""")?", "");
+            return WebUtility.HtmlDecode(markup);
         });
         if (coGio)
         {

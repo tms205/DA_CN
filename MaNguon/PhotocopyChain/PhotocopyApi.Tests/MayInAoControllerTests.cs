@@ -12,6 +12,23 @@ namespace PhotocopyApi.Tests;
 public class MayInAoControllerTests
 {
     [Fact]
+    public async Task DieuKhien_NhanVienKhongCoChiNhanh_BiChanTruocDatabase()
+    {
+        var (c, _, _) = TaoController();
+        c.HttpContext.User = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(
+            new[] { new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Role, "STAFF") }, "test"));
+        Assert.Equal(403, Assert.IsType<StatusCodeResult>(await c.DieuKhien(1, new() { ThaoTac = "TAM_DUNG" })).StatusCode);
+        Assert.Equal(403, Assert.IsType<StatusCodeResult>(await c.DanhSachMay()).StatusCode);
+    }
+
+    [Fact]
+    public void LayDieuKhien_KhoaSaiKhongDocFileDieuKhien()
+    {
+        var (c, _, _) = TaoController();
+        c.Request.Headers["X-Printer-Api-Key"] = "sai";
+        Assert.IsType<UnauthorizedObjectResult>(c.LayDieuKhien(1));
+    }
+    [Fact]
     public async Task CallbackSaiMaLenh_KhongDuocChamVaoDatabase()
     {
         var (controller, store, id) = TaoController();
