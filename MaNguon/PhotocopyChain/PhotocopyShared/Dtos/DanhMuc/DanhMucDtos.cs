@@ -32,11 +32,14 @@ public sealed class DichVuDto
     /// <summary>A4 / A3 — NULL nếu là gia công.</summary>
     public string? KhoGiay { get; set; }
     public string? LoaiGiay { get; set; }
+    /// <summary>Giấy/vật tư tiêu hao liên kết trong kho; không phải giá nhập.</summary>
+    public int? MaVatTu { get; set; }
+    public string? TenVatTu { get; set; }
     /// <summary>1_MAT / 2_MAT.</summary>
     public string? MatIn { get; set; }
     /// <summary>MAU / DEN_TRANG.</summary>
     public string? MauSac { get; set; }
-    /// <summary>Nhóm gia công loại trừ nhau — DONG_GAY: lò xo hoặc bìa kiếng, chỉ chọn 1. NULL = chọn thoải mái.</summary>
+    /// <summary>Nhóm gia công DONG_GAY; bìa kiếng và lò xo được phép đi cùng nhau.</summary>
     public string? NhomGiaCong { get; set; }
     public decimal DonGia { get; set; }
     /// <summary>NULL: tài liệu; mã kích thước: giá tính theo từng ảnh thẻ.</summary>

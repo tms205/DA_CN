@@ -9,13 +9,14 @@
 
 @* F-24B: mở ca / đóng ca đếm tiền / quản lý xác nhận lệch két.
    Tiệm chạy 3 ca 4 tiếng (09:00–13:00, 13:00–17:00, 17:00–21:00) nhưng hệ thống không ép giờ —
-   STAFF đăng nhập tự mở ca riêng 200.000đ, hết ca thì đếm tiền rồi bấm Đóng ca.
+   Nhân viên/quản lý đăng nhập tự mở ca riêng 200.000đ; CEO chọn chi nhánh rồi mở ca thủ công.
+   Hết ca thì đếm tiền rồi bấm Đóng ca.
    Người trực ca không được tự xác nhận ca của chính mình. *@
 <TieuDeTrang TieuDe="Ca làm việc & két tiền" MoTa="@MoTa()" />
 
 <div class="than-trang khoi-doc">
     <div class="the"><a class="nut-phu" href="may-in">Xem máy in đang hoạt động tại chi nhánh</a><p class="nv-phu">Trạng thái thiết bị trực tiếp và đơn đang in trong phiên làm việc; không phải thống kê máy của các ca đã kết thúc.</p></div>
-    @if (_loi != null)
+    @if (_loi != null && !_moCa && _caXacNhan == null)
     {
         <div class="o-loi">@((MarkupString)Svg.ChamThan())<span>@_loi</span></div>
     }
@@ -28,7 +29,7 @@
     {
         <div class="the">
             <h2 class="the-tieu-de nho">Tổng quan ca toàn chuỗi</h2>
-            <p class="the-mo-ta nho">Chọn một chi nhánh ở thanh bên để mở ca và thao tác tại quầy. Bên dưới vẫn hiển thị các ca gần đây và ca chờ xác nhận của toàn chuỗi.</p>
+            <p class="the-mo-ta nho">Chọn một chi nhánh ở thanh trên, sau đó bấm Mở ca làm việc để mở ca thủ công trước khi thao tác tại quầy. Chọn chi nhánh không tự mở ca. Bên dưới vẫn hiển thị các ca gần đây và ca chờ xác nhận của toàn chuỗi.</p>
         </div>
     }
     else if (_dangTai)
@@ -38,10 +39,26 @@
     else if (_ca == null)
     {
         @* ---- Chưa mở ca ---- *@
-        <form @onsubmit="MoCaAsync" @onsubmit:preventDefault class="the ca-the">
+        <section class="the"><h2 class="the-tieu-de nho">Chưa có ca đang mở</h2><p>@(Phien.NguoiDung?.TenVaiTro == "SUPER_ADMIN" ? "CEO cần bấm Mở ca làm việc để mở ca thủ công tại chi nhánh đang chọn. Tiền đầu ca gợi ý 200.000đ." : "Nhân viên và quản lý được tự mở ca khi đăng nhập. Nếu đã chủ động đóng, bạn có thể mở ca mới.")</p><button type="button" class="nut-chinh" @onclick="MoHopCa">Mở ca làm việc</button></section>
+    }
+    else
+    {
+        @* ---- Đang trong ca ---- *@
+        <section class="the ca-the">
+            <div class="ca-dau"><div><h2 class="the-tieu-de nho">Ca đang mở</h2><div class="nv-phu">@_ca.TenNhanVien · @_ca.TenChiNhanh · mở lúc @_ca.GioMoCa.ToString("HH:mm dd/MM")</div></div><span class="nhan-mau nhan-xanh">Đang mở</span></div>
+            <div class="ca-so-lieu"><div class="ca-o"><div class="ca-o-nhan">Tiền đầu ca</div><b class="mono">@Tien(_ca.TienDauCa)</b></div><div class="ca-o"><div class="ca-o-nhan">COD đã thu</div><b class="mono">@Tien(_ca.DoanhThuTrongCa)</b></div><div class="ca-o"><div class="ca-o-nhan">VietQR · không vào két</div><b class="mono">@Tien(_ca.DoanhThuVietQr)</b></div><div class="ca-o"><div class="ca-o-nhan">Két phải có</div><b class="mono">@Tien(TienPhaiCo(_ca))</b></div></div>
+            <button type="button" class="nut-chinh" @onclick="MoHopCa">Đóng ca &amp; kiểm đếm</button>
+        </section>
+    }
+    <HopThoaiQuanTri Mo="@_moCa" TieuDe="@(_ca == null ? "Mở ca làm việc" : "Đóng ca — kiểm đếm tiền")" Loi="@_loi" DangLuu="@_dangGui" Dong="DongHopCa" Rong="true">
+    <NoiDung>
+    @if (_ca == null)
+    {
+        <form id="ca-form-mo" @onsubmit="MoCaAsync" @onsubmit:preventDefault class="the ca-the">
             <h2 class="the-tieu-de nho">Mở ca làm việc</h2>
             <p class="the-mo-ta nho">
-                Nhân viên đăng nhập được tự mở ca riêng, mặc định 200.000đ. Nếu vừa đóng ca, có thể mở ca mới tại đây.
+                Nhân viên và quản lý đăng nhập được tự mở ca riêng 200.000đ; CEO chọn chi nhánh rồi mở ca thủ công tại đây.
+                Nếu vừa chủ động đóng ca, có thể mở lại tại đây.
                 Đếm số tiền lẻ đang có sẵn trong két rồi nhập vào đây. Đơn đặt trên ứng dụng đều đã chuyển khoản trước;
                 ca làm việc dùng để giữ tiền COD thu khi <b>bàn giao tài liệu cho khách</b>.
             </p>
@@ -52,13 +69,12 @@
                     <input max="999999999999" required type="number" min="0" step="1" class="mono" @bind="_tienDauCa" />
                 </div>
             </div>
-            <button type="submit" class="nut-chinh" disabled="@_dangGui">@(_dangGui ? "Đang mở ca…" : "Mở ca")</button>
         </form>
     }
     else
     {
         @* ---- Đang trong ca ---- *@
-        <form @onsubmit="DongCaAsync" @onsubmit:preventDefault class="the ca-the">
+        <form id="ca-form-dong" @onsubmit="DongCaAsync" @onsubmit:preventDefault class="the ca-the">
             <div class="ca-dau">
                 <div>
                     <h2 class="the-tieu-de nho">Ca đang mở</h2>
@@ -131,10 +147,11 @@
                 }
             }
 
-            <button type="submit" class="nut-chinh" disabled="@_dangGui">@(_dangGui ? "Đang đóng ca…" : "Đóng ca")</button>
         </form>
     }
-
+    </NoiDung>
+    <Chan><button type="button" class="nut-phu" disabled="@_dangGui" @onclick="DongHopCa">Hủy</button><button type="submit" form="@(_ca == null ? "ca-form-mo" : "ca-form-dong")" class="nut-chinh" disabled="@_dangGui">@(_dangGui ? "Đang xử lý…" : _ca == null ? "Mở ca" : "Xác nhận đóng ca")</button></Chan>
+    </HopThoaiQuanTri>
     @* ---- Các ca gần đây của chi nhánh ---- *@
     <div class="the the-bang">
         <div class="bang-tieu-de">
@@ -221,15 +238,14 @@
             }
         </div>
 
-        @if (_caXacNhan != null)
-        {
-            <form @onsubmit="XacNhanLechAsync" @onsubmit:preventDefault class="the ca-the">
+        <HopThoaiQuanTri Mo="@(_caXacNhan != null)" TieuDe="Kiểm đếm & xác nhận ca" Loi="@_loi" DangLuu="@_dangGui" Dong="BoChonXacNhan" Rong="true">
+        <NoiDung>
+            <form id="ca-form-doi-soat" @onsubmit="XacNhanLechAsync" @onsubmit:preventDefault class="the ca-the">
                 <div class="ca-dau">
                     <div>
                         <h2 class="the-tieu-de nho">Kiểm tra ca của @_caXacNhan.TenNhanVien</h2>
                         <div class="nv-phu">Két theo hệ thống phải có <b class="mono">@Tien(TienPhaiCo(_caXacNhan))</b></div>
                     </div>
-                    <button type="button" class="nut-dong" title="Đóng" @onclick="BoChonXacNhan">✕</button>
                 </div>
 
                 @if (!_dangXuLyLech)
@@ -275,10 +291,12 @@
                             }
                         }
                     </div>
-                    <div class="xac-nhan-o"><button type="submit" class="nut-nho chinh" disabled="@(_dangGui || _tienQuanLyDem == null)">@(_dangGui ? "Đang xác nhận…" : "Xác nhận đóng ca")</button><button type="button" class="nut-nho" disabled="@_dangGui" @onclick="QuayLaiChonKetQua">Quay lại</button></div>
+                    <button type="button" class="nut-phu" disabled="@_dangGui" @onclick="QuayLaiChonKetQua">Quay lại</button>
                 }
             </form>
-        }
+        </NoiDung>
+        <Chan><button type="button" class="nut-phu" disabled="@_dangGui" @onclick="BoChonXacNhan">Hủy</button>@if (_dangXuLyLech) { <button type="submit" form="ca-form-doi-soat" class="nut-chinh" disabled="@(_dangGui || _tienQuanLyDem == null)">@(_dangGui ? "Đang xác nhận…" : "Xác nhận đóng ca")</button> }</Chan>
+        </HopThoaiQuanTri>
     }
 </div>
 
@@ -300,6 +318,9 @@
     private decimal _tienChi;
     private decimal _tienBu;
     private string _ghiChuXacNhan;
+    private bool _moCa;
+    private void MoHopCa() { if (_dangGui || CeoDangXemToanChuoi()) return; _loi = _thongBao = null; _moCa = true; }
+    private void DongHopCa() { if (!_dangGui) { _moCa = false; _loi = null; } }
 
     private decimal? TienQuanLyDemNhap
     {
@@ -344,6 +365,8 @@
 
     private void ChonXacNhan(CaLamViecDto ca)
     {
+        if (_dangGui) return;
+        _loi = _thongBao = null;
         _caXacNhan = ca;
         _dangXuLyLech = false;
         _tienQuanLyDem = null;
@@ -392,27 +415,24 @@
 
     private async Task GuiXacNhanCaAsync(decimal tienQuanLyDem, decimal tienChi, decimal tienBu, string ghiChu)
     {
+        if (_dangGui || _caXacNhan == null) return;
         var req = new XacNhanCaRequest { TienQuanLyDemCuoiCa = tienQuanLyDem, TienChi = tienChi, TienBu = tienBu, GhiChu = ghiChu };
         _loi = QuyTacNhap.LayLoi(req);
         if (_loi != null) return;
         _loi = null; _thongBao = null;
         _dangGui = true;
-        var res = await Http.PostAsJsonAsync("api/ca/" + _caXacNhan.MaCa + "/xac-nhan",
-            req);
-        if (res.IsSuccessStatusCode)
+        try
         {
+            using var res = await Http.PostAsJsonAsync("api/ca/" + _caXacNhan.MaCa + "/xac-nhan", req);
+            if (!res.IsSuccessStatusCode) { _loi = await DocLoiApi.TuPhanHoiAsync(res, "Không xác nhận được ca."); return; }
             _thongBao = "Đã kiểm đếm và xác nhận ca của " + _caXacNhan.TenNhanVien + ".";
             _caXacNhan = null;
             _dangXuLyLech = false;
             _tienQuanLyDem = null;
             await TaiTatCa();
         }
-        else
-        {
-            var loi = await res.Content.ReadFromJsonAsync<ApiError>();
-            _loi = loi.Message;
-        }
-        _dangGui = false;
+        catch (HttpRequestException) { _loi = "Mất kết nối API. Kiểm tra lại ca trước khi xác nhận lại."; }
+        finally { _dangGui = false; }
     }
 
     // GET api/ca/dang-mo — trả 204 nếu chưa mở ca nào
@@ -460,6 +480,7 @@
     // POST api/ca/mo
     private async Task MoCaAsync()
     {
+        if (_dangGui) return;
         _loi = QuyTacNhap.LayLoi(new MoCaRequest { TienDauCa = _tienDauCa });
         if (_loi != null) return;
         _thongBao = null;
@@ -471,6 +492,7 @@
             {
                 _thongBao = "Đã mở ca, giờ có thể tiếp nhận đơn và thu COD khi bàn giao.";
                 _tienDemDuoc = 0;
+                _moCa = false;
             }
             else
             {
@@ -489,6 +511,7 @@
     // POST api/ca/dong — STAFF chờ xác nhận; BRANCH_ADMIN đóng xong ngay.
     private async Task DongCaAsync()
     {
+        if (_dangGui) return;
         _loi = QuyTacNhap.LayLoi(new DongCaRequest { TongDoanhThuCuoiCa = _tienDemDuoc });
         if (_loi != null) return;
         _thongBao = null;
@@ -501,6 +524,7 @@
                 var ketQua = await res.Content.ReadFromJsonAsync<KetQuaDto>();
                 _thongBao = ketQua.Message;
                 _tienDemDuoc = 0;
+                _moCa = false;
             }
             else
             {

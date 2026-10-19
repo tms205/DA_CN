@@ -7,6 +7,20 @@ namespace PhotocopyApi.Tests;
 public class QuyTacQuanTriChiNhanhTests
 {
     [Theory]
+    [InlineData("Tờ", true)]
+    [InlineData(" tờ ", true)]
+    [InlineData("Ram", false)]
+    [InlineData("Hộp", false)]
+    [InlineData(null, false)]
+    public void VatTuGiayIn_TinhTheoToKhongPhaiRam(string donVi, bool hopLe)
+    {
+        var ham = typeof(QuyTacQuanTriChiNhanh).GetMethod("KiemTraDonViGiay");
+        Assert.NotNull(ham);
+        string loi = (string)ham.Invoke(null, new object[] { donVi });
+        Assert.Equal(hopLe, loi == null);
+    }
+
+    [Theory]
     [InlineData("Bấm kim góc", "Bấm kim mới", true)]
     [InlineData("Đóng lò xo", "Đóng gáy mới", true)]
     [InlineData("Đóng lò xo", "Đóng lò xo", false)]

@@ -34,6 +34,31 @@
     <script>window.moLienHeFooter = hop => hop.showModal();
         window.dashboardDangHienThi = () => document.visibilityState === 'visible';
         window.moMauDon = hop => hop.showModal();
+        window.moFormMauDon = window.moHopThoaiQuanTri = hop => {
+            // cancel của dialog không nổi bọt; bắt trực tiếp để Esc đi qua cùng nút đóng của Blazor.
+            hop.oncancel = event => {
+                event.preventDefault();
+                const nutDong = hop.querySelector('[data-dong-form-mau], [data-dong-popup]');
+                if (nutDong && !nutDong.disabled) nutDong.click();
+            };
+            hop.onkeydown = event => {
+                // Bản xem trước của máy quét có thể mở trên popup lập đơn.
+                if (event.target.closest('dialog') !== hop) return;
+                if (event.key !== 'Tab') return;
+                const cacO = Array.from(hop.querySelectorAll('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), a[href], summary, [tabindex]:not([tabindex="-1"])'))
+                    .filter(o => o.getClientRects().length > 0);
+                if (cacO.length === 0) { event.preventDefault(); return; }
+                const dau = cacO[0], cuoi = cacO[cacO.length - 1];
+                // Giữ vòng Tab/Shift+Tab trong form, không nhảy ra thanh địa chỉ.
+                if (event.shiftKey && document.activeElement === dau) { event.preventDefault(); cuoi.focus(); }
+                else if (!event.shiftKey && document.activeElement === cuoi) { event.preventDefault(); dau.focus(); }
+            };
+            if (!hop.open) {
+                hop.showModal();
+                const oDau = hop.querySelector('[autofocus]:not(:disabled), input:not(:disabled):not([type="hidden"]), select:not(:disabled), textarea:not(:disabled)');
+                if (oDau) oDau.focus();
+            }
+        };
         window.dongMauDon = hop => hop.close();</script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
 </body>

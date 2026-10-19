@@ -38,6 +38,7 @@ public sealed class PhamViChiNhanh
         _daKhoiTao = true;
         GanHeader();
 
+        // Đổi phạm vi chỉ đổi dữ liệu đang xem, không tự mở hoặc đóng ca.
         if (MaChiNhanh == null)
             await _js.InvokeVoidAsync("localStorage.removeItem", TenKhoa);
         else

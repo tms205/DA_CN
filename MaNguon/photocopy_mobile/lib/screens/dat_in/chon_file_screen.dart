@@ -57,6 +57,7 @@ class _ChonFileScreenState extends State<ChonFileScreen> {
   }
 
   Future<void> _taiMauDon() async {
+    if (_dangTai) return;
     setState(() {
       _dangTai = true;
       _loi = null;
@@ -67,6 +68,7 @@ class _ChonFileScreenState extends State<ChonFileScreen> {
       _dangTai = false;
       if (kq.thanhCong) {
         _mauDon = List<Map<String, dynamic>>.from(kq.duLieu);
+        if (!_mauDon.any((mau) => mau['nhom'] == _nhomMau)) _nhomMau = '';
       } else {
         _loi = kq.loi;
       }
@@ -79,7 +81,8 @@ class _ChonFileScreenState extends State<ChonFileScreen> {
       _dangTai = true;
       _loi = null;
     });
-    final kq = await Api.post('/api/file-in/mau/${mau['maMau']}', {});
+    final phienBan = mau['phienBan'] as int?;
+    final kq = await Api.post('/api/file-in/mau/${Uri.encodeComponent(mau['maMau'])}${phienBan == null ? '' : '?phienBan=$phienBan'}', {});
     if (!mounted) return;
     setState(() => _dangTai = false);
     if (!kq.thanhCong) {
@@ -249,12 +252,20 @@ class _ChonFileScreenState extends State<ChonFileScreen> {
               ),
               const SizedBox(height: 12),
               if (_dangTai) const LinearProgressIndicator(),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)),
+                onPressed: _dangTai ? null : _taiMauDon,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Làm mới thư viện mẫu'),
+              ),
+              const SizedBox(height: 12),
               TextField(
                 decoration: const InputDecoration(labelText: 'Tìm mẫu đơn', hintText: 'Tên mẫu hoặc nơi công bố', prefixIcon: Icon(Icons.search)),
                 onChanged: (value) => setState(() => _timMau = value),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
+                key: ValueKey(_nhomMau),
                 initialValue: _nhomMau, isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Nhóm mẫu'),
                 items: [const DropdownMenuItem(value: '', child: Text('Tất cả')),

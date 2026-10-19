@@ -2010,9 +2010,6 @@ a:hover {
 .tq-chu-canh-bao { color: var(--loi-chu); font-size: 14px; margin-top: 6px; }
 .tq-van-hanh .o-loi { margin: 16px; }
 .tq-van-hanh > .o-loi { margin: 0; }
-.tq-phan-trang { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 24px; border-top: 1px solid var(--vach); color: var(--chu-phu); }
-.tq-dong-moi-trang, .tq-nut-trang { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
-.tq-dong-moi-trang select { width: auto; }
 .tq-trang .nut-nho { min-height: 44px; }
 .tq-trang button:focus-visible, .tq-trang a:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 .tq-kinh-doanh { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
@@ -2055,13 +2052,11 @@ a:hover {
     .tq-bo-loc, .tq-noi-bieu-do { padding: 16px; }
     .tq-kpi-tien { font-size: 28px; }
     .tq-tieu-muc, .tq-viec-can-lam { flex-direction: column; align-items: stretch; }
-    .tq-viec-can-lam, .tq-danh-sach, .tq-chi-nhanh, .tq-dem-may, .tq-phan-trang { padding: 16px; }
+    .tq-viec-can-lam, .tq-danh-sach, .tq-chi-nhanh, .tq-dem-may { padding: 16px; }
     .tq-so-vh { padding: 16px; }
     .tq-so-vh > small, .tq-dong-thong-tin p, .tq-ton small { font-size: 16px; }
     .tq-chu-giai { font-size: 16px; }
     .tq-so-vh > span { overflow-wrap: anywhere; }
-    .tq-nut-trang { width: 100%; }
-    .tq-nut-trang > button { flex: 1; }
     .hd-thong-bao-cho { flex-wrap: wrap; padding: 16px; gap: 12px; }
     .hd-thong-bao-cho > div { flex: 1; min-width: 160px; }
     .hd-thong-bao-cho .nut-nho { width: 100%; justify-content: center; }
@@ -2323,6 +2318,13 @@ a:hover {
 .bang.bang-thao-tac-trai th.cot-hanh-dong,
 .bang.bang-thao-tac-trai td.cot-hanh-dong {
     text-align: left;
+}
+
+/* Đánh giá: nút và trạng thái nằm giữa, cùng trục với tiêu đề cột. */
+.bang.bang-thao-tac-giua th.cot-hanh-dong,
+.bang.bang-thao-tac-giua td.cot-hanh-dong {
+    text-align: center;
+    vertical-align: middle;
 }
 
 .bg-hanh-dong-phat-sinh {

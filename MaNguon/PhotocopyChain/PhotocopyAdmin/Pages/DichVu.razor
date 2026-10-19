@@ -9,7 +9,7 @@
 <TieuDeTrang TieuDe="Dịch vụ" MoTa="Danh mục quy cách dùng chung trong chuỗi; giá bán từng chi nhánh quản lý tại Bảng giá in ấn." />
 
 <div class="than-trang khoi-doc">
-    @if (_loi != null)
+    @if (_loi != null && !_moForm)
     {
         <div class="o-loi" role="alert">
             @((MarkupString)Svg.ChamThan())
@@ -27,15 +27,18 @@
     @if (LaSuperAdmin())
     {
         <div class="xac-nhan-o">
-            <button type="button" class="nut-chinh" @onclick="ThemMoi">Thêm dịch vụ</button>
+            <button type="button" class="nut-chinh" disabled="@_dangLuu" @onclick="ThemMoi">Thêm dịch vụ</button>
             <a class="nut-phu" href="bang-gia">Mở bảng giá chi nhánh</a>
         </div>
     }
 
-    @if (LaSuperAdmin() && _moForm)
+    @if (LaSuperAdmin())
     {
-        <form @onsubmit="LuuAsync" @onsubmit:preventDefault class="the the-rong">
-            <h2 class="the-tieu-de nho">@(_dangSua == null ? "Thêm dịch vụ / quy cách mới" : "Sửa danh mục dịch vụ #" + _dangSua.MaDichVu)</h2>
+        <HopThoaiQuanTri Mo="@_moForm" TieuDe="@(_dangSua == null ? "Thêm dịch vụ / quy cách mới" : "Sửa danh mục dịch vụ #" + _dangSua.MaDichVu)"
+                        MoTa="Thông tin quy cách dùng chung trong chuỗi; giá đang bán của chi nhánh giữ nguyên khi sửa danh mục."
+                        Loi="@_loi" DangLuu="@_dangLuu" Dong="DongForm" Rong="true">
+            <NoiDung>
+        <form id="dich-vu-form" @onsubmit="LuuAsync" @onsubmit:preventDefault>
             <div class="ca-loc-luoi">
                 <div class="truong">
                     <label class="nhan" for="dv-truong-1">Tên dịch vụ</label>
@@ -71,18 +74,20 @@
                     <input id="dv-loai-giay" class="ca-o-loc" maxlength="20" @bind="_form.LoaiGiay" disabled="@(_form.KichThuocAnh != null || _form.LoaiDichVu != "IN_AN")" />
                 </div>
                 <div class="truong">
-                    <label class="nhan" for="dv-vat-tu">Vật tư tiêu hao (nếu có)</label>
-                    <select id="dv-vat-tu" class="ca-o-loc" @bind="_form.MaVatTu" disabled="@(_form.KichThuocAnh != null)">
-                        <option value="">Không sử dụng vật tư</option>
-                        @foreach (var vt in _vatTu) { <option value="@vt.MaVatTu">@vt.TenVatTu · @vt.DonViTinh</option> }
+                    <label class="nhan" for="dv-vat-tu">@(_form.LoaiDichVu == "IN_AN" ? "Giấy in trong kho" : "Vật tư tiêu hao (nếu có)")</label>
+                    <select id="dv-vat-tu" class="ca-o-loc" @bind="_form.MaVatTu" required="@(_dangSua == null && _form.LoaiDichVu == "IN_AN" && _form.KichThuocAnh == null)" disabled="@(_form.KichThuocAnh != null)">
+                        <option value="">@(_form.LoaiDichVu == "IN_AN" ? "Chọn giấy in" : "Không sử dụng vật tư")</option>
+                        @foreach (var vt in _vatTu.Where(x => _form.LoaiDichVu != "IN_AN" || string.Equals(x.DonViTinh?.Trim(), "Tờ", StringComparison.OrdinalIgnoreCase))) { <option value="@vt.MaVatTu">@vt.TenVatTu · @vt.DonViTinh</option> }
                     </select>
                     @if (_form.KichThuocAnh != null) { <span class="nv-phu">Ảnh thẻ tự sử dụng Giấy ảnh A4.</span> }
+                    else if (_form.LoaiDichVu == "IN_AN") { <span class="nv-phu">Chọn đúng giấy theo tờ; chưa có loại giấy cần dùng thì thêm tại Kho vật tư. Giấy này sẽ hiện trên web và mobile khi dịch vụ đang bán.</span> }
                 </div>
                 <div class="truong">
                     <label class="nhan" for="dv-nhom-gia-cong">Nhóm gia công</label>
-                    <select id="dv-nhom-gia-cong" class="ca-o-loc" @bind="_form.NhomGiaCong" disabled="@(_form.LoaiDichVu != "GIA_CONG")">
-                        <option value="">Không phân nhóm</option><option value="DONG_GAY">Đóng gáy</option>
+                    <select id="dv-nhom-gia-cong" class="ca-o-loc" aria-describedby="dv-goi-y-gia-cong" @bind="_form.NhomGiaCong" disabled="@(_form.LoaiDichVu != "GIA_CONG")">
+                        <option value="">Không phân nhóm</option><option value="DONG_GAY">Đóng tập tài liệu</option>
                     </select>
+                    <span class="nv-phu" id="dv-goi-y-gia-cong">Đóng tập tài liệu là nhóm các cách ghép tài liệu thành tập; thường chỉ chọn một kiểu trong nhóm cho mỗi bản. Riêng bìa kiếng và lò xo được phép đi cùng. Không thuộc nhóm này thì chọn Không phân nhóm.</span>
                 </div>
                 <div class="truong">
                     <label class="nhan" for="dv-trang-thai">Hiển thị mặc định cho chi nhánh mới</label>
@@ -110,14 +115,13 @@
                 </div>
             </div>
             <p class="nv-phu">Giá khởi tạo áp dụng khi thêm dịch vụ/chi nhánh mới. Sửa danh mục không đổi giá đang bán tại các chi nhánh. Quy cách đã có đơn không được thay đổi; hãy thêm dịch vụ mới. Giữ nguyên tên Bấm kim góc / Đóng lò xo / Đóng bìa kiếng vì các dịch vụ này có ràng buộc gia công.</p>
-            <div class="xac-nhan-o">
-                <button disabled="@_dangLuu" type="submit" class="nut-chinh" style="min-width: 120px;">Lưu dịch vụ</button>
-                @if (_moForm)
-                {
-                    <button type="button" class="nut-phu" @onclick="BoSua">Hủy</button>
-                }
-            </div>
         </form>
+            </NoiDung>
+            <Chan>
+                <button type="button" class="nut-phu" disabled="@_dangLuu" @onclick="DongForm">Hủy</button>
+                <button disabled="@_dangLuu" type="submit" form="dich-vu-form" class="nut-chinh">@(_dangLuu ? "Đang lưu…" : "Lưu dịch vụ")</button>
+            </Chan>
+        </HopThoaiQuanTri>
     }
 
     <div class="the the-bang">
@@ -139,7 +143,7 @@
         else
         {
             <div class="bang-cuon">
-                <table role="table" class="bang">
+                <table role="table" class="bang bang-thao-tac-trai">
                     <thead>
                         <tr>
                             <th scope="col">Tên dịch vụ</th>
@@ -163,6 +167,10 @@
                                 </td>
                                 <td data-nhan="Quy cách áp dụng">
                                     <div>@ThongTinApDung(dv)</div>
+                                    @if (dv.LoaiDichVu == "IN_AN" && dv.TenVatTu != null)
+                                    {
+                                        <div class="nv-phu">Kho: @dv.TenVatTu</div>
+                                    }
                                     @if (dv.LoaiDichVu == "GIA_CONG")
                                     {
                                         <div class="nv-phu">@QuyTacKetHop(dv)</div>
@@ -178,7 +186,7 @@
                                 <td class="cot-hanh-dong" data-nhan="Thao tác">
                                     @if (CoTheSua())
                                     {
-                                        <button class="nut-nho" title="Sửa danh mục dịch vụ này" @onclick="() => Sua(dv)">Sửa dịch vụ</button>
+                                        <button class="nut-nho" disabled="@_dangLuu" title="Sửa danh mục dịch vụ này" @onclick="() => Sua(dv)">Sửa dịch vụ</button>
                                     }
                                 </td>
                             </tr>
@@ -205,7 +213,11 @@
         (x.TenDichVu.Contains(_tuKhoa.Trim(), StringComparison.OrdinalIgnoreCase) || x.MaDichVu.ToString() == _tuKhoa.Trim())).ToList();
     private int SoTrang => Math.Max(1, (DaLoc.Count + 9) / 10);
     private void VeTrangDau() => _trang = 1;
-    private void ThemMoi() { BoSua(); _moForm = true; }
+    private void ThemMoi()
+    {
+        if (_dangLuu || !CoTheSua()) return;
+        BoSua(); _thongBao = null; _moForm = true;
+    }
     private string _loi;
     private string _thongBao;
     private string KichThuocAnh
@@ -251,6 +263,8 @@
 
     private void Sua(DichVuQuanTriDto d)
     {
+        if (_dangLuu || !CoTheSua()) return;
+        _loi = _thongBao = null;
         _moForm = true;
         _dangSua = d;
         _form = new LuuDichVuRequest
@@ -274,11 +288,14 @@
         _moForm = false;
         _dangSua = null;
         _form = Moi();
+        _loi = null;
     }
+
+    private void DongForm() { if (!_dangLuu) BoSua(); }
 
     private async Task LuuAsync()
     {
-        if (_dangLuu) return;
+        if (_dangLuu || !_moForm || !CoTheSua()) return;
         _thongBao = null;
         _loi = QuyTacNhap.LayLoi(_form);
         if (_loi != null) return;
@@ -321,7 +338,7 @@
         : d.TenDichVu.Trim().Equals("Đóng lò xo", StringComparison.OrdinalIgnoreCase)
         ? "Có thể kèm bìa kiếng; không chọn cùng bấm kim góc"
         : d.NhomGiaCong == "DONG_GAY"
-        ? "Chỉ chọn một kiểu đóng gáy cho mỗi bản in"
+        ? "Chỉ chọn một kiểu đóng tập tài liệu cho mỗi bản in"
         : "Có thể chọn kèm dịch vụ hoàn thiện khác";
 
     private static string TenMatIn(string matIn) => matIn == "2_MAT" ? "2 mặt" : "1 mặt";

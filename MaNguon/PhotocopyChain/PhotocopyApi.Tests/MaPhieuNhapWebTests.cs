@@ -14,18 +14,19 @@ namespace PhotocopyApi.Tests;
 public class MaPhieuNhapWebTests
 {
     [Theory]
-    [InlineData(false, 1, "PN0001")]
-    [InlineData(false, 42, "PN0042")]
-    [InlineData(false, 12345, "PN12345")]
-    [InlineData(true, 1, "PN0001")]
-    [InlineData(true, 42, "PN0042")]
-    [InlineData(true, 12345, "PN12345")]
-    public async Task MaPhieu_HienTienToVaSo_KhongInNguyenCode(bool pheDuyet, int ma, string mongDoi)
+    [InlineData(false, 1, "PN0001", "Tờ")]
+    [InlineData(false, 42, "PN0042", "Hộp")]
+    [InlineData(false, 12345, "PN12345", "Cái")]
+    [InlineData(true, 1, "PN0001", "Tờ")]
+    [InlineData(true, 42, "PN0042", "Hộp")]
+    [InlineData(true, 12345, "PN12345", "Cái")]
+    public async Task MaPhieu_HienTienToVaSo_KhongInNguyenCode(bool pheDuyet, int ma, string mongDoi, string donViTinh)
     {
-        using var http = new HttpClient(new ApiPhieuNhap(ma)) { BaseAddress = new Uri("http://test.local/") };
+        using var http = new HttpClient(new ApiPhieuNhap(ma, donViTinh)) { BaseAddress = new Uri("http://test.local/") };
         var phamVi = new PhamViChiNhanh(null, http);
         var services = new ServiceCollection();
         services.AddLogging();
+        services.AddSingleton<Microsoft.JSInterop.IJSRuntime, JsKhongChay>();
         services.AddSingleton(http);
         services.AddSingleton(new ThongBaoPheDuyet(http));
         services.AddSingleton(phamVi);
@@ -42,18 +43,26 @@ public class MaPhieuNhapWebTests
         Assert.True(oMa.Success, "Phải có ô mã phiếu nhập trong bảng.");
         Assert.Equal(mongDoi, oMa.Groups[1].Value);
         Assert.DoesNotContain("MaPhieuNhap.ToString", html);
+        Assert.Contains("<b>20</b> " + donViTinh, html);
+        Assert.DoesNotContain("bản/cuộn", html);
     }
 
-    private sealed class ApiPhieuNhap(int ma) : HttpMessageHandler
+    private sealed class JsKhongChay : Microsoft.JSInterop.IJSRuntime
+    {
+        public ValueTask<T> InvokeAsync<T>(string name, object[] args) => ValueTask.FromResult(default(T));
+        public ValueTask<T> InvokeAsync<T>(string name, CancellationToken token, object[] args) => ValueTask.FromResult(default(T));
+    }
+
+    private sealed class ApiPhieuNhap(int ma, string donViTinh) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage req, CancellationToken token)
         {
             Assert.Equal(HttpMethod.Get, req.Method);
             object data = req.RequestUri.AbsolutePath switch {
-                "/api/quan-tri/phieu-nhap" => new[] { new PhieuNhapDto {
+                "/api/quan-tri/phieu-nhap" => new[] { new {
                     MaPhieuNhap = ma, TrangThai = "CHO_DUYET", MaChiNhanh = 1,
                     TenChiNhanh = "Chi nhánh thử", MaVatTu = 1, TenVatTu = "Giấy A4",
-                    NhaCungCap = "Nhà cung cấp thử", SoLuong = 20, DonGia = 100000,
+                    DonViTinh = donViTinh, NhaCungCap = "Nhà cung cấp thử", SoLuong = 20, DonGia = 100000,
                     TenNguoiLap = "Người lập thử", NgayLap = new DateTime(2026, 10, 12),
                 } },
                 "/api/quan-tri/kho" => Array.Empty<TonKhoDto>(),

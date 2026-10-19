@@ -226,8 +226,7 @@
                         {
                             <div class="truong">
                                 <label class="nhan">@(dong.KichThuocAnh != null ? "Tải lại ảnh gốc để ghép đúng " + dong.SoLuongAnh + " ảnh" : "Tải lại PDF nếu file đã mất (" + dong.TongSoTrangFile + " trang)")</label>
-                                <InputFile accept="@(dong.KichThuocAnh != null ? ".png,.jpg,.jpeg" : ".pdf")" disabled="@_dangGui"
-                                           OnChange="e => PhucHoiFileAsync(e, don, dong)" />
+                                <button type="button" class="nut-nho" disabled="@_dangGui" @onclick="() => MoPhucHoi(don, dong)">Phục hồi tài liệu</button>
                                 <p class="goi-y">Chọn đúng file cũ của khách. Không đổi số trang, số bản hoặc giá đã thanh toán.</p>
                             </div>
                         }
@@ -342,35 +341,7 @@
                     }
                     else
                     {
-                    <h3 class="hd-muc">Chọn máy in</h3>
-                    <div class="hd-may-in">
-                        @if (_dsMayIn == null)
-                        {
-                            <span class="chu-mo">Đang tải danh sách máy in…</span>
-                        }
-                        else
-                        {
-                            @foreach (var may in _dsMayIn)
-                            {
-                                <label class="hd-may @(may.DapUngDuoc ? "" : "mo")">
-                                    <input type="radio" name="mayin" disabled="@(!may.DapUngDuoc)"
-                                           checked="@(_mayDaChon == may.MaMayIn)"
-                                           @onchange="() => _mayDaChon = may.MaMayIn" />
-                                    <div>
-                                        <div class="nv-ten">@may.TenMay</div>
-                                        <div class="nv-phu">
-                                            @(may.DapUngDuoc
-                                                ? $"{may.KhoGiay} · {(may.InMau ? "In màu" : "Đen trắng")} · {(may.In2Mat ? "2 mặt" : "1 mặt")} · {may.TocDo} trang/phút"
-                                                : may.LyDoKhongDapUng)
-                                        </div>
-                                    </div>
-                                </label>
-                            }
-                        }
-                    </div>
-                    <button class="nut-chinh hd-nut-bat-dau" disabled="@(_dangGui || _mayDaChon == null)" @onclick="BatDauInAsync">
-                        @(_dangGui ? "Đang xử lý…" : "Bắt đầu in")
-                    </button>
+                    <button type="button" class="nut-chinh" disabled="@_dangGui" @onclick="() => _moChonMay = true">Chọn máy &amp; bắt đầu in</button>
                     }
                 }
                 else if (don.TrangThaiDonHang == "DANG_IN")
@@ -421,15 +392,52 @@
                     && !(LaInTuDong(don) && don.TrangThaiDonHang == "DANG_IN"))
                 {
                     <h3 class="hd-muc">Hủy đơn</h3>
-                    <div class="truong"><label class="nhan">Lý do</label><div class="o-nhap nho"><input @bind="_lyDoHuy" placeholder="Nêu rõ lý do hủy" /></div></div>
-                    <button class="nut-nho nguy-hiem" disabled="@_dangGui" @onclick="HuyDonAsync">Hủy đơn hàng</button>
+                    <button class="nut-nho nguy-hiem" disabled="@_dangGui" @onclick="MoHuyDon">Hủy đơn hàng</button>
                 }
             </div>
         }
     </div>
 </div>
 
+<XacNhanThaoTac @ref="_xacNhan" />
+<HopThoaiQuanTri Mo="@(_moChonMay && _donDangChon?.TrangThaiDonHang == "DA_XAC_NHAN" && !LaInTuDong(_donDangChon))" TieuDe="Chọn máy & bắt đầu in" Loi="@_loiThaoTac" DangLuu="@_dangGui" Dong="DongChonMay">
+    <NoiDung>
+        <p>Phân máy cho đơn <b>@_donDangChon?.MaDonHangHienThi</b>.</p>
+        @if (_dsMayIn == null) { <p role="status">Đang tải máy in…</p> }
+        else
+        {
+            <div class="hd-may-in">
+            @foreach (var may in _dsMayIn)
+            {
+                <label class="hd-may @(may.DapUngDuoc ? "" : "mo")">
+                    <input type="radio" name="mayin" disabled="@(!may.DapUngDuoc)" checked="@(_mayDaChon == may.MaMayIn)" @onchange="() => _mayDaChon = may.MaMayIn" />
+                    <div><b>@may.TenMay</b><div class="nv-phu">@(may.DapUngDuoc ? $"{may.KhoGiay} · {(may.InMau ? "In màu" : "Đen trắng")} · {(may.In2Mat ? "2 mặt" : "1 mặt")} · {may.TocDo} trang/phút" : may.LyDoKhongDapUng)</div></div>
+                </label>
+            }
+            </div>
+        }
+    </NoiDung>
+    <Chan><button type="button" class="nut-phu" disabled="@_dangGui" @onclick="DongChonMay">Hủy</button><button type="button" class="nut-chinh" disabled="@(_dangGui || _mayDaChon == null)" @onclick="BatDauInAsync">Bắt đầu in</button></Chan>
+</HopThoaiQuanTri>
+<HopThoaiQuanTri Mo="@_moHuy" TieuDe="Hủy đơn hàng" Loi="@_loiThaoTac" DangLuu="@_dangGui" Dong="DongHuyDon">
+    <NoiDung><form id="hd-form-huy" @onsubmit="HuyDonAsync" @onsubmit:preventDefault><p>Hủy đơn <b>@_donDangChon?.MaDonHangHienThi</b>? Lịch sử vẫn được giữ để đối soát.</p><label class="nhan" for="hd-ly-do-huy">Lý do hủy</label><textarea id="hd-ly-do-huy" class="ca-o-loc" required maxlength="255" @bind="_lyDoHuy" placeholder="Nêu rõ lý do hủy"></textarea></form></NoiDung>
+    <Chan><button type="button" class="nut-phu" disabled="@_dangGui" @onclick="DongHuyDon">Không hủy</button><button type="submit" form="hd-form-huy" class="nut-phu nguy-hiem" disabled="@_dangGui">Xác nhận hủy đơn</button></Chan>
+</HopThoaiQuanTri>
+<HopThoaiQuanTri Mo="@(_dongPhucHoi != null)" TieuDe="Phục hồi tài liệu" Loi="@_loiThaoTac" DangLuu="@_dangGui" Dong="DongPhucHoi">
+    <NoiDung><p><b>@_dongPhucHoi?.TenFile</b></p><p>Chọn đúng file gốc. Không đổi số trang, số bản hoặc giá đã thanh toán.</p><InputFile accept="@(_dongPhucHoi?.KichThuocAnh != null ? ".png,.jpg,.jpeg" : ".pdf")" disabled="@_dangGui" OnChange="e => PhucHoiFileAsync(e, _donPhucHoi, _dongPhucHoi)" /></NoiDung>
+    <Chan><button type="button" class="nut-phu" disabled="@_dangGui" @onclick="DongPhucHoi">Đóng</button></Chan>
+</HopThoaiQuanTri>
 @code {
+    private XacNhanThaoTac _xacNhan;
+    private bool _moHuy;
+    private bool _moChonMay;
+    private void DongChonMay() { if (!_dangGui) { _moChonMay = false; _loiThaoTac = null; } }
+    private DonHangChiTietDto _donPhucHoi;
+    private DongInChiTietDto _dongPhucHoi;
+    private void MoHuyDon() { if (_dangGui || !LaQuanLy()) return; _lyDoHuy = ""; _loiThaoTac = null; _moHuy = true; }
+    private void DongHuyDon() { if (!_dangGui) { _moHuy = false; _loiThaoTac = null; } }
+    private void MoPhucHoi(DonHangChiTietDto don, DongInChiTietDto dong) { if (_dangGui) return; _donPhucHoi = don; _dongPhucHoi = dong; _loiThaoTac = null; }
+    private void DongPhucHoi() { if (!_dangGui) { _donPhucHoi = null; _dongPhucHoi = null; _loiThaoTac = null; } }
     [Parameter]
     [SupplyParameterFromQuery(Name = "maDonHang")]
     public int? MaDonHangTuThanhToan { get; set; }
@@ -666,11 +674,13 @@
             return await Http.PutAsJsonAsync($"api/don-hang/{don.MaDonHang}/chi-tiet/{dong.MaChiTiet}/file",
                 new PhucHoiFileInRequest { MaFileIn = fileMoi.MaFileIn });
         });
+        if (_loiThaoTac == null) DongPhucHoi();
     }
 
     // POST api/don-hang/{id}/tiep-nhan (F-15)
     private async Task TiepNhanAsync()
     {
+        if (_dangGui || _donDangChon == null || !await _xacNhan.HoiAsync("Tiếp nhận đơn " + _donDangChon.MaDonHangHienThi + " để xếp in tại quầy?", "Tiếp nhận đơn hàng", "Tiếp nhận")) return;
         // Kiểm tra lại ngay lúc bấm để tránh dùng trạng thái ca đã cũ.
         await TaiTrangThaiCa();
         if (!_coCaDangMo)
@@ -700,14 +710,17 @@
     // PUT api/don-hang/{id}/trang-thai-in với máy in đã chọn (F-21 + F-17)
     private async Task BatDauInAsync()
     {
+        if (_dangGui || _donDangChon == null || _mayDaChon == null) return;
         int maDon = _donDangChon.MaDonHang;
         var than = new CapNhatTrangThaiInRequest { TrangThaiMoi = "DANG_IN", MaMayIn = _mayDaChon };
         await GuiThaoTac(async () => await Http.PutAsJsonAsync("api/don-hang/" + maDon + "/trang-thai-in", than));
+        if (_loiThaoTac == null) _moChonMay = false;
     }
 
     // PUT api/don-hang/{id}/trang-thai-in = DA_IN (F-17; file giữ tới khi đơn kết thúc)
     private async Task InXongAsync()
     {
+        if (_dangGui || _donDangChon == null || !await _xacNhan.HoiAsync("Đã in và kiểm tra đầy đủ bản giấy của đơn " + _donDangChon.MaDonHangHienThi + "?", "Xác nhận in xong", "Đã in xong")) return;
         int maDon = _donDangChon.MaDonHang;
         var than = new CapNhatTrangThaiInRequest { TrangThaiMoi = "DA_IN" };
         await GuiThaoTac(async () => await Http.PutAsJsonAsync("api/don-hang/" + maDon + "/trang-thai-in", than));
@@ -716,6 +729,7 @@
     // POST api/don-hang/{id}/giao-tai-quay (F-18)
     private async Task BanGiaoAsync()
     {
+        if (_dangGui || _donDangChon == null || !await _xacNhan.HoiAsync("Bàn giao đơn " + _donDangChon.MaDonHangHienThi + " cho khách? Nếu là COD, chỉ xác nhận khi đã thu đủ tiền.", "Bàn giao tại quầy", "Xác nhận bàn giao")) return;
         await GuiThaoTac(async () =>
             await Http.PostAsync("api/don-hang/" + _donDangChon.MaDonHang + "/giao-tai-quay", null));
     }
@@ -727,6 +741,7 @@
 
     private async Task HuyDonAsync()
     {
+        if (_dangGui || _donDangChon == null || !LaQuanLy()) return;
         if (string.IsNullOrWhiteSpace(_lyDoHuy))
         {
             _loiThaoTac = "Vui lòng nhập lý do hủy đơn.";
@@ -734,12 +749,13 @@
         }
         await GuiThaoTac(async () => await Http.PostAsJsonAsync(
             "api/don-hang/" + _donDangChon.MaDonHang + "/huy", new HuyDonRequest { LyDo = _lyDoHuy }));
-        _lyDoHuy = "";
+        if (_loiThaoTac == null) { _lyDoHuy = ""; _moHuy = false; }
     }
 
     // 4 nút trên đều làm giống nhau: gọi API → lỗi thì hiện câu báo, xong thì tải lại bảng và panel
     private async Task GuiThaoTac(Func<Task<HttpResponseMessage>> goiApi)
     {
+        if (_dangGui || _donDangChon == null) return;
         _loiThaoTac = null;
         _dangGui = true;
         int maDon = _donDangChon.MaDonHang;

@@ -46,6 +46,53 @@ public class LapDonTaiQuayWebTests
         return trang;
     }
 
+    private static List<MauDonDto> DocTrangThuVien(LapDonTaiQuay trang)
+    {
+        var thuocTinh = trang.GetType().GetProperty("MauTrenTrang", Rieng);
+        Assert.NotNull(thuocTinh);
+        return ((IEnumerable<MauDonDto>)thuocTinh.GetValue(trang)).ToList();
+    }
+
+    private static List<MauDonDto> TaoDanhSachMau() => Enumerable.Range(1, 19).Select(i =>
+        new MauDonDto("MAU_" + i, "Mẫu đơn " + i, "Bản trống") {
+            Nhom = i <= 2 ? "Việc làm" : "Học vụ", Nguon = "Nguồn " + i, SoTrang = 1
+        }).ToList();
+
+    [Fact]
+    public void ThuVienMau_MoiTrangToiDa6Mau_VaKhongMatMauCuoi()
+    {
+        var trang = new LapDonTaiQuay();
+        Gan(trang, "_dsMau", TaoDanhSachMau());
+        Assert.Equal(Enumerable.Range(1, 6).Select(i => "MAU_" + i), DocTrangThuVien(trang).Select(x => x.MaMau));
+        Gan(trang, "_trangThuVienMau", 2);
+        Assert.Equal(Enumerable.Range(7, 6).Select(i => "MAU_" + i), DocTrangThuVien(trang).Select(x => x.MaMau));
+        Gan(trang, "_trangThuVienMau", 4);
+        Assert.Equal("MAU_19", Assert.Single(DocTrangThuVien(trang)).MaMau);
+        Gan(trang, "_trangThuVienMau", 99);
+        Assert.Equal("MAU_19", Assert.Single(DocTrangThuVien(trang)).MaMau);
+    }
+
+    [Fact]
+    public void ThuVienMau_DoiBoLocVeTrangDau_KhongLamMatFileDaChon()
+    {
+        var trang = new LapDonTaiQuay();
+        Gan(trang, "_dsMau", TaoDanhSachMau());
+        Gan(trang, "_dsFile", new List<FileInDto> { new() { MaFileIn = 12, SoTrang = 2 } });
+        Assert.Equal(6, DocTrangThuVien(trang).Count);
+        Gan(trang, "_trangThuVienMau", 3);
+        Gan(trang, "_nhomMau", "Việc làm");
+        trang.GetType().GetMethod("VeTrangDauMau", Rieng).Invoke(trang, null);
+        Assert.Equal(1, Doc<int>(trang, "_trangThuVienMau"));
+        Assert.Equal(2, DocTrangThuVien(trang).Count);
+        Gan(trang, "_timMau", "khong-co");
+        Assert.Empty(DocTrangThuVien(trang));
+        trang.GetType().GetMethod("XoaLocMau", Rieng).Invoke(trang, null);
+        Assert.Equal(6, DocTrangThuVien(trang).Count);
+        Assert.Equal("", Doc<string>(trang, "_timMau"));
+        Assert.Equal("", Doc<string>(trang, "_nhomMau"));
+        Assert.Equal(12, Assert.Single(Doc<List<FileInDto>>(trang, "_dsFile")).MaFileIn);
+    }
+
     [Fact]
     public async Task AnhThe_ChiChonDichVuCungKichThuoc_VaBaoGiaMotBanPdf()
     {
@@ -179,6 +226,13 @@ public class LapDonTaiQuayWebTests
             string markup = System.Text.RegularExpressions.Regex.Replace(ketQua.ToHtmlString(), @" b-[a-z0-9]{10}(="""")?", "");
             return WebUtility.HtmlDecode(markup);
         });
+        int dauPopup = html.IndexOf("<dialog", StringComparison.Ordinal);
+        Assert.True(dauPopup > 0);
+        string noiDungTrang = html[..dauPopup];
+        Assert.Contains("1. Khách hàng", noiDungTrang);
+        Assert.Contains("2. Tài liệu", noiDungTrang);
+        Assert.Contains("3. Quy cách và báo giá", noiDungTrang);
+        Assert.DoesNotContain("Tạm đóng · giữ nội dung", html);
         if (coGio)
         {
             Assert.Contains("15:30 12/10/2026", html);

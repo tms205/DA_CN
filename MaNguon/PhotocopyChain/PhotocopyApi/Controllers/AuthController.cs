@@ -101,7 +101,8 @@ public partial class AuthController : ControllerBase
         string loi = QuyTacDangNhap.KiemTraQuyen(nd.VaiTro, nd.TrangThai, laWeb);
         if (loi != null) return StatusCode(403, new { message = loi });
 
-        // 5. Nhân viên đăng nhập Web được tự mở ca với tiền đầu ca mặc định 200.000đ.
+        // 5. Nhân viên và quản lý chi nhánh đăng nhập Web tự mở ca riêng 200.000đ.
+        // CEO chỉ mở ca thủ công trên Web sau khi chọn chi nhánh.
         // sp_MoCa trả lại ca hiện có nếu nhân viên đăng nhập lại, nên không tạo trùng.
         if (QuyTacCaDangNhap.CanTuDongMoCa(laWeb, nd.VaiTro))
         {
@@ -117,7 +118,7 @@ public partial class AuthController : ControllerBase
             }
             catch (SqlException ex)
             {
-                _logger.LogWarning(ex, "Không thể tự mở ca khi nhân viên {MaNhanVien} đăng nhập.", nd.MaNguoiDung);
+                _logger.LogWarning(ex, "Không thể tự mở ca khi nhân sự {MaNhanVien} đăng nhập.", nd.MaNguoiDung);
                 return Conflict(new { message = "Không thể tự mở ca làm việc: " + ex.Message });
             }
         }

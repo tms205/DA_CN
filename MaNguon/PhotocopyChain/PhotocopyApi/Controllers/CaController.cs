@@ -14,7 +14,8 @@ namespace PhotocopyApi.Controllers;
 
 // F-24B: ca làm việc và két tiền.
 // Tiệm chạy 3 ca liền, mỗi ca 4 tiếng (09:00–13:00, 13:00–17:00, 17:00–21:00) nhưng hệ thống KHÔNG ép giờ:
-// STAFF đăng nhập tự mở ca riêng 200.000đ; quản lý có thể mở ca thủ công. Hết ca thì kiểm đếm và đóng ca.
+// STAFF/BRANCH_ADMIN đăng nhập tự mở ca riêng 200.000đ; CEO chọn chi nhánh rồi mở ca thủ công trên Web.
+// Hết ca thì kiểm đếm và đóng ca; không tự đóng khi chuyển phạm vi chi nhánh.
 // Phải có ca đang mở thì nhân viên mới được tiếp nhận, xử lý đơn và thu COD của khách.
 // Quản lý xác nhận ca (sp_XacNhanCa, xử lý lệch két) làm ở Tuần 3.
 [ApiController]

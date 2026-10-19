@@ -10,7 +10,7 @@
 <TieuDeTrang TieuDe="Chi nhánh & máy in" MoTa="Quản lý mạng lưới chi nhánh, thiết bị in ấn và vùng phục vụ toàn hệ thống" />
 
 <div class="than-trang khoi-doc">
-    @if (_loi != null)
+    @if (_loi != null && _suaChiNhanh == null && _themMay == null && _suaChiSo == null)
     {
         <div class="o-loi">
             @((MarkupString)Svg.ChamThan())
@@ -33,13 +33,9 @@
         </div>
     }
     <button class="nut-phu" @onclick="TaiAsync" disabled="@_dangLuu">Làm mới danh sách</button>
-    @if (_suaChiNhanh != null)
-    {
-        <form @onsubmit="LuuChiNhanhAsync" @onsubmit:preventDefault class="the the-rong">
-            <div class="ca-dau">
-                <h2 class="the-tieu-de nho">@(_suaChiNhanh.MaChiNhanh == 0 ? "Thêm chi nhánh mới" : "Sửa chi nhánh: " + _suaChiNhanh.TenChiNhanh)</h2>
-                <button type="button" class="nut-dong" title="Đóng" @onclick="() => _suaChiNhanh = null">✕</button>
-            </div>
+    <HopThoaiQuanTri Mo="@(_suaChiNhanh != null)" TieuDe="@(_suaChiNhanh?.MaChiNhanh == 0 ? "Thêm chi nhánh mới" : "Sửa chi nhánh")" Loi="@_loi" DangLuu="@_dangLuu" Dong="DongChiNhanh" Rong="true">
+        <NoiDung>
+        <form id="qt-form-chi-nhanh" @onsubmit="LuuChiNhanhAsync" @onsubmit:preventDefault>
             <div class="ca-loc-luoi">
                 <div class="truong">
                     <label class="nhan" for="qt-truong-1">Tên chi nhánh</label>
@@ -73,17 +69,14 @@
                     <input id="cn-dia-chi" required maxlength="255" @bind="_suaChiNhanh.DiaChi" />
                 </div>
             </div>
-            <div class="xac-nhan-o" style="margin-top: 16px;">
-                <button type="submit" class="nut-chinh" disabled="@_dangLuu">@(_dangLuu ? "Đang lưu…" : "Lưu chi nhánh")</button>
-                <button type="button" class="nut-phu" @onclick="() => _suaChiNhanh = null">Hủy</button>
-            </div>
         </form>
-    }
+        </NoiDung>
+        <Chan><button type="button" class="nut-phu" disabled="@_dangLuu" @onclick="DongChiNhanh">Hủy</button><button type="submit" form="qt-form-chi-nhanh" class="nut-chinh" disabled="@_dangLuu">@(_dangLuu ? "Đang lưu…" : "Lưu chi nhánh")</button></Chan>
+    </HopThoaiQuanTri>
 
-    @if (_themMay != null)
-    {
-        <form class="the the-rong" @onsubmit="LuuMayMoiAsync" @onsubmit:preventDefault>
-            <div class="ca-dau"><h2 class="the-tieu-de nho">Thêm máy in mới</h2><button type="button" class="nut-dong" aria-label="Hủy thêm máy in" @onclick="() => _themMay = null">×</button></div>
+    <HopThoaiQuanTri Mo="@(_themMay != null)" TieuDe="Thêm máy in mới" Loi="@_loi" DangLuu="@_dangLuu" Dong="DongMayMoi" Rong="true">
+        <NoiDung>
+        <form id="qt-form-may" @onsubmit="LuuMayMoiAsync" @onsubmit:preventDefault>
             <div class="ca-loc-luoi">
                 <div class="truong"><label class="nhan" for="may-chi-nhanh">Chi nhánh quản lý</label><select id="may-chi-nhanh" class="ca-o-loc" required @bind="_themMay.MaChiNhanh" disabled="@(PhamVi.MaChiNhanh != null)"><option value="0">Chọn chi nhánh</option>@foreach (var cn in _chiNhanh ?? new()) { <option value="@cn.MaChiNhanh">@cn.TenChiNhanh</option> }</select></div>
                 <div class="truong"><label class="nhan" for="may-ten">Tên máy / model</label><input id="may-ten" class="ca-o-loc" maxlength="100" required @bind="_themMay.TenMay" /></div>
@@ -95,9 +88,15 @@
                 <label class="ca-chon"><input type="checkbox" @bind="_themMay.In2Mat" /> Hỗ trợ in hai mặt</label>
             </div>
             <p class="nv-phu">Đăng ký danh mục không tự kết nối thiết bị vật lý. Máy chỉ nhận job sau khi gateway/máy in ảo gửi heartbeat; thông số nên khớp model thực tế.</p>
-            <div class="xac-nhan-o"><button class="nut-chinh" disabled="@_dangLuu">@(_dangLuu ? "Đang lưu…" : "Lưu máy in")</button><button type="button" class="nut-phu" disabled="@_dangLuu" @onclick="() => _themMay = null">Hủy</button></div>
         </form>
-    }
+        </NoiDung>
+        <Chan><button type="button" class="nut-phu" disabled="@_dangLuu" @onclick="DongMayMoi">Hủy</button><button type="submit" form="qt-form-may" class="nut-chinh" disabled="@_dangLuu">@(_dangLuu ? "Đang lưu…" : "Lưu máy in")</button></Chan>
+    </HopThoaiQuanTri>
+    <HopThoaiQuanTri Mo="@(_suaChiSo != null)" TieuDe="Sửa chỉ số trang in" MoTa="Nhập số counter trên thiết bị. Không thay đổi thông số in của các đơn cũ." Loi="@_loi" DangLuu="@_dangLuu" Dong="DongChiSo">
+        <NoiDung><form id="qt-form-counter" @onsubmit="LuuChiSoAsync" @onsubmit:preventDefault><p><b>@_suaChiSo?.TenMay</b></p><label class="nhan" for="qt-counter">Chỉ số trang in</label><input id="qt-counter" required class="ca-o-loc mono" type="number" min="0" max="2147483647" step="1" @bind="_chiSoMoi" /></form></NoiDung>
+        <Chan><button type="button" class="nut-phu" disabled="@_dangLuu" @onclick="DongChiSo">Hủy</button><button type="submit" form="qt-form-counter" class="nut-chinh" disabled="@_dangLuu">Lưu chỉ số</button></Chan>
+    </HopThoaiQuanTri>
+    <XacNhanThaoTac @ref="_xacNhan" />
 
     <div class="the the-bang">
         <div class="bang-tieu-de">
@@ -193,10 +192,8 @@
                                     <span class="mono"><b>@m.TocDo</b> trang/phút</span>
                                 </td>
                                 <td data-nhan="Chỉ số trang in">
-                                    <form style="display: flex; align-items: center; gap: 8px;" @onsubmit="() => LuuChiSoMayAsync(m)" @onsubmit:preventDefault>
-                                        <input max="2147483647" required step="1" class="ca-o-loc mono" style="width: 120px; height: 38px;" type="number" min="0" @bind="m.SoTrangDaIn" />
-                                        <button type="submit" class="nut-nho" title="Lưu số counter hiện tại">Lưu số</button>
-                                    </form>
+                                    <b class="mono">@m.SoTrangDaIn</b>
+                                    <button type="button" class="nut-nho" disabled="@_dangLuu" @onclick="() => MoChiSo(m)">Sửa chỉ số</button>
                                 </td>
                                 <td data-nhan="Trạng thái máy">
                                     <span class="nhan-mau @MauMay(m.TrangThai)">@m.TrangThai</span>
@@ -229,10 +226,24 @@
     private ChiNhanhQuanTriDto _suaChiNhanh;
     private TaoMayInRequest _themMay;
     private bool _dangLuu;
+    private MayInQuanTriDto _suaChiSo;
+    private int _chiSoMoi;
+    private XacNhanThaoTac _xacNhan;
+    private void DongChiNhanh() { if (!_dangLuu) { _suaChiNhanh = null; _loi = null; } }
+    private void DongMayMoi() { if (!_dangLuu) { _themMay = null; _loi = null; } }
+    private void DongChiSo() { if (!_dangLuu) { _suaChiSo = null; _loi = null; } }
+    private void MoChiSo(MayInQuanTriDto may) { if (_dangLuu) return; _suaChiSo = may; _chiSoMoi = may.SoTrangDaIn; _loi = _thongBao = null; }
+    private async Task LuuChiSoAsync()
+    {
+        if (_dangLuu || _suaChiSo == null) return;
+        // Không sửa trực tiếp dòng trong bảng trước khi API lưu thành công.
+        await DoiMayAsync(_suaChiSo, _suaChiSo.TrangThai, _chiSoMoi);
+        if (_loi == null) _suaChiSo = null;
+    }
     private TimeOnly GioMo { get => TimeOnly.FromTimeSpan(_suaChiNhanh.GioMoCua); set => _suaChiNhanh.GioMoCua = value.ToTimeSpan(); }
     private TimeOnly GioDong { get => TimeOnly.FromTimeSpan(_suaChiNhanh.GioDongCua); set => _suaChiNhanh.GioDongCua = value.ToTimeSpan(); }
-    private void ThemChiNhanh() { _loi = _thongBao = null; _themMay = null; _suaChiNhanh = new() { GioMoCua = TimeSpan.FromHours(9), GioDongCua = TimeSpan.FromHours(21), BanKinhGiao = 10, TrangThai = "HOAT_DONG" }; }
-    private void ThemMayIn() { _loi = _thongBao = null; _suaChiNhanh = null; _themMay = new() { MaChiNhanh = PhamVi.MaChiNhanh ?? 0 }; }
+    private void ThemChiNhanh() { if (_dangLuu || !LaSuper()) return; _loi = _thongBao = null; _themMay = null; _suaChiNhanh = new() { GioMoCua = TimeSpan.FromHours(9), GioDongCua = TimeSpan.FromHours(21), BanKinhGiao = 10, TrangThai = "HOAT_DONG" }; }
+    private void ThemMayIn() { if (_dangLuu || !LaSuper()) return; _loi = _thongBao = null; _suaChiNhanh = null; _themMay = new() { MaChiNhanh = PhamVi.MaChiNhanh ?? 0 }; }
     private string _loi;
     private string _thongBao;
 
@@ -261,6 +272,7 @@
 
     private void ChonChiNhanh(ChiNhanhQuanTriDto c)
     {
+        if (_dangLuu || !LaSuper()) return;
         _themMay = null;
         _loi = _thongBao = null;
         _suaChiNhanh = new()
@@ -325,32 +337,27 @@
         finally { _dangLuu = false; }
     }
 
-    private async Task DoiMayAsync(MayInQuanTriDto m, string tt)
+    private async Task DoiMayAsync(MayInQuanTriDto m, string tt, int? chiSo = null)
     {
-        _loi = QuyTacNhap.LayLoi(new CapNhatMayInRequest { TrangThai = tt, SoTrangDaIn = m.SoTrangDaIn });
+        if (_dangLuu) return;
+        var req = new CapNhatMayInRequest { TrangThai = tt, SoTrangDaIn = chiSo ?? m.SoTrangDaIn };
+        _loi = QuyTacNhap.LayLoi(req);
         if (_loi != null) return;
-        var r = await Http.PutAsJsonAsync(
-            "api/quan-tri/may-in/" + m.MaMayIn,
-            new CapNhatMayInRequest
-            {
-                TrangThai = tt,
-                SoTrangDaIn = m.SoTrangDaIn
-            });
-
-        if (r.IsSuccessStatusCode)
+        _dangLuu = true; _thongBao = null;
+        try
+        {
+            using var r = await Http.PutAsJsonAsync("api/quan-tri/may-in/" + m.MaMayIn, req);
+            if (!r.IsSuccessStatusCode) { _loi = await DocLoiApi.TuPhanHoiAsync(r, "Không cập nhật được máy in."); return; }
+            _thongBao = "Đã cập nhật máy in.";
             await TaiAsync();
-        else
-            _loi = (await r.Content.ReadFromJsonAsync<ApiError>()).Message;
-    }
-
-    private async Task LuuChiSoMayAsync(MayInQuanTriDto m)
-    {
-        await DoiMayAsync(m, m.TrangThai);
-        _thongBao = _loi == null ? "Đã lưu chỉ số trang của máy in." : null;
+        }
+        catch (HttpRequestException) { _loi = "Mất kết nối API. Làm mới danh sách để kiểm tra kết quả."; }
+        finally { _dangLuu = false; }
     }
 
     private async Task DoiTrangThaiMayAsync(MayInQuanTriDto m)
     {
+        if (_dangLuu || !await _xacNhan.HoiAsync("Đổi trạng thái máy “" + m.TenMay + "”? Máy bảo trì sẽ không nhận việc in mới.", "Trạng thái máy in", m.TrangThai == "HOAT_DONG" ? "Bảo trì" : "Mở lại")) return;
         await DoiMayAsync(m, m.TrangThai == "HOAT_DONG" ? "BAO_TRI" : "HOAT_DONG");
     }
 

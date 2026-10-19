@@ -8,6 +8,7 @@
 <TieuDeTrang TieuDe="Phê duyệt" MoTa="Kiểm tra và phê duyệt phiếu nhập vật tư và xác nhận hoàn tiền các đơn đã hủy" />
 
 <div class="than-trang khoi-doc">
+    @if (_dangGui) { <p role="status">Đang xử lý xác nhận, vui lòng chờ…</p> }
     @if (_loi != null)
     {
         <div class="o-loi">
@@ -64,15 +65,15 @@
                                     <b>@p.TenVatTu</b>
                                     <div class="nv-phu">NCC: @p.NhaCungCap · Đơn giá @Tien(p.DonGia)</div>
                                 </td>
-                                <td class="mono" data-nhan="Số lượng"><b>@p.SoLuong</b></td>
+                                <td class="mono" data-nhan="Số lượng"><b>@p.SoLuong</b> @p.DonViTinh</td>
                                 <td class="mono hd-tong" data-nhan="Thành tiền">@Tien(p.SoLuong * p.DonGia)</td>
                                 <td data-nhan="Người đề xuất">
                                     <div class="nv-ten">@p.TenNguoiLap</div>
                                 </td>
                                 <td class="cot-hanh-dong" data-nhan="Thao tác">
                                     <div style="display: flex; gap: 8px;">
-                                        <button class="nut-nho chinh" title="Duyệt phiếu nhập" @onclick="() => DuyetAsync(p, true)">Duyệt</button>
-                                        <button class="nut-nho nguy-hiem" title="Từ chối phiếu nhập" @onclick="() => DuyetAsync(p, false)">Từ chối</button>
+                                        <button class="nut-nho chinh" disabled="@_dangGui" title="Duyệt phiếu nhập" @onclick="() => DuyetAsync(p, true)">Duyệt</button>
+                                        <button class="nut-nho nguy-hiem" disabled="@_dangGui" title="Từ chối phiếu nhập" @onclick="() => DuyetAsync(p, false)">Từ chối</button>
                                     </div>
                                 </td>
                             </tr>
@@ -128,7 +129,7 @@
                                     <span class="chu-mo">@(string.IsNullOrEmpty(d.GhiChu) ? "Hủy đơn" : d.GhiChu)</span>
                                 </td>
                                 <td class="cot-hanh-dong" data-nhan="Thao tác">
-                                    <button class="nut-nho chinh" title="Xác nhận đã chuyển khoản hoàn tiền" @onclick="() => HoanTienAsync(d)">Đã chuyển hoàn</button>
+                                    <button class="nut-nho chinh" disabled="@_dangGui" title="Xác nhận đã chuyển khoản hoàn tiền" @onclick="() => HoanTienAsync(d)">Đã chuyển hoàn</button>
                                 </td>
                             </tr>
                         }
@@ -139,11 +140,38 @@
     </div>
 </div>
 
+<XacNhanThaoTac @ref="_xacNhan" />
 @code{
+    private XacNhanThaoTac _xacNhan;
+    private bool _dangGui;
     private List<PhieuNhapDto> _phieu; private List<HoanTienChoDuyetDto> _hoanTien; private string _loi; private string _thongBao;
     protected override async Task OnInitializedAsync()=>await TaiAsync();
     private async Task TaiAsync(){try{_phieu=await Http.GetFromJsonAsync<List<PhieuNhapDto>>("api/quan-tri/phieu-nhap")??new();_hoanTien=await Http.GetFromJsonAsync<List<HoanTienChoDuyetDto>>("api/quan-tri/hoan-tien")??new();ThongBao.CapNhat(_phieu.Count(x=>x.TrangThai=="CHO_DUYET")+_hoanTien.Count);}catch{_loi="Không tải được danh sách phê duyệt.";_phieu=new();_hoanTien=new();ThongBao.CapNhat(null);}}
-    private async Task DuyetAsync(PhieuNhapDto p,bool dongY){var r=await Http.PostAsJsonAsync($"api/quan-tri/phieu-nhap/{p.MaPhieuNhap}/duyet",new DuyetPhieuNhapRequest{DongY=dongY});if(r.IsSuccessStatusCode){_thongBao=dongY?"Đã duyệt phiếu nhập.":"Đã từ chối phiếu nhập.";await TaiAsync();}else _loi=(await r.Content.ReadFromJsonAsync<ApiError>()).Message;}
-    private async Task HoanTienAsync(HoanTienChoDuyetDto d){var r=await Http.PostAsync($"api/don-hang/{d.MaDonHang}/hoan-tien",null);if(r.IsSuccessStatusCode){_thongBao="Đã xác nhận hoàn tiền "+d.MaDonHangHienThi+".";await TaiAsync();}else _loi=(await r.Content.ReadFromJsonAsync<ApiError>()).Message;}
+    private async Task DuyetAsync(PhieuNhapDto p, bool dongY)
+    {
+        if (_dangGui || !await _xacNhan.HoiAsync($"{(dongY ? "Duyệt" : "Từ chối")} phiếu PN{p.MaPhieuNhap:0000} · {p.TenChiNhanh}\n{p.SoLuong} {p.TenVatTu} · {Tien(p.SoLuong * p.DonGia)}\nDuyệt phiếu chưa làm tăng tồn kho; cần bước nhận hàng.", "Phê duyệt phiếu nhập", dongY ? "Duyệt phiếu" : "Từ chối", !dongY)) return;
+        _dangGui = true; _loi = _thongBao = null;
+        try
+        {
+            using var r = await Http.PostAsJsonAsync($"api/quan-tri/phieu-nhap/{p.MaPhieuNhap}/duyet", new DuyetPhieuNhapRequest { DongY = dongY });
+            if (r.IsSuccessStatusCode) { _thongBao = dongY ? "Đã duyệt phiếu nhập." : "Đã từ chối phiếu nhập."; await TaiAsync(); }
+            else _loi = await DocLoiApi.TuPhanHoiAsync(r, "Không cập nhật được phiếu nhập.");
+        }
+        catch (HttpRequestException) { _loi = "Mất kết nối API. Làm mới trang để kiểm tra kết quả."; }
+        finally { _dangGui = false; }
+    }
+    private async Task HoanTienAsync(HoanTienChoDuyetDto d)
+    {
+        if (_dangGui || !await _xacNhan.HoiAsync($"Xác nhận đã chuyển hoàn {Tien(d.SoTien)} cho đơn {d.MaDonHangHienThi} của {d.TenKhachHang}? Chỉ xác nhận sau khi thực sự chuyển tiền; thao tác này không tự chuyển khoản.", "Xác nhận hoàn tiền", "Đã chuyển hoàn", true)) return;
+        _dangGui = true; _loi = _thongBao = null;
+        try
+        {
+            using var r = await Http.PostAsync($"api/don-hang/{d.MaDonHang}/hoan-tien", null);
+            if (r.IsSuccessStatusCode) { _thongBao = "Đã xác nhận hoàn tiền " + d.MaDonHangHienThi + "."; await TaiAsync(); }
+            else _loi = await DocLoiApi.TuPhanHoiAsync(r, "Không xác nhận được hoàn tiền.");
+        }
+        catch (HttpRequestException) { _loi = "Mất kết nối API. Làm mới trang để kiểm tra kết quả."; }
+        finally { _dangGui = false; }
+    }
     private static readonly System.Globalization.NumberFormatInfo KieuSo=new(){NumberGroupSeparator=".",NumberDecimalSeparator=","};private string Tien(decimal s)=>s.ToString("#,##0",KieuSo)+"₫";
 }

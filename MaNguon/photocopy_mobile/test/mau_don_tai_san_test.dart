@@ -30,6 +30,39 @@ void main() {
     )..addFont(Future.value(ByteData.sublistView(font)))).load();
   });
   setUp(() => AppTheme.dungGoogleFonts = false);
+  testWidgets('Làm mới nhận mẫu mới và bỏ nhóm lọc đã bị gỡ', (tester) async {
+    int lanTai = 0;
+    await http.runWithClient(() async {
+      await tester.pumpWidget(const MaterialApp(home: ChonFileScreen()));
+      await tester.tap(find.byType(DropdownButtonFormField<String>).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('In mẫu đơn trống').last);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Nhóm mẫu'));
+      await tester.tap(find.byType(DropdownButtonFormField<String>).last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Nhóm cũ').last);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Làm mới thư viện mẫu'));
+      await tester.tap(find.text('Làm mới thư viện mẫu'));
+      await tester.pumpAndSettle();
+      expect(lanTai, 2);
+      expect(find.text('Mẫu mới'), findsOneWidget);
+      expect(find.text('Mẫu cũ'), findsNothing);
+      expect(find.text('Tất cả'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    }, () => MockClient((request) async {
+      expect(request.method, 'GET');
+      expect(request.url.path, '/api/file-in/mau');
+      lanTai++;
+      return http.Response(jsonEncode([{
+        'maMau': 'MAU_QA', 'tenMau': lanTai == 1 ? 'Mẫu cũ' : 'Mẫu mới',
+        'nhom': lanTai == 1 ? 'Nhóm cũ' : 'Nhóm mới', 'soTrang': 1,
+        'nguon': 'Cửa hàng', 'phienBan': lanTai,
+      }]), 200, headers: {'content-type': 'application/json; charset=utf-8'});
+    }));
+  });
   test(
     'Ảnh xem trước dùng bearer header và chặn dữ liệu không phải PNG',
     () async {
@@ -88,6 +121,7 @@ void main() {
             await tester.tap(find.text('In mẫu đơn trống').last);
             await tester.pumpAndSettle();
             await tester.ensureVisible(find.text('Đơn xin việc'));
+            expect(find.text('Làm mới thư viện mẫu'), findsOneWidget);
             await tester.tap(find.text('Đơn xin việc'));
             await tester.pumpAndSettle();
             expect(post, 0);
@@ -128,6 +162,7 @@ void main() {
           () => MockClient((request) async {
             if (request.method == 'POST') {
               expect(request.url.path, '/api/file-in/mau/DON_XIN_VIEC');
+              expect(request.url.queryParameters['phienBan'], '17');
               post++;
               return http.Response(
                 jsonEncode({'message': 'Kiểm thử không tạo file thật.'}),
@@ -140,6 +175,7 @@ void main() {
                 jsonEncode([
                   {
                     'maMau': 'DON_XIN_VIEC',
+                    'phienBan': 17,
                     'tenMau': 'Đơn xin việc',
                     'moTa': 'Bản trống',
                     'soTrang': 2,
@@ -153,6 +189,7 @@ void main() {
               );
             }
             if (request.url.path.contains('/trang/')) {
+              expect(request.url.queryParameters['phienBan'], '17');
               pages.add(int.parse(request.url.pathSegments.last));
               if (imageError) {
                 return http.Response(

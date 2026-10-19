@@ -1,0 +1,16 @@
+#mk-form .o-nut-mat {
+    min-width: 44px;
+    min-height: 44px;
+    flex-shrink: 0;
+}
+
+#mk-form .o-nut-mat:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+/* Khung o-nhap đã có viền focus; tránh vẽ thêm viền bên trong ô. */
+.o-nhap ::deep input:focus {
+    outline: none;
+    box-shadow: none;
+}

@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using PhotocopyShared.Constants;
 using PhotocopyShared.Dtos;
+using PhotocopyShared.Dtos.Auth;
 using PhotocopyShared.Dtos.Tuan3;
 
 namespace PhotocopyApi.Controllers;
@@ -51,6 +52,8 @@ public partial class QuanTriController : ControllerBase
         int? maChiNhanh = LayChiNhanhTuToken();
         string loi = QuyTacQuanTriChiNhanh.KiemTraDichVu(req, 1);
         if (loi != null) return BadRequest(new { message = loi });
+        if (req.LoaiDichVu == "IN_AN" && req.KichThuocAnh == null && req.MaVatTu == null)
+            return BadRequest(new { message = "Hãy chọn giấy trong kho để thêm dịch vụ in mới." });
 
         using var conn = new SqlConnection(_chuoiKetNoi);
         await conn.OpenAsync();
@@ -253,6 +256,42 @@ public partial class QuanTriController : ControllerBase
         return Ok(new KetQuaDto { Message = "Đã cập nhật tài khoản khách hàng." });
     }
 
+    [HttpPut("khach-hang/{maKhachHang}")]
+    [Authorize(Roles = "SUPER_ADMIN")]
+    public async Task<IActionResult> CapNhatHoSoKhachHang([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maKhachHang, CapNhatHoSoRequest req)
+    {
+        using var conn = new SqlConnection(_chuoiKetNoi);
+        await conn.OpenAsync();
+        await using var giaoDich = await conn.BeginTransactionAsync();
+        int? maChiNhanh = LayChiNhanhTuToken();
+        if (maChiNhanh != null)
+        {
+            bool thuocPhamVi = await conn.ExecuteScalarAsync<bool>(
+                @"SELECT CAST(CASE WHEN EXISTS (SELECT 1 FROM DonHang
+                  WHERE MaKhachHang=@MaKhachHang AND MaChiNhanh=@MaChiNhanh) THEN 1 ELSE 0 END AS BIT)",
+                new { MaKhachHang = maKhachHang, MaChiNhanh = maChiNhanh }, giaoDich);
+            if (!thuocPhamVi) return StatusCode(403, new { message = "Khách hàng không thuộc phạm vi chi nhánh đang chọn." });
+        }
+        bool tonTai = await conn.ExecuteScalarAsync<bool>(
+            "SELECT CAST(CASE WHEN EXISTS (SELECT 1 FROM NguoiDung WITH (UPDLOCK,HOLDLOCK) WHERE MaNguoiDung=@MaKhachHang AND VaiTro='CUSTOMER') THEN 1 ELSE 0 END AS BIT)",
+            new { MaKhachHang = maKhachHang }, giaoDich);
+        if (!tonTai) return NotFound(new { message = "Không tìm thấy khách hàng." });
+        string soDienThoai = string.IsNullOrWhiteSpace(req.SoDienThoai) ? null : req.SoDienThoai.Trim();
+        if (soDienThoai != null)
+        {
+            int trung = await conn.ExecuteScalarAsync<int>(
+                "SELECT COUNT(*) FROM NguoiDung WITH (UPDLOCK,HOLDLOCK) WHERE SoDienThoai=@SoDienThoai AND MaNguoiDung<>@MaKhachHang",
+                new { SoDienThoai = soDienThoai, MaKhachHang = maKhachHang }, giaoDich);
+            if (trung > 0) return BadRequest(new { message = "Số điện thoại này đã được tài khoản khác sử dụng." });
+        }
+        await conn.ExecuteAsync(
+            "UPDATE NguoiDung SET HoTen=@HoTen,SoDienThoai=@SoDienThoai,DiaChi=@DiaChi WHERE MaNguoiDung=@MaKhachHang AND VaiTro='CUSTOMER'",
+            new { HoTen = req.HoTen.Trim(), SoDienThoai = soDienThoai,
+                DiaChi = string.IsNullOrWhiteSpace(req.DiaChiMacDinh) ? null : req.DiaChiMacDinh.Trim(), MaKhachHang = maKhachHang }, giaoDich);
+        await giaoDich.CommitAsync();
+        return Ok(new KetQuaDto { Message = "Đã cập nhật thông tin khách hàng." });
+    }
+
     [HttpGet("khuyen-mai")]
     [Authorize(Roles = "SUPER_ADMIN")]
     public async Task<IActionResult> DanhSachKhuyenMai()
@@ -337,7 +376,11 @@ public partial class QuanTriController : ControllerBase
         var ds = await conn.QueryAsync<TonKhoDto>(
             @"SELECT tk.MaChiNhanh, cn.TenChiNhanh, tk.MaVatTu, vt.TenVatTu, vt.DonViTinh,
                      tk.SoLuong, tk.MucToiThieu, vt.DonGia,
-                     CAST(CASE WHEN tk.SoLuong <= tk.MucToiThieu THEN 1 ELSE 0 END AS BIT) AS CanhBao
+                     CAST(CASE WHEN tk.SoLuong <= tk.MucToiThieu THEN 1 ELSE 0 END AS BIT) AS CanhBao,
+                     CAST(CASE WHEN EXISTS (SELECT 1 FROM TonKho k WHERE k.MaVatTu=vt.MaVatTu AND k.SoLuong<>0)
+                         OR EXISTS (SELECT 1 FROM PhieuNhap p WHERE p.MaVatTu=vt.MaVatTu)
+                         OR EXISTS (SELECT 1 FROM DichVu d WHERE d.MaVatTu=vt.MaVatTu)
+                         THEN 0 ELSE 1 END AS BIT) AS DuocDoiDonVi
               FROM TonKho tk JOIN ChiNhanh cn ON cn.MaChiNhanh=tk.MaChiNhanh
               JOIN VatTu vt ON vt.MaVatTu=tk.MaVatTu
               WHERE @MaChiNhanh IS NULL OR tk.MaChiNhanh=@MaChiNhanh
@@ -352,7 +395,7 @@ public partial class QuanTriController : ControllerBase
         int? maChiNhanh = LayChiNhanhTuToken();
         using var conn = new SqlConnection(_chuoiKetNoi);
         var ds = await conn.QueryAsync<PhieuNhapDto>(
-            @"SELECT pn.MaPhieuNhap, pn.MaChiNhanh, cn.TenChiNhanh, pn.MaVatTu, vt.TenVatTu,
+            @"SELECT pn.MaPhieuNhap, pn.MaChiNhanh, cn.TenChiNhanh, pn.MaVatTu, vt.TenVatTu, vt.DonViTinh,
                      pn.NhaCungCap, pn.SoLuong, pn.DonGia, lap.HoTen AS TenNguoiLap,
                      duyet.HoTen AS TenNguoiDuyet, pn.TrangThai, pn.NgayLap
               FROM PhieuNhap pn JOIN ChiNhanh cn ON cn.MaChiNhanh=pn.MaChiNhanh
@@ -544,9 +587,11 @@ public partial class QuanTriController : ControllerBase
         }
         if (req.MaVatTu != null)
         {
-            bool tonTai = await conn.ExecuteScalarAsync<bool>(
-                "SELECT CAST(CASE WHEN EXISTS(SELECT 1 FROM VatTu WHERE MaVatTu=@MaVatTu) THEN 1 ELSE 0 END AS BIT)", new { req.MaVatTu }, giaoDich);
-            if (!tonTai) return "Không tìm thấy vật tư tiêu hao đã chọn.";
+            var vatTu = await conn.QuerySingleOrDefaultAsync<VatTuDanhMucDto>(
+                "SELECT MaVatTu,TenVatTu,DonViTinh FROM VatTu WHERE MaVatTu=@MaVatTu", new { req.MaVatTu }, giaoDich);
+            if (vatTu == null) return "Không tìm thấy vật tư tiêu hao đã chọn.";
+            if (req.LoaiDichVu == "IN_AN")
+                return QuyTacQuanTriChiNhanh.KiemTraDonViGiay(vatTu.DonViTinh);
         }
         return null;
     }

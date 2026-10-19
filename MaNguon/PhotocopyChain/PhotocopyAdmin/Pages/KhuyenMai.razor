@@ -8,16 +8,16 @@
 <TieuDeTrang TieuDe="Quản lý khuyến mãi" MoTa="@MoTaPhamVi()" />
 
 <div class="than-trang khoi-doc">
-    @if (_loi != null)
+    @if (_loi != null && !_moForm)
     {
-        <div class="o-loi">
+        <div class="o-loi" role="alert">
             @((MarkupString)Svg.ChamThan())
             <span>@_loi</span>
         </div>
     }
     @if (_thongBao != null)
     {
-        <div class="o-thanh-cong the-rong">
+        <div class="o-thanh-cong the-rong" role="status">
             @((MarkupString)Svg.DauTich(16))
             <span>@_thongBao</span>
         </div>
@@ -35,58 +35,65 @@
     }
     else
     {
-        <form @onsubmit="LuuAsync" @onsubmit:preventDefault class="the the-rong">
-            <h2 class="the-tieu-de nho">@(_dangSua == null ? "Tạo mã khuyến mãi mới" : "Chỉnh sửa khuyến mãi #" + _dangSua.MaKhuyenMai)</h2>
+        <div class="xac-nhan-o">
+            <button type="button" class="nut-chinh" disabled="@(_dangLuu || _dangHoi)" @onclick="ThemMoi">Thêm khuyến mãi</button>
+        </div>
+    }
+
+    <HopThoaiQuanTri Mo="@(_moForm && CoTheSua())" TieuDe="@(_dangSua == null ? "Tạo mã khuyến mãi mới" : "Chỉnh sửa khuyến mãi #" + _dangSua.MaKhuyenMai)"
+                    MoTa="Chương trình chỉ áp dụng tại chi nhánh đang chọn. Kiểm tra thời hạn và số lượng trước khi lưu."
+                    Loi="@_loi" DangLuu="@_dangLuu" Dong="DongForm" Rong="true">
+        <NoiDung>
+        <form id="khuyen-mai-form" @onsubmit="LuuAsync" @onsubmit:preventDefault>
             <div class="ca-loc-luoi">
                 <div class="truong">
-                    <label class="nhan">Mã code ưu đãi</label>
-                    <input required maxlength="30" class="ca-o-loc mono" placeholder="VD: INAN20" @bind="_form.MaCode" />
+                    <label class="nhan" for="km-code">Mã code ưu đãi</label>
+                    <input id="km-code" required maxlength="30" class="ca-o-loc mono" placeholder="VD: INAN20" @bind="_form.MaCode" />
                 </div>
                 <div class="truong">
-                    <label class="nhan">Tên chương trình khuyến mãi</label>
-                    <input maxlength="150" class="ca-o-loc" placeholder="VD: Giảm 20% đầu năm học" @bind="_form.TenKhuyenMai" />
+                    <label class="nhan" for="km-ten">Tên chương trình khuyến mãi</label>
+                    <input id="km-ten" maxlength="150" class="ca-o-loc" placeholder="VD: Giảm 20% đầu năm học" @bind="_form.TenKhuyenMai" />
                 </div>
                 <div class="truong">
-                    <label class="nhan">% giảm giá</label>
-                    <input required step="1" class="ca-o-loc" type="number" min="1" max="100" @bind="_form.PhanTramGiam" />
+                    <label class="nhan" for="km-phan-tram">% giảm giá</label>
+                    <input id="km-phan-tram" required step="1" class="ca-o-loc" type="number" min="1" max="100" @bind="_form.PhanTramGiam" />
                 </div>
                 <div class="truong">
-                    <label class="nhan">Số tiền giảm tối đa (₫)</label>
-                    <input max="999999999999" class="ca-o-loc mono" type="number" min="0" step="1" @bind="_form.GiamToiDa" />
+                    <label class="nhan" for="km-giam-toi-da">Số tiền giảm tối đa (₫)</label>
+                    <input id="km-giam-toi-da" max="999999999999" class="ca-o-loc mono" type="number" min="0" step="1" @bind="_form.GiamToiDa" />
                 </div>
                 <div class="truong">
-                    <label class="nhan">Đơn hàng tối thiểu (₫)</label>
-                    <input max="999999999999" required class="ca-o-loc mono" type="number" min="0" step="1" @bind="_form.DonToiThieu" />
+                    <label class="nhan" for="km-don-toi-thieu">Đơn hàng tối thiểu (₫)</label>
+                    <input id="km-don-toi-thieu" max="999999999999" required class="ca-o-loc mono" type="number" min="0" step="1" @bind="_form.DonToiThieu" />
                 </div>
                 <div class="truong">
-                    <label class="nhan">Số lượng mã phát hành</label>
-                    <input max="2147483647" required step="1" class="ca-o-loc" type="number" min="0" @bind="_form.SoLuong" />
+                    <label class="nhan" for="km-so-luong">Số lượng mã phát hành</label>
+                    <input id="km-so-luong" max="2147483647" required step="1" class="ca-o-loc" type="number" min="0" @bind="_form.SoLuong" />
                 </div>
                 <div class="truong">
-                    <label class="nhan">Ngày bắt đầu</label>
-                    <input required min="1753-01-01" max="9999-12-31" class="ca-o-loc" type="date" @bind="_form.NgayBatDau" />
+                    <label class="nhan" for="km-bat-dau">Ngày bắt đầu</label>
+                    <input id="km-bat-dau" required min="1753-01-01" max="9999-12-31" class="ca-o-loc" type="date" @bind="_form.NgayBatDau" />
                 </div>
                 <div class="truong">
-                    <label class="nhan">Ngày kết thúc</label>
-                    <input required min="1753-01-01" max="9999-12-31" class="ca-o-loc" type="date" @bind="_form.NgayKetThuc" />
+                    <label class="nhan" for="km-ket-thuc">Ngày kết thúc</label>
+                    <input id="km-ket-thuc" required min="1753-01-01" max="9999-12-31" class="ca-o-loc" type="date" @bind="_form.NgayKetThuc" />
                 </div>
                 <div class="truong">
-                    <label class="nhan">Trạng thái áp dụng</label>
-                    <select class="ca-o-loc" @bind="_form.TrangThai">
+                    <label class="nhan" for="km-trang-thai">Trạng thái áp dụng</label>
+                    <select id="km-trang-thai" class="ca-o-loc" @bind="_form.TrangThai">
                         <option value="HOAT_DONG">Đang hoạt động</option>
                         <option value="TAM_DUNG">Tạm dừng áp dụng</option>
                     </select>
                 </div>
             </div>
-            <div class="xac-nhan-o">
-                <button type="submit" class="nut-chinh" style="min-width: 130px;">Lưu khuyến mãi</button>
-                @if (_dangSua != null)
-                {
-                    <button type="button" class="nut-phu" @onclick="BoSua">Hủy chỉnh sửa</button>
-                }
-            </div>
         </form>
-    }
+        </NoiDung>
+        <Chan>
+            <button type="button" class="nut-phu" disabled="@_dangLuu" @onclick="DongForm">Hủy</button>
+            <button type="submit" form="khuyen-mai-form" class="nut-chinh" disabled="@_dangLuu">@(_dangLuu ? "Đang lưu…" : "Lưu khuyến mãi")</button>
+        </Chan>
+    </HopThoaiQuanTri>
+    <XacNhanThaoTac @ref="_xacNhan" />
 
     <div class="the the-bang">
         <div class="bang-tieu-de">
@@ -143,8 +150,8 @@
                                     @if (CoTheSua())
                                     {
                                         <div style="display: flex; gap: 6px;">
-                                            <button class="nut-nho" title="Sửa thông tin mã" @onclick="() => Sua(km)">Sửa</button>
-                                            <button class="nut-nho" title="Bật/Tắt trạng thái hoạt động" @onclick="() => DoiTrangThaiAsync(km)">
+                                            <button class="nut-nho" disabled="@(_dangLuu || _dangHoi)" title="Sửa thông tin mã" @onclick="() => Sua(km)">Sửa</button>
+                                            <button class="nut-nho" disabled="@(_dangLuu || _dangHoi)" title="Bật/Tắt trạng thái hoạt động" @onclick="() => DoiTrangThaiAsync(km)">
                                                 @(km.TrangThai == "HOAT_DONG" ? "Tạm dừng" : "Kích hoạt")
                                             </button>
                                         </div>
@@ -163,6 +170,8 @@
     private List<KhuyenMaiQuanTriDto> _ds;
     private KhuyenMaiQuanTriDto _dangSua;
     private LuuKhuyenMaiRequest _form = Moi();
+    private bool _moForm, _dangLuu, _dangHoi;
+    private XacNhanThaoTac _xacNhan;
     private string _loi;
     private string _thongBao;
 
@@ -185,58 +194,80 @@
 
     private void Sua(KhuyenMaiQuanTriDto km)
     {
+        if (_dangLuu || _dangHoi || !CoTheSua()) return;
+        _loi = _thongBao = null;
         _dangSua = km;
         _form = TaoYeuCau(km, km.TrangThai);
+        _moForm = true;
+    }
+
+    private void ThemMoi()
+    {
+        if (_dangLuu || _dangHoi || !CoTheSua()) return;
+        BoSua(); _thongBao = null; _moForm = true;
     }
 
     private void BoSua()
     {
         _dangSua = null;
         _form = Moi();
+        _moForm = false;
+        _loi = null;
     }
+
+    private void DongForm() { if (!_dangLuu) BoSua(); }
 
     private async Task LuuAsync()
     {
+        if (_dangLuu || !_moForm || !CoTheSua()) return;
         _thongBao = null;
-        _form.MaCode = _form.MaCode.Trim();
+        _form.MaCode = _form.MaCode?.Trim();
         _loi = QuyTacNhap.LayLoi(_form);
         if (_loi != null) return;
 
-        var res = _dangSua == null
-            ? await Http.PostAsJsonAsync("api/quan-tri/khuyen-mai", _form)
-            : await Http.PutAsJsonAsync("api/quan-tri/khuyen-mai/" + _dangSua.MaKhuyenMai, _form);
-
-        if (res.IsSuccessStatusCode)
+        _dangLuu = true;
+        try
         {
+            var res = _dangSua == null
+                ? await Http.PostAsJsonAsync("api/quan-tri/khuyen-mai", _form)
+                : await Http.PutAsJsonAsync("api/quan-tri/khuyen-mai/" + _dangSua.MaKhuyenMai, _form);
+            if (!res.IsSuccessStatusCode) { _loi = await DocLoiApi.TuPhanHoiAsync(res, "Không lưu được khuyến mãi."); return; }
             _thongBao = _dangSua == null ? "Đã thêm khuyến mãi." : "Đã cập nhật khuyến mãi.";
             BoSua();
             await TaiAsync();
         }
-        else
-        {
-            _loi = (await res.Content.ReadFromJsonAsync<ApiError>())?.Message;
-        }
+        catch (HttpRequestException) { _loi = "Không kết nối được API. Kiểm tra danh sách trước khi thử lại để tránh tạo trùng."; }
+        finally { _dangLuu = false; }
     }
 
     private async Task DoiTrangThaiAsync(KhuyenMaiQuanTriDto km)
     {
+        if (_dangLuu || _dangHoi || !CoTheSua()) return;
+        bool tamDung = km.TrangThai == "HOAT_DONG";
+        _dangHoi = true;
+        bool dongY;
+        try
+        {
+            dongY = await _xacNhan.HoiAsync(
+                $"{(tamDung ? "Tạm dừng" : "Kích hoạt")} mã {km.MaCode} tại {km.TenChiNhanh}? " +
+                (tamDung ? "Mã sẽ không còn được áp dụng cho đơn mới." : "Mã sẽ được áp dụng theo thời hạn và điều kiện đã thiết lập."),
+                tamDung ? "Tạm dừng khuyến mãi" : "Kích hoạt khuyến mãi", tamDung ? "Tạm dừng" : "Kích hoạt", tamDung);
+        }
+        finally { _dangHoi = false; }
+        if (!dongY) return;
         _loi = null;
         _thongBao = null;
-        string trangThaiMoi = km.TrangThai == "HOAT_DONG" ? "TAM_DUNG" : "HOAT_DONG";
-
-        var res = await Http.PutAsJsonAsync(
-            "api/quan-tri/khuyen-mai/" + km.MaKhuyenMai,
-            TaoYeuCau(km, trangThaiMoi));
-
-        if (res.IsSuccessStatusCode)
+        _dangLuu = true;
+        try
         {
+            var res = await Http.PutAsJsonAsync("api/quan-tri/khuyen-mai/" + km.MaKhuyenMai,
+                TaoYeuCau(km, tamDung ? "TAM_DUNG" : "HOAT_DONG"));
+            if (!res.IsSuccessStatusCode) { _loi = await DocLoiApi.TuPhanHoiAsync(res, "Không đổi được trạng thái khuyến mãi."); return; }
             _thongBao = "Đã cập nhật trạng thái khuyến mãi.";
             await TaiAsync();
         }
-        else
-        {
-            _loi = (await res.Content.ReadFromJsonAsync<ApiError>())?.Message;
-        }
+        catch (HttpRequestException) { _loi = "Không kết nối được API. Làm mới danh sách để kiểm tra trạng thái khuyến mãi."; }
+        finally { _dangLuu = false; }
     }
 
     private static LuuKhuyenMaiRequest TaoYeuCau(KhuyenMaiQuanTriDto km, string trangThai) => new()

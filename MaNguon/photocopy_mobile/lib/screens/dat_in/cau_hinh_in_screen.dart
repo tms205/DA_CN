@@ -37,11 +37,12 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
   // Dữ liệu tải từ API
   List<DichVu> _bangGia = [];
   List<ChiNhanh> _dsChiNhanh = [];
+  int? _maChiNhanhBangGia;
   bool _dangTaiBangGia = true;
   String? _loiTaiBangGia;
 
   // Lựa chọn của khách
-  String? _giay; // "A4 70gsm"
+  String? _giay; // khóa khổ giấy / loại giấy / mã vật tư
   String _matIn = '2_MAT';
   String _huongGiay = 'DUNG';
   String? _thongBaoGiaCong;
@@ -71,11 +72,16 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
     super.dispose();
   }
 
-  // Tải chi nhánh trước để lấy bảng giá tạm tính của chi nhánh đầu tiên.
+  // Mặc định chi nhánh đầu; khách có thể đổi để thấy giấy chỉ bán ở cơ sở khác.
   Future<void> _taiBangGia() async {
+    _hen?.cancel();
+    _lanGoi++; // Không nhận báo giá cũ trong lúc chuyển danh mục giấy.
     setState(() {
       _dangTaiBangGia = true;
       _loiTaiBangGia = null;
+      _baoGia = null;
+      _loiBaoGia = null;
+      _dangTinh = false;
     });
 
     KetQuaApi kqChiNhanh = await Api.get('/api/danh-muc/chi-nhanh');
@@ -101,7 +107,9 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
       return;
     }
 
-    int maChiNhanh = dsChiNhanh[0].maChiNhanh;
+    int maChiNhanh = dsChiNhanh.any((cn) => cn.maChiNhanh == _maChiNhanhBangGia)
+        ? _maChiNhanhBangGia!
+        : dsChiNhanh[0].maChiNhanh;
     KetQuaApi kqGia = await Api.get(
       '/api/danh-muc/bang-gia?maChiNhanh=$maChiNhanh',
     );
@@ -122,7 +130,11 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
     setState(() {
       _bangGia = bangGia;
       _dsChiNhanh = dsChiNhanh;
+      _maChiNhanhBangGia = maChiNhanh;
       _dangTaiBangGia = false;
+      _dsGiaCong.removeWhere(
+        (ma) => !bangGia.any((d) => !d.laDongIn && d.maDichVu == ma),
+      );
       _chuanHoaLuaChon();
       _kiemTraKimGoc();
     });
@@ -141,7 +153,7 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
   List<String> _dsGiay() {
     List<String> ds = [];
     for (DichVu d in _dongIn()) {
-      if (!ds.contains(d.tenGiay)) ds.add(d.tenGiay);
+      if (!ds.contains(d.khoaGiay)) ds.add(d.khoaGiay);
     }
     ds.sort((a, b) {
       if (a.startsWith('A4') && !b.startsWith('A4')) return -1;
@@ -151,12 +163,18 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
     return ds;
   }
 
+  String _nhanGiay(String khoa) =>
+      _dongIn().firstWhere((d) => d.khoaGiay == khoa).tenGiay;
+
+  String get _tenGiayDangChon =>
+      _giay == null ? 'Loại giấy này' : _nhanGiay(_giay!);
+
   // Bảng giá có dòng nào khớp giấy đang chọn + mặt in + màu không (null = không xét)
   bool _coDong({String? mat, String? mau}) {
     for (DichVu d in _dongIn()) {
       bool khopMat = mat == null || d.matIn == mat;
       bool khopMau = mau == null || d.mauSac == mau;
-      if (d.tenGiay == _giay && khopMat && khopMau) return true;
+      if (d.khoaGiay == _giay && khopMat && khopMau) return true;
     }
     return false;
   }
@@ -166,7 +184,7 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
   // Dòng giá ứng với lựa chọn hiện tại
   DichVu? _dongDaChon() {
     for (DichVu d in _dongIn()) {
-      if (d.tenGiay == _giay && d.matIn == _matIn && d.mauSac == _mauSac) {
+      if (d.khoaGiay == _giay && d.matIn == _matIn && d.mauSac == _mauSac) {
         return d;
       }
     }
@@ -223,9 +241,9 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
     });
 
     KetQuaApi kq = await Api.post('/api/bao-gia', {
-      // Tạm tính theo chi nhánh đã dùng để tải bảng giá ở bước này.
+      // Tạm tính theo chi nhánh đang xem danh mục giấy.
       // Bước 3 sẽ báo giá lại theo đúng chi nhánh khách chọn.
-      'maChiNhanh': _dsChiNhanh[0].maChiNhanh,
+      'maChiNhanh': _maChiNhanhBangGia,
       'hinhThucNhan': 'TAI_QUAY',
       'inGap': _hoaToc,
       'fileIn': [
@@ -263,6 +281,7 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
         builder: (context) => ChonChiNhanhScreen(
           file: widget.file,
           maDichVu: dong.maDichVu,
+          maChiNhanhGoiY: _maChiNhanhBangGia,
           tenCauHinh:
               '${dong.tenGiay} · ${_matIn == '2_MAT' ? '2 mặt' : '1 mặt'} · ${_mauSac == 'MAU' ? 'In màu' : 'Đen trắng'} · ${_huongGiay == 'NGANG' ? 'Giấy ngang' : 'Giấy đứng'}',
           soBan: _soBan,
@@ -342,16 +361,42 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
               children: [
                 _theFile(),
                 const SizedBox(height: 12),
+                if (_dsChiNhanh.length > 1) ...[
+                  DropdownButtonFormField<int>(
+                    initialValue: _maChiNhanhBangGia,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Xem giấy và giá tạm tính tại',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: [
+                      for (final cn in _dsChiNhanh)
+                        DropdownMenuItem(
+                          value: cn.maChiNhanh,
+                          child: Text(
+                            cn.tenChiNhanh,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: (ma) {
+                      if (ma == null || ma == _maChiNhanhBangGia) return;
+                      _maChiNhanhBangGia = ma;
+                      _taiBangGia();
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 if (widget.file.laAnhThe)
                   Text(
                     '${widget.file.moTaSoLuong}\nGiấy ảnh A4 · in màu một mặt · giá theo ảnh. Số ảnh đã ghép, không nhân số bản hay gia công.',
                     style: AppTheme.font(size: 14, height: 1.5),
                   )
                 else ...[
-                  const NhanTruong('Khổ giấy & loại giấy'),
+                  const NhanTruong('Giấy in trong kho'),
                   const SizedBox(height: 6),
                   SizedBox(
-                    height: 42,
+                    height: 48,
                     child: ListView(
                       scrollDirection: Axis.horizontal,
                       children: [
@@ -360,6 +405,15 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
                           const SizedBox(width: 7),
                         ],
                       ],
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Giấy đã có dịch vụ và giá bán tại chi nhánh; giá chính thức được tính lại ở bước chọn chi nhánh.',
+                    style: AppTheme.font(
+                      size: 12.5,
+                      color: AppColors.chuNhan,
+                      height: 1.4,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -372,14 +426,14 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
                         'In 2 mặt',
                         'tiết kiệm 50% giấy',
                         _coDong(mat: '2_MAT'),
-                        'Bảng giá chưa có $_giay in 2 mặt.',
+                        'Bảng giá chưa có $_tenGiayDangChon in 2 mặt.',
                       ),
                       LuaChon(
                         '1_MAT',
                         'In 1 mặt',
                         null,
                         _coDong(mat: '1_MAT'),
-                        'Bảng giá chưa có $_giay in 1 mặt.',
+                        'Bảng giá chưa có $_tenGiayDangChon in 1 mặt.',
                       ),
                     ],
                     _matIn,
@@ -413,14 +467,14 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
                                   'Đen trắng',
                                   null,
                                   _coDong(mat: _matIn, mau: 'DEN_TRANG'),
-                                  'Bảng giá chưa có $_giay ${_tenMatIn()} đen trắng.',
+                                  'Bảng giá chưa có $_tenGiayDangChon ${_tenMatIn()} đen trắng.',
                                 ),
                                 LuaChon(
                                   'MAU',
                                   'In màu',
                                   null,
                                   _coDong(mat: _matIn, mau: 'MAU'),
-                                  'Bảng giá chưa có $_giay ${_tenMatIn()} màu.',
+                                  'Bảng giá chưa có $_tenGiayDangChon ${_tenMatIn()} màu.',
                                 ),
                               ],
                               _mauSac,
@@ -592,29 +646,34 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
   }
 
   // Chip chọn loại giấy
-  Widget _chipGiay(String tenGiay) {
-    bool daChon = tenGiay == _giay;
-    return GestureDetector(
-      onTap: () => _doiLuaChon(() => _giay = tenGiay),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
-        height: 42,
-        padding: const EdgeInsets.symmetric(horizontal: 13),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: daChon ? AppColors.accentSoft : AppColors.trang,
-          border: Border.all(
-            color: daChon ? AppColors.accent : AppColors.vien,
-            width: daChon ? 1.5 : 1,
+  Widget _chipGiay(String khoaGiay) {
+    bool daChon = khoaGiay == _giay;
+    return Semantics(
+      button: true,
+      selected: daChon,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () => _doiLuaChon(() => _giay = khoaGiay),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          height: 48,
+          padding: const EdgeInsets.symmetric(horizontal: 13),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: daChon ? AppColors.accentSoft : AppColors.trang,
+            border: Border.all(
+              color: daChon ? AppColors.accent : AppColors.vien,
+              width: daChon ? 1.5 : 1,
+            ),
+            borderRadius: BorderRadius.circular(10),
           ),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Text(
-          tenGiay,
-          style: AppTheme.font(
-            size: 12.5,
-            weight: daChon ? FontWeight.w600 : FontWeight.w500,
-            color: daChon ? AppColors.accentDeep : AppColors.chuNhan,
+          child: Text(
+            _nhanGiay(khoaGiay),
+            style: AppTheme.font(
+              size: 12.5,
+              weight: daChon ? FontWeight.w600 : FontWeight.w500,
+              color: daChon ? AppColors.accentDeep : AppColors.chuNhan,
+            ),
           ),
         ),
       ),

@@ -80,6 +80,11 @@ async function run() {
           const selected = (route.request().headers().authorization || '').includes('branch-fixture') ? 1 : Number(route.request().headers()['x-ma-chi-nhanh'] || 0);
           const danhMuc = await danhMucFixture.response(route.request(), selected);
           if (danhMuc) return route.fulfill({ status: danhMuc.status, contentType: 'application/json', body: JSON.stringify(danhMuc.body), headers: { 'Access-Control-Allow-Origin': '*' } });
+          if (url.pathname === '/api/ca/mo' && route.request().method() === 'POST') {
+            assert.ok(selected > 0, 'CEO chỉ mở ca tại một chi nhánh cụ thể.');
+            assert.equal(route.request().postDataJSON().tienDauCa, 200000);
+            return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ maCa: 50, maNhanVien: 1, maChiNhanh: selected, tienDauCa: 200000, trangThai: 'DANG_MO' }), headers: { 'Access-Control-Allow-Origin': '*' } });
+          }
           assert.equal(route.request().method(), url.pathname.startsWith('/hubs/') ? 'POST' : 'GET', 'Chỉ fixture danh mục được xử lý request ghi; không gọi backend thật.');
           apiCalls.push({ path: url.pathname, selected });
           let body;
@@ -230,13 +235,12 @@ async function run() {
         await page.screenshot({ animations: 'disabled', path: path.join(output, `chart-${width}.png`) });
         await expect(page.getByRole('heading', { name: 'Giờ cao điểm', exact: true })).toHaveCount(0);
         await expect(page.getByRole('heading', { name: 'Hiệu quả & trải nghiệm khách hàng', exact: true })).toHaveCount(0);
-        await expect(detail).toHaveCount(1);
+        await expect(detail).toHaveCount(0);
         await page.getByRole('heading', { name: 'Cơ cấu dịch vụ', exact: true }).scrollIntoViewIfNeeded();
         await noOverflow();
         await page.screenshot({ animations: 'disabled', path: path.join(output, `analysis-${width}.png`) });
         // Preset tự áp dụng, không cần bấm nút lần nữa.
         await page.getByLabel('Khoảng thời gian', { exact: true }).selectOption('ngay');
-        await expect(detail.getByRole('table').getByRole('row')).toHaveCount(2);
         await expect(page.getByLabel('Chỉ số doanh thu').getByText('600.000₫', { exact: true })).toHaveCount(1);
         mode = 'previous-zero';
         await apply.click();
@@ -253,11 +257,10 @@ async function run() {
         await page.getByLabel('Từ ngày', { exact: true }).fill(viDate(from));
         await page.getByLabel('Đến ngày', { exact: true }).fill(viDate(to));
         await apply.click();
-        await expect(detail.getByRole('table').getByRole('row')).toHaveCount(11);
-        await detail.getByRole('button', { name: 'Trang sau', exact: true }).click();
-        await expect(detail.getByText('Trang 2 / 3', { exact: true })).toBeVisible();
-        await page.getByLabel('Số dòng báo cáo').selectOption('50');
-        await expect(detail.getByRole('table').getByRole('row')).toHaveCount(26);
+        await expect(apply).toBeEnabled();
+        await expect(detail).toHaveCount(0);
+        await expect(page.getByLabel('Số dòng báo cáo')).toHaveCount(0);
+        await expect(page.getByRole('img', { name: 'Xu hướng doanh thu kỳ đã chọn so với cùng số ngày liền trước', exact: true })).toBeVisible();
         await page.getByLabel('Từ ngày', { exact: true }).fill('31/02/2026');
         const beforeBadDate = apiCalls.length;
         await apply.click();
@@ -375,7 +378,7 @@ async function run() {
         await noOverflow();
         assert.deepEqual(errors, []);
         assert.deepEqual(consoleErrors.filter(x => /Unhandled exception|crit: Microsoft/i.test(x)), []);
-        results.push({ width, status: 'PASS', scenarios: 'CRUD danh mục fixture, Gmail popup/phone dialog/copy/focus, sidebar unique icons/independent groups/drawer/collapse, header SPA navigation/footer/auth layout, dashboard regression/roles/errors/keyboard/presets/chart/pagination, timer at 1366' });
+        results.push({ width, status: 'PASS', scenarios: 'CRUD danh mục fixture, Gmail popup/phone dialog/copy/focus, sidebar unique icons/independent groups/drawer/collapse, header SPA navigation/footer/auth layout, dashboard regression/roles/errors/keyboard/presets/chart/no revenue detail table, timer at 1366' });
       } catch (error) {
         await page.screenshot({ animations: 'disabled', path: path.join(output, `failure-${width}.png`), fullPage: true });
         console.error(consoleErrors.filter(x => /Unhandled|Exception|critical/i.test(x)).join('\n'));

@@ -4,6 +4,11 @@ namespace PhotocopyApi;
 
 public static class QuyTacQuanTriChiNhanh
 {
+    public static string KiemTraDonViGiay(string donViTinh) =>
+        string.Equals(donViTinh?.Trim(), "Tờ", StringComparison.OrdinalIgnoreCase)
+            ? null
+            : "Giấy in phải quản lý theo Tờ, không theo ram/thùng. Hãy chọn đúng vật tư giấy trong kho.";
+
     public static string KiemTraDoiTenDichVu(string tenCu, string tenMoi)
     {
         // QuyTacIn và thủ tục SQL đang nhận diện hai dịch vụ này theo tên.

@@ -10,6 +10,27 @@ public sealed class VatTuDanhMucDto
     public string DonViTinh { get; set; } = "";
 }
 
+public sealed class TaoVatTuRequest
+{
+    [Required(ErrorMessage = "Vui lòng nhập tên vật tư.")]
+    [MaxLength(100, ErrorMessage = "Tên vật tư tối đa 100 ký tự.")]
+    [RegularExpression(@"^[^\p{C}]+$", ErrorMessage = "Tên vật tư không được chứa ký tự điều khiển.")]
+    public string TenVatTu { get; set; } = "";
+    [Required(ErrorMessage = "Vui lòng nhập đơn vị tính.")]
+    [MaxLength(20, ErrorMessage = "Đơn vị tính tối đa 20 ký tự.")]
+    [RegularExpression(@"^[^\p{C}]+$", ErrorMessage = "Đơn vị tính không được chứa ký tự điều khiển.")]
+    public string DonViTinh { get; set; } = "Tờ";
+    [SoTien]
+    public decimal DonGia { get; set; }
+}
+
+public sealed class CapNhatMucCanhBaoRequest
+{
+    [Required(ErrorMessage = "Vui lòng nhập mức cảnh báo tối thiểu.")]
+    [Range(0, int.MaxValue, ErrorMessage = "Mức cảnh báo phải là số nguyên không âm.")]
+    public int? MucToiThieu { get; set; }
+}
+
 public sealed class TaoMayInRequest
 {
     [Range(1, int.MaxValue, ErrorMessage = "Vui lòng chọn chi nhánh.")]

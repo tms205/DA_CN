@@ -24,10 +24,10 @@ class KetQuaApi {
 //   if (kq.thanhCong) { ... kq.duLieu ... } else { ... kq.loi ... }
 class Api {
   // Ảnh xem trước lấy từ PDF có sẵn trên máy chủ; gửi token trong header, không đưa vào URL.
-  static Future<KetQuaApi> getAnhMau(String maMau, int soTrang) async {
+  static Future<KetQuaApi> getAnhMau(String maMau, int soTrang, {int? phienBan}) async {
     try {
       final res = await http.get(
-        Uri.parse('$diaChiApi/api/file-in/mau/${Uri.encodeComponent(maMau)}/trang/$soTrang'),
+        Uri.parse('$diaChiApi/api/file-in/mau/${Uri.encodeComponent(maMau)}/trang/$soTrang${phienBan == null ? '' : '?phienBan=$phienBan'}'),
         headers: _taoHeader(),
       ).timeout(const Duration(seconds: 30));
       if (res.statusCode != 200) {

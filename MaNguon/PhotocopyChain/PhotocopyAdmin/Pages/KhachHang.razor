@@ -6,7 +6,7 @@
 <TieuDeTrang TieuDe="Khách hàng" MoTa="Quản lý tài khoản và thống kê đơn trong phạm vi đang chọn. Khóa tài khoản áp dụng toàn hệ thống." />
 
 <div class="than-trang khoi-doc">
-    @if (_loi != null) { <div class="o-loi" role="alert">@_loi</div> }
+    @if (_loi != null && _doiTrangThai == null && _sua == null) { <div class="o-loi" role="alert">@_loi</div> }
     @if (_thongBao != null) { <div class="o-thanh-cong" role="status">@_thongBao</div> }
     <section class="the the-bang" aria-label="Danh sách khách hàng">
         <div class="bang-tieu-de"><div><h2>Danh sách khách hàng</h2><p class="bang-mo-ta">Tổng chi tiêu chỉ tính đơn hoàn tất, không tính đơn in lại lỗi quầy.</p></div><button class="nut-phu" @onclick="TaiAsync" disabled="@_dangTai">Làm mới</button></div>
@@ -28,7 +28,7 @@
                         <td data-nhan="Tổng đơn" class="mono">@k.SoDon</td>
                         <td data-nhan="Tổng chi tiêu" class="mono">@TongQuanBaoCao.Tien(k.TongChiTieu)</td>
                         <td data-nhan="Trạng thái"><span class="nhan-mau @(k.TrangThai == "KHOA" ? "nhan-do" : "nhan-xanh")">@(k.TrangThai == "KHOA" ? "Bị khóa" : "Hoạt động")</span></td>
-                        <td data-nhan="Thao tác"><button class="nut-nho" @onclick="() => _chiTiet = k">Chi tiết</button><button class="nut-nho @(k.TrangThai == "KHOA" ? "" : "nguy-hiem")" @onclick="() => ChonDoiTrangThai(k)" disabled="@_dangLuu">@(k.TrangThai == "KHOA" ? "Mở khóa" : "Khóa")</button></td>
+                        <td data-nhan="Thao tác"><button type="button" class="nut-nho" @onclick="() => MoSua(k)" disabled="@_dangLuu">Sửa</button><button class="nut-nho" @onclick="() => _chiTiet = k" disabled="@_dangLuu">Chi tiết</button><button class="nut-nho @(k.TrangThai == "KHOA" ? "" : "nguy-hiem")" @onclick="() => ChonDoiTrangThai(k)" disabled="@_dangLuu">@(k.TrangThai == "KHOA" ? "Mở khóa" : "Khóa")</button></td>
                     </tr>
                 }
                 @if (DaLoc.Count == 0) { <tr><td colspan="6">Không có khách hàng phù hợp.</td></tr> }
@@ -37,29 +37,70 @@
             <div class="bang-tieu-de"><span>Trang @_trang / @SoTrang · @DaLoc.Count khách hàng</span><div class="xac-nhan-o"><button class="nut-phu" disabled="@(_trang <= 1)" @onclick="() => _trang--">Trước</button><button class="nut-phu" disabled="@(_trang >= SoTrang)" @onclick="() => _trang++">Sau</button></div></div>
         }
     </section>
-    @if (_chiTiet != null)
-    {
+    <HopThoaiQuanTri Mo="@(_sua != null)" TieuDe="Sửa khách hàng" MoTa="Cập nhật thông tin liên hệ; không đổi email đăng nhập, mật khẩu hay quyền tài khoản." Loi="@_loi" DangLuu="@_dangLuu" Dong="DongSua">
+    <NoiDung>
+        <EditForm id="kh-form-sua" Model="_formSua" OnValidSubmit="LuuKhachHangAsync" class="dn-form">
+            <DataAnnotationsValidator />
+            <div class="truong">
+                <label class="nhan" for="kh-ho-ten">Họ và tên</label>
+                <InputText id="kh-ho-ten" class="ca-o-loc" maxlength="100" autocomplete="name" @bind-Value="_formSua.HoTen" />
+                <ValidationMessage For="() => _formSua.HoTen" class="loi-truong" />
+            </div>
+            <div class="truong">
+                <label class="nhan" for="kh-email">Email đăng nhập</label>
+                <input id="kh-email" class="ca-o-loc" value="@_sua.Email" readonly />
+            </div>
+            <div class="truong">
+                <label class="nhan" for="kh-sdt">Số điện thoại</label>
+                <InputText id="kh-sdt" class="ca-o-loc" type="tel" inputmode="tel" maxlength="10" autocomplete="tel" @bind-Value="_formSua.SoDienThoai" />
+                <ValidationMessage For="() => _formSua.SoDienThoai" class="loi-truong" />
+            </div>
+            <div class="truong">
+                <label class="nhan" for="kh-dia-chi">Địa chỉ mặc định</label>
+                <InputTextArea id="kh-dia-chi" class="ca-o-loc" maxlength="255" rows="3" autocomplete="street-address" @bind-Value="_formSua.DiaChiMacDinh" />
+                <ValidationMessage For="() => _formSua.DiaChiMacDinh" class="loi-truong" />
+            </div>
+        </EditForm>
+    </NoiDung>
+    <Chan><button type="button" class="nut-phu" disabled="@_dangLuu" @onclick="DongSua">Hủy</button><button type="submit" form="kh-form-sua" class="nut-chinh" disabled="@_dangLuu">@(_dangLuu ? "Đang lưu…" : "Lưu thay đổi")</button></Chan>
+    </HopThoaiQuanTri>
+    <HopThoaiQuanTri Mo="@(_chiTiet != null)" TieuDe="Chi tiết khách hàng" Dong="() => _chiTiet = null">
+    <NoiDung>
         <section class="the the-rong" aria-label="Chi tiết khách hàng">
-            <div class="ca-dau"><h2 class="the-tieu-de nho">@_chiTiet.HoTen</h2><button class="nut-dong" aria-label="Đóng chi tiết khách hàng" @onclick="() => _chiTiet = null">×</button></div>
+            <h3 class="the-tieu-de nho">@_chiTiet.HoTen</h3>
             <dl class="tq-doi-chieu-tien"><div><dt>Email</dt><dd>@_chiTiet.Email</dd></div><div><dt>Điện thoại</dt><dd>@(_chiTiet.SoDienThoai ?? "Chưa cung cấp")</dd></div><div><dt>Địa chỉ</dt><dd>@(_chiTiet.DiaChi ?? "Chưa cung cấp")</dd></div><div><dt>Ngày đăng ký</dt><dd>@_chiTiet.NgayTao.ToString("dd/MM/yyyy HH:mm")</dd></div></dl>
         </section>
-    }
-    @if (_doiTrangThai != null)
-    {
+    </NoiDung>
+    </HopThoaiQuanTri>
+    <HopThoaiQuanTri Mo="@(_doiTrangThai != null)" TieuDe="Xác nhận trạng thái tài khoản" Loi="@_loi" DangLuu="@_dangLuu" Dong="DongTrangThai">
+    <NoiDung>
         <section class="the the-rong" aria-label="Xác nhận trạng thái khách hàng">
             <h2 class="the-tieu-de nho">@(_doiTrangThai.TrangThai == "KHOA" ? "Mở khóa" : "Khóa") tài khoản @_doiTrangThai.HoTen?</h2>
             <p>Thay đổi có hiệu lực toàn hệ thống; không xóa tài khoản hay lịch sử đơn.</p>
-            <div class="xac-nhan-o"><button class="nut-chinh" disabled="@_dangLuu" @onclick="DoiTrangThaiAsync">@(_dangLuu ? "Đang lưu…" : "Xác nhận")</button><button class="nut-phu" disabled="@_dangLuu" @onclick="() => _doiTrangThai = null">Hủy</button></div>
         </section>
-    }
+    </NoiDung>
+    <Chan><button type="button" class="nut-phu" disabled="@_dangLuu" @onclick="DongTrangThai">Hủy</button><button type="button" class="nut-chinh" disabled="@_dangLuu" @onclick="DoiTrangThaiAsync">@(_dangLuu ? "Đang lưu…" : "Xác nhận")</button></Chan>
+    </HopThoaiQuanTri>
 </div>
 
 @code {
     private List<KhachHangQuanTriDto> _ds = new();
     private KhachHangQuanTriDto _chiTiet, _doiTrangThai;
+    private KhachHangQuanTriDto _sua;
+    private CapNhatHoSoRequest _formSua = new();
     private string _tuKhoa = "", _trangThai = "", _loi, _thongBao;
     private int _trang = 1;
     private bool _dangTai, _dangLuu;
+    private void DongTrangThai() { if (!_dangLuu) { _doiTrangThai = null; _loi = null; } }
+    private void MoSua(KhachHangQuanTriDto k)
+    {
+        if (_dangLuu) return;
+        _sua = k;
+        _chiTiet = _doiTrangThai = null;
+        _formSua = new() { HoTen = k.HoTen, SoDienThoai = k.SoDienThoai, DiaChiMacDinh = k.DiaChi };
+        _loi = _thongBao = null;
+    }
+    private void DongSua() { if (!_dangLuu) { _sua = null; _formSua = new(); _loi = null; } }
     private List<KhachHangQuanTriDto> DaLoc => _ds.Where(x =>
         (_trangThai == "" || x.TrangThai == _trangThai) &&
         new[] { x.HoTen, x.Email, x.SoDienThoai }.Any(s => (s ?? "").Contains(_tuKhoa.Trim(), StringComparison.OrdinalIgnoreCase))).ToList();
@@ -91,6 +132,23 @@
             await TaiAsync();
         }
         catch (HttpRequestException) { _loi = "Mất kết nối API. Làm mới danh sách để kiểm tra kết quả."; }
+        finally { _dangLuu = false; }
+    }
+    private async Task LuuKhachHangAsync()
+    {
+        if (_dangLuu || _sua == null) return;
+        _dangLuu = true;
+        _loi = null;
+        try
+        {
+            using var res = await Http.PutAsJsonAsync($"api/quan-tri/khach-hang/{_sua.MaNguoiDung}", _formSua);
+            if (!res.IsSuccessStatusCode) { _loi = await DocLoiApi.TuPhanHoiAsync(res, "Không lưu được thông tin khách hàng."); return; }
+            _sua = null;
+            _formSua = new();
+            await TaiAsync();
+            if (_loi == null) _thongBao = "Đã cập nhật thông tin khách hàng.";
+        }
+        catch (HttpRequestException) { _loi = "Mất kết nối API. Dữ liệu đang nhập vẫn được giữ lại, vui lòng thử lại."; }
         finally { _dangLuu = false; }
     }
 }

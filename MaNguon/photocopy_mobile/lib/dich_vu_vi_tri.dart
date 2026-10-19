@@ -11,7 +11,7 @@ class DiemGps {
 Future<DiemGps> layViTriHienTai() async {
   if (!await Geolocator.isLocationServiceEnabled()) {
     throw StateError(
-      'Điện thoại đang tắt vị trí. Bạn có thể bật vị trí hoặc nhập địa chỉ bên dưới.',
+      'Điện thoại đang tắt vị trí. Hãy bật vị trí rồi bấm Dùng vị trí hiện tại để thử lại.',
     );
   }
   var quyen = await Geolocator.checkPermission();
@@ -21,7 +21,7 @@ Future<DiemGps> layViTriHienTai() async {
   if (quyen == LocationPermission.denied ||
       quyen == LocationPermission.deniedForever) {
     throw StateError(
-      'Chưa được cấp quyền vị trí. Bạn vẫn có thể tìm địa chỉ bằng cách nhập tay, hoặc cấp quyền trong cài đặt ứng dụng.',
+      'Chưa được cấp quyền vị trí. Hãy cấp quyền và bật vị trí chính xác trong cài đặt ứng dụng rồi thử lại.',
     );
   }
   final viTri = await Geolocator.getCurrentPosition(
@@ -34,7 +34,7 @@ Future<DiemGps> layViTriHienTai() async {
       !viTri.longitude.isFinite ||
       !viTri.accuracy.isFinite) {
     throw StateError(
-      'Chưa lấy được vị trí hợp lệ. Hãy thử lại hoặc nhập địa chỉ.',
+      'Chưa lấy được vị trí hợp lệ. Hãy bật vị trí chính xác và thử lại.',
     );
   }
   return DiemGps(viTri.latitude, viTri.longitude, viTri.accuracy);

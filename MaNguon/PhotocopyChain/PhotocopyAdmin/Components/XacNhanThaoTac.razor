@@ -1,0 +1,30 @@
+@implements IDisposable
+
+<HopThoaiQuanTri Mo="@_mo" TieuDe="@_tieuDe" Dong="Huy">
+    <NoiDung><p style="margin:0; white-space:pre-line; line-height:1.7">@_noiDung</p></NoiDung>
+    <Chan>
+        <button type="button" class="nut-phu" @onclick="Huy" autofocus>Hủy</button>
+        <button type="button" class="@(_nguyHiem ? "nut-phu nguy-hiem" : "nut-chinh")" @onclick="DongY">@_nutXacNhan</button>
+    </Chan>
+</HopThoaiQuanTri>
+
+@code {
+    private bool _mo, _nguyHiem;
+    private string _tieuDe, _noiDung, _nutXacNhan;
+    private TaskCompletionSource<bool> _ketQua;
+
+    public async Task<bool> HoiAsync(string noiDung, string tieuDe = "Xác nhận thao tác", string nutXacNhan = "Xác nhận", bool nguyHiem = false)
+    {
+        if (_mo) return false;
+        _noiDung = noiDung; _tieuDe = tieuDe; _nutXacNhan = nutXacNhan; _nguyHiem = nguyHiem;
+        _ketQua = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        _mo = true;
+        await InvokeAsync(StateHasChanged);
+        return await _ketQua.Task;
+    }
+
+    private void Huy() => TraLoi(false);
+    private void DongY() => TraLoi(true);
+    private void TraLoi(bool dongY) { _mo = false; _ketQua?.TrySetResult(dongY); }
+    public void Dispose() => _ketQua?.TrySetResult(false);
+}

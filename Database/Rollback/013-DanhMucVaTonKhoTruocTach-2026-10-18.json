@@ -1,0 +1,684 @@
+{
+  "VatTu": [
+    {
+      "MaVatTu": 1,
+      "TenVatTu": "Giấy A4",
+      "DonViTinh": "Tờ",
+      "DonGia": 120
+    },
+    {
+      "MaVatTu": 2,
+      "TenVatTu": "Giấy A3",
+      "DonViTinh": "Tờ",
+      "DonGia": 240
+    },
+    {
+      "MaVatTu": 3,
+      "TenVatTu": "Mực đen",
+      "DonViTinh": "Hộp",
+      "DonGia": 850000
+    },
+    {
+      "MaVatTu": 4,
+      "TenVatTu": "Mực màu",
+      "DonViTinh": "Hộp",
+      "DonGia": 100000
+    },
+    {
+      "MaVatTu": 5,
+      "TenVatTu": "Bìa kiếng",
+      "DonViTinh": "Cái",
+      "DonGia": 2000
+    },
+    {
+      "MaVatTu": 6,
+      "TenVatTu": "Lò xo",
+      "DonViTinh": "Cái",
+      "DonGia": 3500
+    },
+    {
+      "MaVatTu": 7,
+      "TenVatTu": "Giấy ảnh A4",
+      "DonViTinh": "tờ",
+      "DonGia": 300
+    }
+  ],
+  "DichVu": [
+    {
+      "MaDichVu": 1,
+      "TenDichVu": "In A4 70gsm 1 mặt đen trắng",
+      "LoaiDichVu": "IN_AN",
+      "KhoGiay": "A4",
+      "LoaiGiay": "70gsm",
+      "MatIn": "1_MAT",
+      "MauSac": "DEN_TRANG",
+      "NhomGiaCong": null,
+      "KichThuocAnh": null,
+      "DonGia": 300,
+      "MaVatTu": 1,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaDichVu": 2,
+      "TenDichVu": "In A4 70gsm 2 mặt đen trắng",
+      "LoaiDichVu": "IN_AN",
+      "KhoGiay": "A4",
+      "LoaiGiay": "70gsm",
+      "MatIn": "2_MAT",
+      "MauSac": "DEN_TRANG",
+      "NhomGiaCong": null,
+      "KichThuocAnh": null,
+      "DonGia": 250,
+      "MaVatTu": 1,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaDichVu": 3,
+      "TenDichVu": "In A4 70gsm 1 mặt màu",
+      "LoaiDichVu": "IN_AN",
+      "KhoGiay": "A4",
+      "LoaiGiay": "70gsm",
+      "MatIn": "1_MAT",
+      "MauSac": "MAU",
+      "NhomGiaCong": null,
+      "KichThuocAnh": null,
+      "DonGia": 3000,
+      "MaVatTu": 1,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaDichVu": 4,
+      "TenDichVu": "In A4 80gsm 1 mặt đen trắng",
+      "LoaiDichVu": "IN_AN",
+      "KhoGiay": "A4",
+      "LoaiGiay": "80gsm",
+      "MatIn": "1_MAT",
+      "MauSac": "DEN_TRANG",
+      "NhomGiaCong": null,
+      "KichThuocAnh": null,
+      "DonGia": 400,
+      "MaVatTu": 1,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaDichVu": 5,
+      "TenDichVu": "In A3 70gsm 1 mặt đen trắng",
+      "LoaiDichVu": "IN_AN",
+      "KhoGiay": "A3",
+      "LoaiGiay": "70gsm",
+      "MatIn": "1_MAT",
+      "MauSac": "DEN_TRANG",
+      "NhomGiaCong": null,
+      "KichThuocAnh": null,
+      "DonGia": 600,
+      "MaVatTu": 2,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaDichVu": 6,
+      "TenDichVu": "In A3 70gsm 1 mặt màu",
+      "LoaiDichVu": "IN_AN",
+      "KhoGiay": "A3",
+      "LoaiGiay": "70gsm",
+      "MatIn": "1_MAT",
+      "MauSac": "MAU",
+      "NhomGiaCong": null,
+      "KichThuocAnh": null,
+      "DonGia": 6000,
+      "MaVatTu": 2,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaDichVu": 7,
+      "TenDichVu": "In A4 70gsm 2 mặt màu",
+      "LoaiDichVu": "IN_AN",
+      "KhoGiay": "A4",
+      "LoaiGiay": "70gsm",
+      "MatIn": "2_MAT",
+      "MauSac": "MAU",
+      "NhomGiaCong": null,
+      "KichThuocAnh": null,
+      "DonGia": 2500,
+      "MaVatTu": 1,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaDichVu": 8,
+      "TenDichVu": "In A4 80gsm 2 mặt đen trắng",
+      "LoaiDichVu": "IN_AN",
+      "KhoGiay": "A4",
+      "LoaiGiay": "80gsm",
+      "MatIn": "2_MAT",
+      "MauSac": "DEN_TRANG",
+      "NhomGiaCong": null,
+      "KichThuocAnh": null,
+      "DonGia": 350,
+      "MaVatTu": 1,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaDichVu": 9,
+      "TenDichVu": "In A4 80gsm 1 mặt màu",
+      "LoaiDichVu": "IN_AN",
+      "KhoGiay": "A4",
+      "LoaiGiay": "80gsm",
+      "MatIn": "1_MAT",
+      "MauSac": "MAU",
+      "NhomGiaCong": null,
+      "KichThuocAnh": null,
+      "DonGia": 3500,
+      "MaVatTu": 1,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaDichVu": 10,
+      "TenDichVu": "In A4 80gsm 2 mặt màu",
+      "LoaiDichVu": "IN_AN",
+      "KhoGiay": "A4",
+      "LoaiGiay": "80gsm",
+      "MatIn": "2_MAT",
+      "MauSac": "MAU",
+      "NhomGiaCong": null,
+      "KichThuocAnh": null,
+      "DonGia": 3000,
+      "MaVatTu": 1,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaDichVu": 11,
+      "TenDichVu": "In A3 70gsm 2 mặt đen trắng",
+      "LoaiDichVu": "IN_AN",
+      "KhoGiay": "A3",
+      "LoaiGiay": "70gsm",
+      "MatIn": "2_MAT",
+      "MauSac": "DEN_TRANG",
+      "NhomGiaCong": null,
+      "KichThuocAnh": null,
+      "DonGia": 500,
+      "MaVatTu": 2,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaDichVu": 12,
+      "TenDichVu": "In A3 70gsm 2 mặt màu",
+      "LoaiDichVu": "IN_AN",
+      "KhoGiay": "A3",
+      "LoaiGiay": "70gsm",
+      "MatIn": "2_MAT",
+      "MauSac": "MAU",
+      "NhomGiaCong": null,
+      "KichThuocAnh": null,
+      "DonGia": 5000,
+      "MaVatTu": 2,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaDichVu": 13,
+      "TenDichVu": "Đóng bìa kiếng",
+      "LoaiDichVu": "GIA_CONG",
+      "KhoGiay": null,
+      "LoaiGiay": null,
+      "MatIn": null,
+      "MauSac": null,
+      "NhomGiaCong": "DONG_GAY",
+      "KichThuocAnh": null,
+      "DonGia": 5000,
+      "MaVatTu": 5,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaDichVu": 14,
+      "TenDichVu": "Đóng lò xo",
+      "LoaiDichVu": "GIA_CONG",
+      "KhoGiay": null,
+      "LoaiGiay": null,
+      "MatIn": null,
+      "MauSac": null,
+      "NhomGiaCong": "DONG_GAY",
+      "KichThuocAnh": null,
+      "DonGia": 10000,
+      "MaVatTu": 6,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaDichVu": 15,
+      "TenDichVu": "Ép plastic",
+      "LoaiDichVu": "GIA_CONG",
+      "KhoGiay": null,
+      "LoaiGiay": null,
+      "MatIn": null,
+      "MauSac": null,
+      "NhomGiaCong": null,
+      "KichThuocAnh": null,
+      "DonGia": 15000,
+      "MaVatTu": null,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaDichVu": 16,
+      "TenDichVu": "Bấm kim góc",
+      "LoaiDichVu": "GIA_CONG",
+      "KhoGiay": null,
+      "LoaiGiay": null,
+      "MatIn": null,
+      "MauSac": null,
+      "NhomGiaCong": null,
+      "KichThuocAnh": null,
+      "DonGia": 1000,
+      "MaVatTu": null,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaDichVu": 17,
+      "TenDichVu": "In ảnh thẻ 2x3 cm",
+      "LoaiDichVu": "IN_AN",
+      "KhoGiay": "A4",
+      "LoaiGiay": "GIAY_ANH",
+      "MatIn": "1_MAT",
+      "MauSac": "MAU",
+      "NhomGiaCong": null,
+      "KichThuocAnh": "2X3",
+      "DonGia": 3000,
+      "MaVatTu": 7,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaDichVu": 18,
+      "TenDichVu": "In ảnh thẻ 3x4 cm",
+      "LoaiDichVu": "IN_AN",
+      "KhoGiay": "A4",
+      "LoaiGiay": "GIAY_ANH",
+      "MatIn": "1_MAT",
+      "MauSac": "MAU",
+      "NhomGiaCong": null,
+      "KichThuocAnh": "3X4",
+      "DonGia": 5000,
+      "MaVatTu": 7,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaDichVu": 19,
+      "TenDichVu": "In ảnh thẻ 4x6 cm",
+      "LoaiDichVu": "IN_AN",
+      "KhoGiay": "A4",
+      "LoaiGiay": "GIAY_ANH",
+      "MatIn": "1_MAT",
+      "MauSac": "MAU",
+      "NhomGiaCong": null,
+      "KichThuocAnh": "4X6",
+      "DonGia": 10000,
+      "MaVatTu": 7,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaDichVu": 20,
+      "TenDichVu": "In ảnh thẻ 3,5x4,5 cm",
+      "LoaiDichVu": "IN_AN",
+      "KhoGiay": "A4",
+      "LoaiGiay": "GIAY_ANH",
+      "MatIn": "1_MAT",
+      "MauSac": "MAU",
+      "NhomGiaCong": null,
+      "KichThuocAnh": "35X45",
+      "DonGia": 7000,
+      "MaVatTu": 7,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaDichVu": 21,
+      "TenDichVu": "In ảnh thẻ 5x5 cm",
+      "LoaiDichVu": "IN_AN",
+      "KhoGiay": "A4",
+      "LoaiGiay": "GIAY_ANH",
+      "MatIn": "1_MAT",
+      "MauSac": "MAU",
+      "NhomGiaCong": null,
+      "KichThuocAnh": "5X5",
+      "DonGia": 10000,
+      "MaVatTu": 7,
+      "TrangThai": "HIEN"
+    }
+  ],
+  "BangGiaChiNhanh": [
+    {
+      "MaChiNhanh": 1,
+      "MaDichVu": 1,
+      "DonGia": 300,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 1,
+      "MaDichVu": 2,
+      "DonGia": 250,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 1,
+      "MaDichVu": 3,
+      "DonGia": 3000,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 1,
+      "MaDichVu": 4,
+      "DonGia": 400,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 1,
+      "MaDichVu": 5,
+      "DonGia": 600,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 1,
+      "MaDichVu": 6,
+      "DonGia": 6000,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 1,
+      "MaDichVu": 7,
+      "DonGia": 2500,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 1,
+      "MaDichVu": 8,
+      "DonGia": 350,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 1,
+      "MaDichVu": 9,
+      "DonGia": 3500,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 1,
+      "MaDichVu": 10,
+      "DonGia": 3000,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 1,
+      "MaDichVu": 11,
+      "DonGia": 500,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 1,
+      "MaDichVu": 12,
+      "DonGia": 5000,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 1,
+      "MaDichVu": 13,
+      "DonGia": 5000,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 1,
+      "MaDichVu": 14,
+      "DonGia": 10000,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 1,
+      "MaDichVu": 15,
+      "DonGia": 15000,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 1,
+      "MaDichVu": 16,
+      "DonGia": 1000,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 1,
+      "MaDichVu": 17,
+      "DonGia": 3000,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 1,
+      "MaDichVu": 18,
+      "DonGia": 5000,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 1,
+      "MaDichVu": 19,
+      "DonGia": 10000,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 1,
+      "MaDichVu": 20,
+      "DonGia": 7000,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 1,
+      "MaDichVu": 21,
+      "DonGia": 10000,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 2,
+      "MaDichVu": 1,
+      "DonGia": 300,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 2,
+      "MaDichVu": 2,
+      "DonGia": 250,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 2,
+      "MaDichVu": 3,
+      "DonGia": 3000,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 2,
+      "MaDichVu": 4,
+      "DonGia": 400,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 2,
+      "MaDichVu": 5,
+      "DonGia": 600,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 2,
+      "MaDichVu": 6,
+      "DonGia": 6000,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 2,
+      "MaDichVu": 7,
+      "DonGia": 2500,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 2,
+      "MaDichVu": 8,
+      "DonGia": 350,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 2,
+      "MaDichVu": 9,
+      "DonGia": 3500,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 2,
+      "MaDichVu": 10,
+      "DonGia": 3000,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 2,
+      "MaDichVu": 11,
+      "DonGia": 500,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 2,
+      "MaDichVu": 12,
+      "DonGia": 5000,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 2,
+      "MaDichVu": 13,
+      "DonGia": 5000,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 2,
+      "MaDichVu": 14,
+      "DonGia": 10000,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 2,
+      "MaDichVu": 15,
+      "DonGia": 15000,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 2,
+      "MaDichVu": 16,
+      "DonGia": 1000,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 2,
+      "MaDichVu": 17,
+      "DonGia": 3000,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 2,
+      "MaDichVu": 18,
+      "DonGia": 5000,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 2,
+      "MaDichVu": 19,
+      "DonGia": 10000,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 2,
+      "MaDichVu": 20,
+      "DonGia": 7000,
+      "TrangThai": "HIEN"
+    },
+    {
+      "MaChiNhanh": 2,
+      "MaDichVu": 21,
+      "DonGia": 10000,
+      "TrangThai": "HIEN"
+    }
+  ],
+  "TonKho": [
+    {
+      "MaChiNhanh": 1,
+      "MaVatTu": 1,
+      "SoLuong": 49561,
+      "MucToiThieu": 10000
+    },
+    {
+      "MaChiNhanh": 1,
+      "MaVatTu": 2,
+      "SoLuong": 19951,
+      "MucToiThieu": 5000
+    },
+    {
+      "MaChiNhanh": 1,
+      "MaVatTu": 3,
+      "SoLuong": 8,
+      "MucToiThieu": 2
+    },
+    {
+      "MaChiNhanh": 1,
+      "MaVatTu": 4,
+      "SoLuong": 121,
+      "MucToiThieu": 2
+    },
+    {
+      "MaChiNhanh": 1,
+      "MaVatTu": 5,
+      "SoLuong": 124,
+      "MucToiThieu": 10
+    },
+    {
+      "MaChiNhanh": 1,
+      "MaVatTu": 6,
+      "SoLuong": 25,
+      "MucToiThieu": 10
+    },
+    {
+      "MaChiNhanh": 1,
+      "MaVatTu": 7,
+      "SoLuong": 999,
+      "MucToiThieu": 10
+    },
+    {
+      "MaChiNhanh": 2,
+      "MaVatTu": 1,
+      "SoLuong": 39942,
+      "MucToiThieu": 10000
+    },
+    {
+      "MaChiNhanh": 2,
+      "MaVatTu": 2,
+      "SoLuong": 15000,
+      "MucToiThieu": 5000
+    },
+    {
+      "MaChiNhanh": 2,
+      "MaVatTu": 3,
+      "SoLuong": 6,
+      "MucToiThieu": 2
+    },
+    {
+      "MaChiNhanh": 2,
+      "MaVatTu": 4,
+      "SoLuong": 4,
+      "MucToiThieu": 2
+    },
+    {
+      "MaChiNhanh": 2,
+      "MaVatTu": 5,
+      "SoLuong": 25,
+      "MucToiThieu": 10
+    },
+    {
+      "MaChiNhanh": 2,
+      "MaVatTu": 6,
+      "SoLuong": 25,
+      "MucToiThieu": 10
+    },
+    {
+      "MaChiNhanh": 2,
+      "MaVatTu": 7,
+      "SoLuong": 10,
+      "MucToiThieu": 10
+    }
+  ],
+  "SoDongDonCu": 29,
+  "SoDonDangIn": 0
+}

@@ -304,6 +304,7 @@ public sealed partial class LuuKhuyenMaiRequest
 
 public sealed class TonKhoDto
 {
+    public bool DuocDoiDonVi { get; set; }
     public int MaChiNhanh { get; set; }
     public string TenChiNhanh { get; set; } = "";
     public int MaVatTu { get; set; }
@@ -322,6 +323,7 @@ public sealed class PhieuNhapDto
     public string TenChiNhanh { get; set; } = "";
     public int MaVatTu { get; set; }
     public string TenVatTu { get; set; } = "";
+    public string? DonViTinh { get; set; }
     public string? NhaCungCap { get; set; }
     public int SoLuong { get; set; }
     public decimal DonGia { get; set; }

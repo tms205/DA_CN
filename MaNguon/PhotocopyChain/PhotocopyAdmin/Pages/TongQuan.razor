@@ -64,20 +64,6 @@
                 </section>
             }
             <TongQuanPhanTich @key="_lucTai" TuNgay="_tuDaTai" DenNgay="_denDaTai" />
-            <section class="the the-bang" aria-label="Chi tiết doanh thu">
-                <div class="bang-tieu-de"><div><h2>Chi tiết doanh thu</h2><p class="bang-mo-ta">Ngày không có đơn tính 0; kỳ đầu/cuối chỉ tính ngày trong khoảng chọn.</p></div><span class="bang-dem">@_ky.Count kỳ</span></div>
-                <div class="bang-cuon"><table class="bang" aria-label="Chi tiết doanh thu">
-                    <thead><tr><th scope="col">Kỳ thống kê</th><th scope="col">Đơn hoàn tất</th><th scope="col">Doanh thu</th><th scope="col">Kỳ đối chiếu</th><th scope="col">Thay đổi</th></tr></thead>
-                    <tbody>
-                        @for (int i = _ky.Count - 1 - (_trangBaoCao - 1) * _soDong; i >= Math.Max(0, _ky.Count - _trangBaoCao * _soDong); i--)
-                        {
-                            var ky = _ky[i]; var truoc = _kyTruoc[i];
-                            <tr><td data-nhan="Kỳ thống kê"><b>@NhanKy(ky.Ngay)</b></td><td data-nhan="Đơn hoàn tất">@ky.SoDon đơn</td><td data-nhan="Doanh thu" class="mono">@Tien(ky.DoanhThu)</td><td data-nhan="Kỳ đối chiếu" class="mono">@Tien(truoc.DoanhThu)<div class="nv-phu">@NhanNgayDoiChieu(ky.Ngay)</div></td><td data-nhan="Thay đổi">@ThayDoi(ky.DoanhThu, truoc.DoanhThu)</td></tr>
-                        }
-                    </tbody>
-                </table></div>
-                <div class="tq-phan-trang"><div class="tq-dong-moi-trang"><label for="tq-so-dong">Số dòng báo cáo</label><select id="tq-so-dong" class="ca-o-loc" value="@_soDong" @onchange="DoiSoDong"><option value="10">10 dòng</option><option value="20">20 dòng</option><option value="50">50 dòng</option></select></div><span aria-live="polite">Trang @_trangBaoCao / @TongTrangBaoCao</span><div class="tq-nut-trang"><button type="button" class="nut-nho" disabled="@(_trangBaoCao <= 1)" @onclick="() => _trangBaoCao--">Trang trước</button><button type="button" class="nut-nho" disabled="@(_trangBaoCao >= TongTrangBaoCao)" @onclick="() => _trangBaoCao++">Trang sau</button></div></div>
-            </section>
             <details class="tq-giai-thich"><summary>Cách tính và kỳ đối chiếu</summary><p>Tuần bắt đầu thứ Hai. Kỳ đối chiếu là @_soNgayDaTai ngày liền trước, không mặc định toàn tháng trước. Khi kỳ trước bằng 0, không tính tỷ lệ tăng trưởng. Chọn nhóm rồi bấm Xem tổng quan; báo cáo không tự chuyển trạng thái đơn.</p></details>
         }
     </div>
@@ -96,9 +82,6 @@
     private DateTime _denTruoc;
     private DateTime _lucTai;
     private int _soNgayDaTai;
-    private int _trangBaoCao = 1;
-    private int _soDong = 10;
-    private int TongTrangBaoCao => Math.Max(1, (_ky.Count + _soDong - 1) / _soDong);
     private bool _dangTai;
     private string _loi;
     private List<BaoCaoDoanhThuDto> _ds;
@@ -183,7 +166,6 @@
             _lucTai = DateTime.Now;
             _soNgayDaTai = (den - tu).Days + 1;
             _nhomDaTai = _nhomTheo;
-            _trangBaoCao = 1;
             _ky = TongQuanBaoCao.NhomKy(_ds, tu, den, _nhomDaTai);
             // Dịch kỳ trước sang cùng vị trí ngày của kỳ này trước khi nhóm tuần/tháng.
             var canNgay = _truoc.Select(x => new BaoCaoDoanhThuDto { Ngay = x.Ngay.AddDays(_soNgayDaTai), SoDon = x.SoDon, DoanhThu = x.DoanhThu });
@@ -202,14 +184,6 @@
 
     private static string Tien(decimal tien) => tien.ToString("#,##0", KieuSo) + "₫";
 
-    private void DoiSoDong(ChangeEventArgs e)
-    {
-        if (int.TryParse(e.Value?.ToString(), out int soDong) && soDong is 10 or 20 or 50)
-        {
-            _soDong = soDong;
-            _trangBaoCao = 1;
-        }
-    }
     private static string ThayDoi(decimal nay, decimal truoc)
     {
         decimal? tyLe = TongQuanBaoCao.TyLeThayDoi(nay, truoc);
@@ -222,19 +196,4 @@
         return "width:" + Math.Clamp(tien / tran * 100, 0, 100).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "%";
     }
 
-    private DateTime CuoiKy(DateTime ngay) => _nhomDaTai == "thang" ? new DateTime(ngay.Year, ngay.Month, DateTime.DaysInMonth(ngay.Year, ngay.Month))
-        : _nhomDaTai == "tuan" ? ngay.AddDays(Math.Min(6, (DateTime.MaxValue.Date - ngay).Days)) : ngay;
-    private string NhanKy(DateTime ngay)
-    {
-        DateTime dau = ngay < _tuDaTai ? _tuDaTai : ngay;
-        DateTime cuoi = CuoiKy(ngay) > _denDaTai ? _denDaTai : CuoiKy(ngay);
-        return dau == cuoi ? dau.ToString("dd'/'MM'/'yyyy") : $"{dau:dd'/'MM'/'yyyy} – {cuoi:dd'/'MM'/'yyyy}";
-    }
-
-    private string NhanNgayDoiChieu(DateTime ngay)
-    {
-        DateTime dau = (ngay < _tuDaTai ? _tuDaTai : ngay).AddDays(-_soNgayDaTai);
-        DateTime cuoi = (CuoiKy(ngay) > _denDaTai ? _denDaTai : CuoiKy(ngay)).AddDays(-_soNgayDaTai);
-        return dau == cuoi ? dau.ToString("dd'/'MM'/'yyyy") : $"{dau:dd'/'MM'/'yyyy} – {cuoi:dd'/'MM'/'yyyy}";
-    }
 }

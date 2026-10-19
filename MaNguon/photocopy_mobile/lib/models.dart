@@ -103,10 +103,12 @@ class DichVu {
   String loaiDichVu = ''; // IN_AN (giá / trang) hoặc GIA_CONG (giá / cuốn)
   String? khoGiay; // A4 / A3
   String? loaiGiay; // 70gsm, 80gsm...
+  int? maVatTu;
+  String? tenVatTu;
   String? matIn; // 1_MAT / 2_MAT
   String? mauSac; // DEN_TRANG / MAU
   String?
-  nhomGiaCong; // DONG_GAY: lò xo / bìa kiếng chỉ chọn 1; null = chọn thoải mái
+  nhomGiaCong; // DONG_GAY; riêng bìa kiếng và lò xo được phép đi cùng nhau
   double donGia = 0;
 
   DichVu.fromJson(Map<String, dynamic> json) {
@@ -116,6 +118,8 @@ class DichVu {
     loaiDichVu = json['loaiDichVu'];
     khoGiay = json['khoGiay'];
     loaiGiay = json['loaiGiay'];
+    maVatTu = json['maVatTu'];
+    tenVatTu = json['tenVatTu'];
     matIn = json['matIn'];
     mauSac = json['mauSac'];
     nhomGiaCong = json['nhomGiaCong'];
@@ -124,10 +128,15 @@ class DichVu {
 
   bool get laDongIn => loaiDichVu == 'IN_AN';
 
-  // "A4 70gsm" — dùng làm nhãn chip "Khổ giấy & loại giấy"
+  // Khóa riêng theo vật tư, không gộp hai loại giấy chỉ vì cùng A4/80gsm.
+  String get khoaGiay => '${khoGiay ?? ''}|${loaiGiay ?? ''}|${maVatTu ?? ''}';
+
+  // Ưu tiên đúng tên trong kho; API cũ chưa trả tên thì giữ nhãn quy cách.
   String get tenGiay => kichThuocAnh != null
       ? '${kichThuocAnhThe[kichThuocAnh] ?? kichThuocAnh} · Giấy ảnh A4'
-      : '${khoGiay ?? ''} ${loaiGiay ?? ''}'.trim();
+      : (tenVatTu?.trim().isNotEmpty == true
+            ? tenVatTu!.trim()
+            : '${khoGiay ?? ''} ${loaiGiay ?? ''}'.trim());
 
   bool hopVoiFile(FileIn file) => laDongIn && kichThuocAnh == file.kichThuocAnh;
 }

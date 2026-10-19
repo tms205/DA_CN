@@ -9,7 +9,7 @@
 <TieuDeTrang TieuDe="Kho vật tư" MoTa="Theo dõi tồn kho thực tế, cảnh báo định mức tối thiểu và quản lý phiếu nhập hàng" />
 
 <div class="than-trang khoi-doc">
-    @if (_loi != null)
+    @if (_loi != null && !_moForm && !_moVatTu && !_moCanhBao)
     {
         <div class="o-loi">
             @((MarkupString)Svg.ChamThan())
@@ -24,10 +24,88 @@
         </div>
     }
 
-    @if (LaQuanLyChiNhanh() && _tonKho?.Count > 0)
+    <div class="xac-nhan-o">
+        @if (LaCEO())
+        {
+            <button type="button" class="nut-chinh" disabled="@_dangLuu" @onclick="MoThemVatTu">Thêm vật tư mới</button>
+            <a class="nut-phu" href="dich-vu">Cấu hình giấy cho dịch vụ</a>
+        }
+        @if (LaQuanLyChiNhanh() && _tonKho?.Count > 0)
+        {
+            <button type="button" class="nut-phu" disabled="@_dangLuu" @onclick="MoTaoPhieu">Lập phiếu nhập</button>
+        }
+    </div>
+    @if (LaCEO())
     {
-        <form @onsubmit="TaoPhieuAsync" @onsubmit:preventDefault class="the the-rong">
-            <h2 class="the-tieu-de nho">@(LaCEO() ? "Lập và duyệt phiếu nhập vật tư" : "Đề xuất lập phiếu nhập vật tư mới")</h2>
+        <HopThoaiQuanTri Mo="@_moVatTu" TieuDe="@(_vatTuDangSua == null ? "Thêm vật tư mới" : "Sửa thông tin vật tư")" MoTa="Danh mục dùng chung toàn chuỗi; không thay đổi số lượng tồn hay giá bán dịch vụ." Loi="@_loi" DangLuu="@_dangLuu" Dong="DongVatTu">
+            <NoiDung>
+                <form id="kho-form-vat-tu" @onsubmit="LuuVatTuAsync" @onsubmit:preventDefault>
+                    <div class="khoi-doc">
+                        <div class="truong">
+                            <label class="nhan" for="vt-ten">Tên vật tư</label>
+                            <input id="vt-ten" required maxlength="100" class="ca-o-loc" @bind="_vatTuMoi.TenVatTu" placeholder="VD: Giấy A4 100gsm" />
+                            <small class="nv-phu">Ghi rõ khổ, loại hoặc định lượng để không nhầm giấy trong kho.</small>
+                        </div>
+                        <div class="truong">
+                            <label class="nhan" for="vt-don-vi">Đơn vị tính</label>
+                            <input id="vt-don-vi" required maxlength="20" class="ca-o-loc" @bind="_vatTuMoi.DonViTinh" disabled="@(_vatTuDangSua != null && !_vatTuDangSua.DuocDoiDonVi)" placeholder="VD: Tờ, Cuốn, Hộp" />
+                            @if (_vatTuDangSua != null && !_vatTuDangSua.DuocDoiDonVi)
+                            {
+                                <small class="nv-phu">Đã khóa đơn vị tính vì vật tư có tồn kho, phiếu nhập hoặc đã được gắn với dịch vụ.</small>
+                            }
+                            else
+                            {
+                                <small class="nv-phu">Giấy in dùng đơn vị Tờ; 1 ram 500 tờ thì nhập số lượng 500 khi nhận hàng.</small>
+                            }
+                        </div>
+                        <div class="truong">
+                            <label class="nhan" for="vt-gia">Giá nhập tham khảo (₫/đơn vị)</label>
+                            <input id="vt-gia" type="number" required min="0" max="999999999999" step="1" class="ca-o-loc mono" @bind="_vatTuMoi.DonGia" />
+                            <small class="nv-phu">Chưa có giá mua có thể để 0. Đây không phải giá bán dịch vụ in.</small>
+                        </div>
+                        @if (_vatTuDangSua == null)
+                        {
+                            <p class="nv-phu">Vật tư mới có tồn 0 ở các chi nhánh. Sau khi nhận hàng, vào Dịch vụ chọn vật tư cho quy cách in; chỉnh giá bán tại Bảng giá in ấn. Web và mobile mới dùng giấy này để báo giá.</p>
+                        }
+                        else
+                        {
+                            <p class="nv-phu">Tên và giá nhập tham khảo áp dụng toàn chuỗi. Thao tác này không đổi giá bán, phiếu nhập đã lưu hoặc số lượng tồn.</p>
+                        }
+                    </div>
+                </form>
+            </NoiDung>
+            <Chan>
+                <button type="button" class="nut-phu" disabled="@_dangLuu" @onclick="DongVatTu">Hủy</button>
+                <button type="submit" form="kho-form-vat-tu" class="nut-chinh" disabled="@_dangLuu">@(_dangLuu ? "Đang lưu…" : _vatTuDangSua == null ? "Thêm vật tư" : "Lưu thông tin")</button>
+            </Chan>
+        </HopThoaiQuanTri>
+    }
+    <HopThoaiQuanTri Mo="@_moCanhBao" TieuDe="Sửa mức cảnh báo tồn kho" MoTa="Chỉ áp dụng cho vật tư tại chi nhánh đang sửa, không điều chỉnh số lượng tồn." Loi="@_loi" DangLuu="@_dangLuu" Dong="DongCanhBao">
+        <NoiDung>
+            <form id="kho-form-canh-bao" @onsubmit="LuuCanhBaoAsync" @onsubmit:preventDefault>
+                <div class="khoi-doc">
+                    <div><b>@_khoDangSua?.TenVatTu</b><div class="nv-phu">@_khoDangSua?.TenChiNhanh · Đơn vị: @_khoDangSua?.DonViTinh</div></div>
+                    <div class="truong">
+                        <label class="nhan" for="kho-muc-toi-thieu">Mức cảnh báo tối thiểu</label>
+                        <input id="kho-muc-toi-thieu" class="ca-o-loc mono" type="number" required min="0" max="2147483647" step="1" @bind="_formCanhBao.MucToiThieu" />
+                        <small class="nv-phu">Hiện cảnh báo khi tồn kho nhỏ hơn hoặc bằng mức này. Nhập theo đơn vị @_khoDangSua?.DonViTinh, không nhập số ram/thùng.</small>
+                    </div>
+                    <p class="nv-phu">Tồn hiện tại: @_khoDangSua?.SoLuong @_khoDangSua?.DonViTinh. Muốn tăng tồn, hãy lập phiếu nhập và xác nhận nhận hàng.</p>
+                </div>
+            </form>
+        </NoiDung>
+        <Chan>
+            <button type="button" class="nut-phu" disabled="@_dangLuu" @onclick="DongCanhBao">Hủy</button>
+            <button type="submit" form="kho-form-canh-bao" class="nut-chinh" disabled="@_dangLuu">@(_dangLuu ? "Đang lưu…" : "Lưu mức cảnh báo")</button>
+        </Chan>
+    </HopThoaiQuanTri>
+    @if (_tonKho?.Any(x => x.TenVatTu.EndsWith("(chưa phân loại)") && x.SoLuong > 0) == true)
+    {
+        <div class="o-canh-bao">Tồn giấy chưa phân loại đang được giữ riêng, chưa tính vào giấy 70gsm/80gsm. Cần kiểm kê trước khi phân bổ; không nhập bù lần nữa cùng lượng giấy đang có.</div>
+    }
+    <HopThoaiQuanTri Mo="@_moForm" TieuDe="@(LaCEO() ? "Lập và duyệt phiếu nhập vật tư" : "Đề xuất nhập vật tư")" MoTa="Tồn kho chỉ tăng sau khi xác nhận nhận hàng thực tế." Loi="@_loi" DangLuu="@_dangLuu" Dong="DongForm">
+        <NoiDung>
+        <form id="kho-form-phieu" @onsubmit="TaoPhieuAsync" @onsubmit:preventDefault>
             <div class="ca-loc-luoi">
                 <div class="truong">
                     <label class="nhan">Vật tư cần nhập</label>
@@ -43,19 +121,20 @@
                     <input maxlength="150" class="ca-o-loc" placeholder="Tên đơn vị cung ứng" @bind="_form.NhaCungCap" />
                 </div>
                 <div class="truong">
-                    <label class="nhan">Số lượng nhập</label>
+                    <label class="nhan">Số lượng nhập (@DonViTinhDangChon)</label>
                     <input max="2147483647" required step="1" class="ca-o-loc" type="number" min="1" @bind="_form.SoLuong" />
+                    <small class="nv-phu">Nhập theo @DonViTinhDangChon, không nhập số ram/thùng.</small>
                 </div>
                 <div class="truong">
-                    <label class="nhan">Đơn giá nhập (₫)</label>
+                    <label class="nhan">Đơn giá nhập (₫/@DonViTinhDangChon)</label>
                     <input max="999999999999" required class="ca-o-loc mono" type="number" min="0" step="1" @bind="_form.DonGia" />
-                </div>
-                <div class="truong" style="align-self: flex-end;">
-                    <button type="submit" class="nut-chinh" style="width: 100%;">@(LaCEO() ? "Lập phiếu & duyệt trực tiếp" : "Gửi đề xuất CEO duyệt")</button>
                 </div>
             </div>
         </form>
-    }
+        </NoiDung>
+        <Chan><button type="button" class="nut-phu" disabled="@_dangLuu" @onclick="DongForm">Hủy</button><button type="submit" form="kho-form-phieu" class="nut-chinh" disabled="@_dangLuu">@(_dangLuu ? "Đang lưu…" : LaCEO() ? "Lập phiếu & duyệt trực tiếp" : "Gửi đề xuất CEO duyệt")</button></Chan>
+    </HopThoaiQuanTri>
+    <XacNhanThaoTac @ref="_xacNhan" />
 
     <div class="the the-bang">
         <div class="bang-tieu-de">
@@ -72,15 +151,16 @@
         else
         {
             <div class="bang-cuon">
-                <table role="table" class="bang">
+                <table role="table" class="bang bang-thao-tac-trai">
                     <thead>
                         <tr>
                             <th scope="col">Chi nhánh</th>
                             <th scope="col">Tên vật tư & ĐVT</th>
                             <th scope="col">Số lượng tồn</th>
                             <th scope="col">Mức cảnh báo tối thiểu</th>
-                            <th scope="col">Đơn giá bình quân</th>
+                            <th scope="col">Giá nhập tham khảo</th>
                             <th scope="col">Trạng thái tồn</th>
+                            <th scope="col" class="cot-hanh-dong">Thao tác</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -96,7 +176,7 @@
                                     <b style="font-size: 17px; color: @(x.CanhBao ? "var(--loi-chu)" : "var(--chu)");">@x.SoLuong</b>
                                 </td>
                                 <td class="mono" data-nhan="Mức cảnh báo tối thiểu">@x.MucToiThieu</td>
-                                <td class="mono" data-nhan="Đơn giá bình quân">@Tien(x.DonGia)</td>
+                                <td class="mono" data-nhan="Giá nhập tham khảo">@Tien(x.DonGia)</td>
                                 <td data-nhan="Trạng thái tồn">
                                     @if (x.CanhBao)
                                     {
@@ -108,6 +188,18 @@
                                     {
                                         <span class="nhan-mau nhan-xanh">Đủ tồn kho</span>
                                     }
+                                </td>
+                                <td class="cot-hanh-dong" data-nhan="Thao tác">
+                                    <div class="xac-nhan-o">
+                                        @if (LaCEO())
+                                        {
+                                            <button type="button" class="nut-nho" disabled="@_dangLuu" @onclick="() => MoSuaVatTu(x)">Sửa thông tin</button>
+                                        }
+                                        @if (DuocSuaCanhBao(x))
+                                        {
+                                            <button type="button" class="nut-nho" disabled="@_dangLuu" @onclick="() => MoSuaCanhBao(x)">Sửa mức cảnh báo</button>
+                                        }
+                                    </div>
                                 </td>
                             </tr>
                         }
@@ -155,8 +247,8 @@
                                     <div class="nv-phu">NCC: @p.NhaCungCap</div>
                                 </td>
                                 <td data-nhan="Số lượng & Đơn giá">
-                                    <span class="mono"><b>@p.SoLuong</b> bản/cuộn</span>
-                                    <div class="nv-phu mono">@Tien(p.DonGia)/đv</div>
+                                    <span class="mono"><b>@p.SoLuong</b> @p.DonViTinh</span>
+                                    <div class="nv-phu mono">@Tien(p.DonGia)/@(p.DonViTinh ?? "đơn vị")</div>
                                 </td>
                                 <td data-nhan="Người tạo">
                                     <div class="nv-ten">@p.TenNguoiLap</div>
@@ -167,7 +259,7 @@
                                 <td class="cot-hanh-dong" data-nhan="Thao tác">
                                     @if (LaQuanLyChiNhanh() && p.TrangThai == "DA_DUYET")
                                     {
-                                        <button class="nut-nho chinh" title="Xác nhận hàng đã về kho chi nhánh" @onclick="() => NhanHangAsync(p)">
+                                        <button class="nut-nho chinh" disabled="@_dangLuu" title="Xác nhận hàng đã về kho chi nhánh" @onclick="() => NhanHangAsync(p)">
                                             @((MarkupString)Svg.DauTich(14)) Nhận đủ @p.SoLuong
                                         </button>
                                     }
@@ -184,9 +276,96 @@
 @code {
     private List<TonKhoDto> _tonKho;
     private List<PhieuNhapDto> _phieu;
+    private string DonViTinhDangChon => _tonKho?.FirstOrDefault(x => x.MaVatTu == _form.MaVatTu)?.DonViTinh ?? "đơn vị";
     private TaoPhieuNhapRequest _form = new() { SoLuong = 1 };
+    private TaoVatTuRequest _vatTuMoi = new();
+    private TonKhoDto _vatTuDangSua, _khoDangSua;
+    private CapNhatMucCanhBaoRequest _formCanhBao = new();
     private string _loi;
     private string _thongBao;
+    private bool _moForm, _moVatTu, _moCanhBao, _dangLuu;
+    private XacNhanThaoTac _xacNhan;
+    private void MoTaoPhieu() { if (_dangLuu || !LaQuanLyChiNhanh()) return; _form = new() { SoLuong = 1, MaVatTu = _tonKho?.FirstOrDefault()?.MaVatTu ?? 0 }; _loi = _thongBao = null; _moForm = true; }
+    private void DongForm() { if (!_dangLuu) { _moForm = false; _loi = null; } }
+
+    private void MoThemVatTu()
+    {
+        if (_dangLuu || !LaCEO()) return;
+        _vatTuMoi = new();
+        _vatTuDangSua = null;
+        _moForm = _moCanhBao = false;
+        _loi = _thongBao = null;
+        _moVatTu = true;
+    }
+
+    private void DongVatTu() { if (!_dangLuu) { _moVatTu = false; _vatTuDangSua = null; _loi = null; } }
+
+    private void MoSuaVatTu(TonKhoDto vatTu)
+    {
+        if (_dangLuu || !LaCEO()) return;
+        _vatTuDangSua = vatTu;
+        _vatTuMoi = new() { TenVatTu = vatTu.TenVatTu, DonViTinh = vatTu.DonViTinh, DonGia = vatTu.DonGia };
+        _moForm = _moCanhBao = false;
+        _loi = _thongBao = null;
+        _moVatTu = true;
+    }
+
+    private bool DuocSuaCanhBao(TonKhoDto kho)
+    {
+        int? maChiNhanh = PhamVi.MaChiNhanh ?? Phien.NguoiDung?.MaChiNhanh;
+        return (LaCEO() && maChiNhanh == null) ||
+            ((LaCEO() || Phien.NguoiDung?.TenVaiTro == "BRANCH_ADMIN") && maChiNhanh == kho.MaChiNhanh);
+    }
+
+    private void MoSuaCanhBao(TonKhoDto kho)
+    {
+        if (_dangLuu || !DuocSuaCanhBao(kho)) return;
+        _khoDangSua = kho;
+        _formCanhBao = new() { MucToiThieu = kho.MucToiThieu };
+        _moForm = _moVatTu = false;
+        _loi = _thongBao = null;
+        _moCanhBao = true;
+    }
+
+    private void DongCanhBao() { if (!_dangLuu) { _moCanhBao = false; _khoDangSua = null; _loi = null; } }
+
+    private async Task LuuCanhBaoAsync()
+    {
+        if (_dangLuu || !_moCanhBao || _khoDangSua == null || !DuocSuaCanhBao(_khoDangSua)) return;
+        _loi = QuyTacNhap.LayLoi(_formCanhBao);
+        if (_loi != null) return;
+        _dangLuu = true; _thongBao = null;
+        try
+        {
+            using var r = await Http.PutAsJsonAsync($"api/quan-tri/kho/{_khoDangSua.MaChiNhanh}/{_khoDangSua.MaVatTu}/muc-canh-bao", _formCanhBao);
+            if (!r.IsSuccessStatusCode) { _loi = await DocLoiApi.TuPhanHoiAsync(r, "Không lưu được mức cảnh báo."); return; }
+            _thongBao = (await r.Content.ReadFromJsonAsync<KetQuaDto>()).Message;
+            _moCanhBao = false; _khoDangSua = null;
+            await TaiAsync();
+        }
+        catch (HttpRequestException) { _loi = "Mất kết nối API. Tải lại kho để kiểm tra trước khi lưu lại."; }
+        finally { _dangLuu = false; }
+    }
+
+    private async Task LuuVatTuAsync()
+    {
+        if (_dangLuu || !_moVatTu || !LaCEO()) return;
+        _loi = QuyTacNhap.LayLoi(_vatTuMoi);
+        if (_loi != null) return;
+        _dangLuu = true; _thongBao = null;
+        try
+        {
+            using var r = _vatTuDangSua == null
+                ? await Http.PostAsJsonAsync("api/quan-tri/danh-muc-vat-tu", _vatTuMoi)
+                : await Http.PutAsJsonAsync("api/quan-tri/danh-muc-vat-tu/" + _vatTuDangSua.MaVatTu, _vatTuMoi);
+            if (!r.IsSuccessStatusCode) { _loi = await DocLoiApi.TuPhanHoiAsync(r, "Không lưu được vật tư."); return; }
+            _thongBao = (await r.Content.ReadFromJsonAsync<KetQuaDto>()).Message;
+            _moVatTu = false; _vatTuDangSua = null;
+            await TaiAsync();
+        }
+        catch (HttpRequestException) { _loi = "Mất kết nối API. Kiểm tra danh sách kho trước khi lưu lại để tránh tạo trùng."; }
+        finally { _dangLuu = false; }
+    }
 
     protected override async Task OnInitializedAsync() => await TaiAsync();
 
@@ -216,37 +395,39 @@
 
     private async Task TaoPhieuAsync()
     {
+        if (_dangLuu || !LaQuanLyChiNhanh()) return;
         _loi = QuyTacNhap.LayLoi(_form);
         if (_loi != null) return;
-        var r = await Http.PostAsJsonAsync("api/quan-tri/phieu-nhap", _form);
-
-        if (r.IsSuccessStatusCode)
+        _dangLuu = true; _thongBao = null;
+        try
         {
+            using var r = await Http.PostAsJsonAsync("api/quan-tri/phieu-nhap", _form);
+            if (!r.IsSuccessStatusCode) { _loi = await DocLoiApi.TuPhanHoiAsync(r, "Không lập được phiếu nhập."); return; }
             _thongBao = (await r.Content.ReadFromJsonAsync<KetQuaDto>()).Message;
+            _moForm = false;
             await TaiAsync();
         }
-        else
-        {
-            _loi = (await r.Content.ReadFromJsonAsync<ApiError>()).Message;
-        }
+        catch (HttpRequestException) { _loi = "Mất kết nối API. Làm mới lịch sử để kiểm tra trước khi gửi lại."; }
+        finally { _dangLuu = false; }
     }
 
     private async Task NhanHangAsync(PhieuNhapDto p)
     {
+        if (_dangLuu || !LaQuanLyChiNhanh()) return;
+        if (!await _xacNhan.HoiAsync($"Đã nhận đủ {p.SoLuong} {p.TenVatTu} theo phiếu PN{p.MaPhieuNhap:0000}? Xác nhận sẽ tăng tồn kho.", "Nhận vật tư vào kho", "Xác nhận nhận đủ")) return;
+        _dangLuu = true;
         _loi = null;
-        var r = await Http.PostAsJsonAsync(
-            $"api/quan-tri/phieu-nhap/{p.MaPhieuNhap}/nhan-hang",
-            new NhanHangRequest { SoLuongThucNhan = p.SoLuong });
-
-        if (r.IsSuccessStatusCode)
+        try
         {
+            using var r = await Http.PostAsJsonAsync(
+                $"api/quan-tri/phieu-nhap/{p.MaPhieuNhap}/nhan-hang",
+                new NhanHangRequest { SoLuongThucNhan = p.SoLuong });
+            if (!r.IsSuccessStatusCode) { _loi = await DocLoiApi.TuPhanHoiAsync(r, "Không xác nhận được nhận hàng."); return; }
             _thongBao = "Đã nhập kho.";
             await TaiAsync();
         }
-        else
-        {
-            _loi = (await r.Content.ReadFromJsonAsync<ApiError>()).Message;
-        }
+        catch (HttpRequestException) { _loi = "Mất kết nối API. Làm mới kho để kiểm tra kết quả."; }
+        finally { _dangLuu = false; }
     }
 
     private string Mau(string s) => s == "DA_NHAP"

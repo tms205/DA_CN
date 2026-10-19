@@ -185,6 +185,105 @@ void main() {
     );
   });
 
+  testWidgets('Giấy lấy tên kho, hai vật tư cùng quy cách không bị gộp', (
+    tester,
+  ) async {
+    final baoGia = <Map<String, dynamic>>[];
+    await http.runWithClient(
+      () async {
+        await mo(tester);
+        expect(find.text('Giấy A4 100gsm loại A'), findsOneWidget);
+        final giayB = find.text('Giấy A4 100gsm loại B');
+        await tester.drag(find.byType(ListView).first, const Offset(-320, 0));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(giayB);
+        await tester.tap(giayB);
+        await tester.pumpAndSettle();
+        expect(baoGia.last['fileIn'][0]['maDichVu'], 102);
+        await tester.tap(find.text('Tiếp tục chọn chi nhánh'));
+        await tester.pumpAndSettle();
+        expect(baoGia.last['fileIn'][0]['maDichVu'], 102);
+      },
+      () => MockClient((req) async {
+        if (req.url.path == '/api/danh-muc/chi-nhanh' ||
+            req.url.path == '/api/don-hang/chi-nhanh-phu-hop') {
+          return traJson([chiNhanh(11)]);
+        }
+        if (req.url.path == '/api/danh-muc/bang-gia') {
+          return traJson([
+            for (final i in [1, 2])
+              {
+                'maDichVu': 100 + i,
+                'tenDichVu': 'In A4 100gsm',
+                'loaiDichVu': 'IN_AN',
+                'maVatTu': 20 + i,
+                'tenVatTu': 'Giấy A4 100gsm loại ${i == 1 ? 'A' : 'B'}',
+                'khoGiay': 'A4',
+                'loaiGiay': '100gsm',
+                'matIn': '1_MAT',
+                'mauSac': 'DEN_TRANG',
+                'donGia': 500,
+              },
+          ]);
+        }
+        if (req.url.path == '/api/bao-gia') {
+          baoGia.add(Map<String, dynamic>.from(jsonDecode(req.body)));
+          return traJson({'tienIn': 1000, 'tongTien': 1000, 'tongSoTrang': 2});
+        }
+        throw StateError('API không mong đợi: ${req.url.path}');
+      }),
+    );
+  });
+
+  testWidgets('Chọn chi nhánh để thấy giấy chỉ bán ở chi nhánh đó', (
+    tester,
+  ) async {
+    final baoGia = <Map<String, dynamic>>[];
+    await http.runWithClient(
+      () async {
+        await mo(tester);
+        await tester.tap(find.byType(DropdownButtonFormField<int>));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Chi nhánh 22').last);
+        await tester.pumpAndSettle();
+        expect(find.text('Giấy A4 120gsm'), findsOneWidget);
+        expect(baoGia.last['maChiNhanh'], 22);
+        expect(baoGia.last['fileIn'][0]['maDichVu'], 122);
+        await tester.tap(find.text('Tiếp tục chọn chi nhánh'));
+        await tester.pumpAndSettle();
+        expect(baoGia.last['maChiNhanh'], 22);
+      },
+      () => MockClient((req) async {
+        if (req.url.path == '/api/danh-muc/chi-nhanh' ||
+            req.url.path == '/api/don-hang/chi-nhanh-phu-hop') {
+          return traJson([chiNhanh(11), chiNhanh(22)]);
+        }
+        if (req.url.path == '/api/danh-muc/bang-gia') {
+          final cn = int.parse(req.url.queryParameters['maChiNhanh']!);
+          return traJson([
+            {
+              'maDichVu': 100 + cn,
+              'tenDichVu': 'In A4',
+              'loaiDichVu': 'IN_AN',
+              'maVatTu': cn,
+              'tenVatTu': cn == 22 ? 'Giấy A4 120gsm' : 'Giấy A4 70gsm',
+              'khoGiay': 'A4',
+              'loaiGiay': cn == 22 ? '120gsm' : '70gsm',
+              'matIn': '1_MAT',
+              'mauSac': 'DEN_TRANG',
+              'donGia': 500,
+            },
+          ]);
+        }
+        if (req.url.path == '/api/bao-gia') {
+          baoGia.add(Map<String, dynamic>.from(jsonDecode(req.body)));
+          return traJson({'tienIn': 1000, 'tongTien': 1000, 'tongSoTrang': 2});
+        }
+        throw StateError('API không mong đợi: ${req.url.path}');
+      }),
+    );
+  });
+
   testWidgets('Tải chi nhánh lỗi thì có thể thử lại', (tester) async {
     int soLan = 0;
     await http.runWithClient(

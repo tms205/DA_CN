@@ -6,17 +6,21 @@ namespace PhotocopyApi.Tests;
 
 public class QuyTacCaDangNhapTests
 {
-    [Fact]
-    public void NhanVienDangNhapWeb_ThiTuDongMoCa()
+    [Theory]
+    [InlineData(VaiTro.Staff)]
+    [InlineData(VaiTro.BranchAdmin)]
+    public void NhanSuCoChiNhanhDangNhapWeb_ThiTuDongMoCa(string vaiTro)
     {
-        Assert.True(QuyTacCaDangNhap.CanTuDongMoCa(true, VaiTro.Staff));
+        Assert.True(QuyTacCaDangNhap.CanTuDongMoCa(true, vaiTro));
     }
 
     [Theory]
     [InlineData(false, VaiTro.Staff)]
-    [InlineData(true, VaiTro.BranchAdmin)]
+    [InlineData(false, VaiTro.BranchAdmin)]
+    [InlineData(false, VaiTro.SuperAdmin)]
     [InlineData(true, VaiTro.SuperAdmin)]
     [InlineData(true, VaiTro.Customer)]
+    [InlineData(true, VaiTro.Shipper)]
     public void TaiKhoanKhac_HoacDangNhapApp_ThiKhongTuDongMoCa(bool laWeb, string vaiTro)
     {
         Assert.False(QuyTacCaDangNhap.CanTuDongMoCa(laWeb, vaiTro));

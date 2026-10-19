@@ -14,7 +14,7 @@
 <TieuDeTrang TieuDe="Bàn giao tại quầy" MoTa="@MoTa()" />
 
 <div class="than-trang khoi-doc">
-    @if (_loi != null)
+    @if (_loi != null && _donPhatSinh == null && _donBanGiao == null)
     {
         <div class="o-loi">@((MarkupString)Svg.ChamThan())<span>@_loi</span></div>
     }
@@ -103,14 +103,6 @@
                                     {
                                         <button class="nut-nho" disabled>Chưa thể bàn giao</button>
                                     }
-                                    else if (_dangXacNhan == don.MaDonHang)
-                                    {
-                                        <div class="xac-nhan-o">
-                                            <span class="chu-mo">@(don.PhuongThucThanhToan == "COD" ? "Đã thu COD và giao tài liệu?" : "Giao tài liệu cho khách?")</span>
-                                            <button class="nut-nho chinh" disabled="@_dangGui" @onclick="() => BanGiaoAsync(don)">@(_dangGui ? "Đang xử lý…" : "Xác nhận")</button>
-                                            <button class="nut-nho" disabled="@_dangGui" @onclick="() => _dangXacNhan = null">Hủy</button>
-                                        </div>
-                                    }
                                     else
                                     {
                                         <button class="nut-nho chinh" @onclick="() => MoXacNhan(don)">@((MarkupString)Svg.CapTap(13)) Bàn giao</button>
@@ -124,9 +116,13 @@
         }
     </div>
 
-    @if (_donPhatSinh != null)
-    {
-        <form @onsubmit="TaoPhatSinhAsync" @onsubmit:preventDefault class="the the-rong bg-phat-sinh">
+    <HopThoaiQuanTri Mo="@(_donBanGiao != null)" TieuDe="Bàn giao tại quầy" Loi="@_loi" DangLuu="@_dangGui" Dong="DongBanGiao">
+        <NoiDung><p><b>@_donBanGiao?.MaDonHangHienThi · @_donBanGiao?.TenKhachHang</b></p><p>@(_donBanGiao?.PhuongThucThanhToan is "COD" or "TIEN_MAT" ? "Chỉ xác nhận khi đã thu đủ tiền COD và giao đúng tài liệu cho khách. Tiền sẽ được ghi nhận vào ca." : "Xác nhận đã giao đúng tài liệu cho khách.")</p></NoiDung>
+        <Chan><button type="button" class="nut-phu" disabled="@_dangGui" @onclick="DongBanGiao">Hủy</button><button type="button" class="nut-chinh" disabled="@_dangGui" @onclick="() => BanGiaoAsync(_donBanGiao)">Xác nhận bàn giao</button></Chan>
+    </HopThoaiQuanTri>
+    <HopThoaiQuanTri Mo="@(_donPhatSinh != null)" TieuDe="@(_cheDoPhatSinh == "IN_LAI_LOI_QUAY" ? "In lại do lỗi quầy" : "Khách mua thêm")" Loi="@_loi" DangLuu="@_dangGui" Dong="YeuCauDongPhatSinh" Rong="true">
+    <NoiDung>
+        <form id="bg-form-phat-sinh" @onsubmit="TaoPhatSinhAsync" @onsubmit:preventDefault class="bg-phat-sinh">
             <div class="ca-dau">
                 <div>
                     <h2 class="the-tieu-de nho">@(_cheDoPhatSinh == "IN_LAI_LOI_QUAY" ? "In lại miễn phí do lỗi quầy" : "Lập đơn khách mua thêm")</h2>
@@ -134,7 +130,6 @@
                         Đơn gốc @_donPhatSinh.MaDonHangHienThi · @_donPhatSinh.TenKhachHang
                     </p>
                 </div>
-                <button type="button" class="nut-dong" @onclick="DongPhatSinh">✕</button>
             </div>
 
             <div class="o-canh-bao @(_cheDoPhatSinh == "IN_LAI_LOI_QUAY" ? "bg-mien-phi" : "")">
@@ -224,15 +219,11 @@
                     <span class="nv-phu">Khách cần trả thêm</span>
                     <b class="mono hd-tong">@(_cheDoPhatSinh == "IN_LAI_LOI_QUAY" ? "0₫" : Tien(TienDuKienBoSung))</b>
                 </div>
-                <div class="xac-nhan-o">
-                    <button type="button" class="nut-nho" disabled="@_dangGui" @onclick="DongPhatSinh">Hủy</button>
-                    <button type="submit" class="nut-nho chinh" disabled="@(_dangGui || !PhatSinhHopLe)">
-                        @(_dangGui ? "Đang tạo…" : _cheDoPhatSinh == "IN_LAI_LOI_QUAY" ? "Tạo việc in lại 0₫" : "Tạo đơn bổ sung COD")
-                    </button>
-                </div>
             </div>
         </form>
-    }
+    </NoiDung>
+    <Chan><button type="button" class="nut-phu" disabled="@_dangGui" @onclick="YeuCauDongPhatSinh">Hủy</button><button type="submit" form="bg-form-phat-sinh" class="nut-chinh" disabled="@(_dangGui || !PhatSinhHopLe)">@(_dangGui ? "Đang tạo…" : _cheDoPhatSinh == "IN_LAI_LOI_QUAY" ? "Tạo việc in lại 0₫" : "Tạo đơn bổ sung COD")</button></Chan>
+    </HopThoaiQuanTri>
 </div>
 
 @code {
@@ -240,7 +231,9 @@
     private string _tuKhoa = "";
     private string _loi;
     private string _thongBao;
-    private int? _dangXacNhan;            // đơn đang hỏi "Xác nhận / Hủy"
+    private HangDoiDonDto _donBanGiao;
+    private void DongBanGiao() { if (!_dangGui) { _donBanGiao = null; _loi = null; } }
+    private void YeuCauDongPhatSinh() { if (!_dangGui) { DongPhatSinh(); _loi = null; } }
     private bool _dangGui = false;
 
     private DonHangChiTietDto _donPhatSinh;
@@ -316,15 +309,16 @@
 
     private void MoXacNhan(HangDoiDonDto don)
     {
+        if (_dangGui) return;
         _loi = null;
-        _dangXacNhan = don.MaDonHang;
+        _donBanGiao = don;
     }
 
     private async Task MoPhatSinhAsync(HangDoiDonDto don, string cheDo)
     {
         _loi = null;
         _thongBao = null;
-        _dangXacNhan = null;
+        _donBanGiao = null;
         try
         {
             var res = await Http.GetAsync("api/don-hang/" + don.MaDonHang);
@@ -408,7 +402,7 @@
 
     private async Task TaoPhatSinhAsync()
     {
-        if (_donPhatSinh == null || !PhatSinhHopLe) return;
+        if (_dangGui || _donPhatSinh == null || !PhatSinhHopLe) return;
         _dangGui = true;
         _loi = null;
         _thongBao = null;
@@ -557,6 +551,7 @@
     // POST api/don-hang/{id}/giao-tai-quay — VietQR đã trả trước; COD thu tại bước này.
     private async Task BanGiaoAsync(HangDoiDonDto don)
     {
+        if (_dangGui || don == null) return;
         _loi = null;
         _dangGui = true;
 
@@ -568,7 +563,7 @@
             var res = await Http.PostAsync("api/don-hang/" + don.MaDonHang + "/giao-tai-quay", null);
             if (res.IsSuccessStatusCode)
             {
-                _dangXacNhan = null;
+                _donBanGiao = null;
             }
             else
             {

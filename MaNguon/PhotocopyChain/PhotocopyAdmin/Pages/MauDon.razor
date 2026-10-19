@@ -1,0 +1,284 @@
+@page "/mau-don"
+@attribute [Authorize(Roles = "SUPER_ADMIN")]
+@inject HttpClient Http
+@inject IJSRuntime Js
+
+<PageTitle>Mẫu đơn in sẵn · PhotocopyChain</PageTitle>
+<TieuDeTrang TieuDe="Mẫu đơn in sẵn" MoTa="Thư viện dùng chung toàn chuỗi. Tải PDF lên một lần, chọn để in trên web và app." />
+
+<div class="than-trang khoi-doc">
+    @if (_loi != null && !_moForm) { <div class="o-loi" role="alert">@_loi</div> }
+    @if (_thongBao != null) { <div class="o-thanh-cong" role="status">@_thongBao</div> }
+    <div class="xac-nhan-o">
+        <button type="button" class="nut-chinh" disabled="@_dangLuu" @onclick="ThemMoi">Tải mẫu lên</button>
+        <button type="button" class="nut-phu" title="Tải lại danh sách mẫu từ máy chủ, không xóa hay tạo lại thư viện." disabled="@(_dangLuu || _dangTai)" @onclick="TaiAsync">Làm mới thư viện</button>
+    </div>
+
+    <section class="the the-bang" aria-label="Danh mục mẫu đơn">
+        <div class="bang-tieu-de"><div><h2>Thư viện biểu mẫu</h2><p class="bang-mo-ta">Mẫu ẩn không xuất hiện khi lập đơn. Thay file không thay đổi tài liệu trong đơn đã tạo.</p></div>
+            <span class="nhan-mau nhan-xam">@(_ds?.Count(x => x.TrangThai == "HIEN") ?? 0) đang hiện</span></div>
+        <div class="mau-loc">
+            <div class="truong"><label class="nhan" for="mau-tim">Tìm mẫu</label><input id="mau-tim" class="ca-o-loc" placeholder="Tên mẫu, loại mẫu" @bind="_tuKhoa" @bind:event="oninput" @bind:after="VeTrangDau" /></div>
+            <div class="truong"><label class="nhan" for="mau-loc-loai">Loại mẫu</label><select id="mau-loc-loai" class="ca-o-loc" @bind="_loaiLoc" @bind:after="VeTrangDau"><option value="">Tất cả loại</option>@foreach (var nhom in CacNhom) { <option value="@nhom">@nhom</option> }</select></div>
+            <div class="truong"><label class="nhan" for="mau-trang-thai">Hiển thị</label><select id="mau-trang-thai" class="ca-o-loc" @bind="_trangThai" @bind:after="VeTrangDau"><option value="">Tất cả</option><option value="HIEN">Đang hiện</option><option value="AN">Đang ẩn</option></select></div>
+        </div>
+        @if (_ds == null) { <div class="bang-trong" role="status">@(_dangTai ? "Đang tải thư viện…" : "Chưa tải được thư viện. Hãy bấm Làm mới thư viện.")</div> }
+        else
+        {
+            <div class="bang-cuon"><table class="bang mau-bang">
+                <thead><tr><th scope="col">Tên mẫu</th><th scope="col">Loại mẫu</th><th scope="col">Số trang</th><th scope="col">Cập nhật</th><th scope="col">Trạng thái</th><th scope="col" class="cot-hanh-dong">Thao tác</th></tr></thead>
+                <tbody>
+                    @foreach (var mau in DaLoc.Skip((Trang - 1) * 10).Take(10))
+                    {
+                        <tr @key="mau.MaMau">
+                            <td data-nhan="Tên mẫu"><b>@mau.TenMau</b><div class="nv-phu">@mau.Nguon</div></td>
+                            <td data-nhan="Loại mẫu">@mau.Nhom</td>
+                            <td data-nhan="Số trang">@mau.SoTrang</td>
+                            <td data-nhan="Cập nhật">@if (mau.CapNhatLuc != null) { <span class="mau-ngay">@mau.CapNhatLuc.Value.ToLocalTime().ToString("dd/MM/yyyy")</span><div class="nv-phu">@mau.CapNhatLuc.Value.ToLocalTime().ToString("HH:mm")</div> } else { <span class="nv-phu">Mẫu ban đầu</span> }</td>
+                            <td data-nhan="Trạng thái"><span class="nhan-mau @(mau.TrangThai == "HIEN" ? "nhan-xanh" : "nhan-xam")">@(mau.TrangThai == "HIEN" ? "Đang hiện" : "Đang ẩn")</span></td>
+                            <td data-nhan="Thao tác" class="cot-hanh-dong"><div class="mau-thao-tac">
+                                <button type="button" class="nut-nho" disabled="@_dangLuu" @onclick="() => XemAsync(mau)">Xem</button>
+                                <button type="button" class="nut-nho" disabled="@_dangLuu" @onclick="() => Sua(mau)">Sửa</button>
+                                <button type="button" class="nut-nho" disabled="@_dangLuu" @onclick="() => Sua(mau, true)">Thay file</button>
+                                <button type="button" class="nut-nho" disabled="@_dangLuu" @onclick="() => DoiHienAsync(mau)">@(mau.TrangThai == "HIEN" ? "Ẩn" : "Hiện")</button>
+                                <button type="button" class="nut-nho mau-go" disabled="@_dangLuu" @onclick="() => GoAsync(mau)" aria-label="@("Gỡ mẫu " + mau.TenMau)">Gỡ</button>
+                            </div></td>
+                        </tr>
+                    }
+                    @if (DaLoc.Count == 0) { <tr><td colspan="6">Không có mẫu phù hợp.</td></tr> }
+                </tbody>
+            </table></div>
+            <div class="bang-tieu-de"><span>Trang @Trang / @SoTrang · @DaLoc.Count mẫu</span><div class="xac-nhan-o"><button type="button" class="nut-phu" disabled="@(Trang <= 1)" @onclick="() => _trang = Trang - 1">Trước</button><button type="button" class="nut-phu" disabled="@(Trang >= SoTrang)" @onclick="() => _trang = Trang + 1">Sau</button></div></div>
+        }
+    </section>
+</div>
+
+<XacNhanThaoTac @ref="_xacNhan" />
+<dialog class="mau-hop-form" @ref="_hopForm" aria-labelledby="mau-tieu-de-form" aria-describedby="mau-mo-ta-form">
+    @if (_moForm)
+    {
+        <form class="mau-form" @onsubmit="LuuAsync" @onsubmit:preventDefault @key="_khoaForm" aria-label="Thông tin mẫu đơn" aria-busy="@(_dangLuu ? "true" : "false")">
+            <header class="mau-form-dau">
+                <span class="mau-form-bieu-tuong" aria-hidden="true">@((MarkupString)Svg.BieuMau(26))</span>
+                <div><h2 id="mau-tieu-de-form">@TieuDeForm</h2><p id="mau-mo-ta-form">@(_thayFile ? "Cập nhật bản PDF, giữ nguyên mẫu trong thư viện." : "Thông tin rõ ràng giúp khách hàng chọn đúng biểu mẫu.")</p></div>
+                <button type="button" class="mau-dong-form" data-dong-form-mau aria-label="Đóng form mẫu đơn" disabled="@_dangLuu" @onclick="YeuCauDongForm">×</button>
+            </header>
+            <div class="mau-form-noi-dung">
+                @if (_loi != null) { <div class="mau-form-loi o-loi" role="alert">@_loi</div> }
+                <div class="mau-form-luoi">
+                    <section class="mau-thong-tin" aria-labelledby="mau-nhan-thong-tin">
+                        <div class="mau-muc-dau"><h3 id="mau-nhan-thong-tin">Thông tin mẫu</h3><span>* Bắt buộc</span></div>
+                        <div class="truong">
+                            <label class="nhan" for="mau-ten">Tên mẫu đơn <span class="mau-bat-buoc" aria-hidden="true">*</span></label>
+                            <input id="mau-ten" class="ca-o-loc" required maxlength="150" @bind="_ten" disabled="@(_dangLuu || _thayFile)" autofocus="@(!_thayFile)" placeholder="Ví dụ: Đơn xin việc" />
+                        </div>
+                        <div class="truong">
+                            <label class="nhan" for="mau-loai">Loại mẫu <span class="mau-bat-buoc" aria-hidden="true">*</span></label>
+                            <input id="mau-loai" class="ca-o-loc" required maxlength="80" list="mau-cac-loai" @bind="_nhom" disabled="@(_dangLuu || _thayFile)" aria-describedby="mau-goi-y-loai" placeholder="Ví dụ: Việc làm, Học vụ…" />
+                            <datalist id="mau-cac-loai">@foreach (var nhom in CacNhom) { <option value="@nhom"></option> }</datalist>
+                            <span id="mau-goi-y-loai" class="mau-goi-y">Chọn loại đã có hoặc nhập một loại mới.</span>
+                        </div>
+                        @if (!_thayFile)
+                        {
+                            <div class="truong">
+                                <label class="nhan" for="mau-mo-ta">Mô tả / lưu ý sử dụng <span class="mau-khong-bat-buoc">Không bắt buộc</span></label>
+                                <textarea id="mau-mo-ta" class="ca-o-loc" rows="4" maxlength="1000" @bind="_moTa" disabled="@_dangLuu" placeholder="Nêu mục đích sử dụng hoặc lưu ý cho người chọn mẫu."></textarea>
+                            </div>
+                        }
+                    </section>
+                    <aside class="mau-tai-lieu" aria-label="Tài liệu mẫu">
+                        @if (_dangSua == null || _thayFile)
+                        {
+                            <label class="nhan" for="mau-file">File PDF <span class="mau-bat-buoc" aria-hidden="true">*</span></label>
+                            <div class="mau-chon-file @(_file != null ? "da-chon" : "")">
+                                <InputFile id="mau-file" OnChange="ChonFile" accept=".pdf,application/pdf" disabled="@_dangLuu" autofocus="@_thayFile" aria-describedby="mau-huong-dan" />
+                                <div class="mau-file-minh-hoa" aria-hidden="true">
+                                    <span class="mau-file-icon">@((MarkupString)Svg.TaiLieu(32))</span>
+                                    @if (_file == null)
+                                    {
+                                        <strong>Chọn file PDF</strong><span>Bấm vào đây để chọn tài liệu từ máy</span>
+                                    }
+                                    else
+                                    {
+                                        <strong>@_file.Name</strong><span>@((_file.Size / 1024d).ToString("N0")) KB · Đã chọn PDF</span><span class="mau-doi-file">Bấm để chọn file khác</span>
+                                    }
+                                </div>
+                            </div>
+                            <div class="mau-gioi-han"><span>PDF không khóa</span><span>≤ 20 MB</span><span>≤ 50 trang</span></div>
+                            <p id="mau-huong-dan" class="mau-goi-y">File Word cần xuất PDF trước. Dùng bản trống, không chứa thông tin cá nhân.</p>
+                        }
+                        else
+                        {
+                            <div class="mau-file-hien-tai"><span aria-hidden="true">@((MarkupString)Svg.TaiLieu(28))</span><div><strong>Giữ nguyên file PDF</strong><span>@_dangSua.SoTrang trang · @(_dangSua.TrangThai == "HIEN" ? "Đang hiện" : "Đang ẩn")</span></div></div>
+                            <p class="mau-goi-y">Lần lưu này chỉ thay đổi thông tin. Muốn dùng PDF khác, chọn thao tác “Thay file” trong danh sách.</p>
+                        }
+                        <div class="mau-luu-y"><span aria-hidden="true">@((MarkupString)Svg.ThongTin(18))</span><p>@(_dangSua == null ? "Mẫu sẽ có trong thư viện dùng chung sau khi lưu thành công." : "Tài liệu trong các đơn đã tạo không bị thay đổi.")</p></div>
+                    </aside>
+                </div>
+            </div>
+            <footer class="mau-form-cuoi">
+                <p>@(_dangLuu ? "Vui lòng chờ, hệ thống đang xử lý file." : "Chỉ lưu khi đã kiểm tra thông tin và tài liệu.")</p>
+                <div><button type="button" class="nut-phu" disabled="@_dangLuu" @onclick="YeuCauDongForm">Hủy</button>
+                    <button type="submit" class="nut-chinh" disabled="@_dangLuu">@(_dangLuu ? "Đang kiểm tra PDF và lưu…" : _thayFile ? "Lưu file thay thế" : "Lưu mẫu đơn")</button></div>
+            </footer>
+        </form>
+    }
+</dialog>
+
+<dialog class="mau-xem" @ref="_hopXem" aria-labelledby="mau-tieu-de-xem">
+    <div class="mau-xem-dau"><h2 id="mau-tieu-de-xem">@_mauXem?.TenMau</h2><form method="dialog"><button class="nut-phu" aria-label="Đóng xem trước mẫu">Đóng</button></form></div>
+    <div class="mau-cong-cu"><button type="button" class="nut-phu" disabled="@(_dangXem || _trangXem <= 1)" @onclick="() => TaiAnhAsync(_trangXem - 1)">Trang trước</button>
+        <span>Trang @_trangXem / @_mauXem?.SoTrang</span><button type="button" class="nut-phu" disabled="@(_dangXem || _trangXem >= (_mauXem?.SoTrang ?? 1))" @onclick="() => TaiAnhAsync(_trangXem + 1)">Trang sau</button>
+        <label for="mau-phong">Phóng to</label><select id="mau-phong" class="ca-o-loc" @bind="_phong"><option value="100">Vừa khung</option><option value="150">150%</option><option value="200">200%</option></select></div>
+    @if (_loiXem != null) { <div class="o-loi" role="alert">@_loiXem</div><button class="nut-phu" @onclick="() => TaiAnhAsync(_trangXem)">Thử lại bản xem trước</button> }
+    @if (_dangXem) { <p role="status">Đang tải trang…</p> }
+    <div class="mau-anh-khung">@if (_anh != null) { <img src="@_anh" alt="@($"{_mauXem?.TenMau}, trang {_trangXem}")" style="width:@(_phong)%;" /> }</div>
+</dialog>
+
+@code {
+    private List<MauDonDto> _ds;
+    private MauDonDto _dangSua, _mauXem;
+    private IBrowserFile _file;
+    private string _ten = "", _nhom = "", _moTa = "", _tuKhoa = "", _loaiLoc = "", _trangThai = "";
+    private string _loi, _thongBao, _loiXem, _anh;
+    private bool _moForm, _thayFile, _dangLuu, _dangTai, _dangXem;
+    private int _trang = 1, _khoaForm, _trangXem = 1, _phong = 100;
+    private ElementReference _hopXem;
+    private ElementReference _hopForm;
+    private bool _canMoForm, _canDongForm;
+    private XacNhanThaoTac _xacNhan;
+    private string TieuDeForm => _dangSua == null ? "Thêm mẫu đơn" : _thayFile ? "Thay file mẫu đơn" : "Sửa thông tin mẫu";
+    private IEnumerable<string> CacNhom => (_ds ?? new()).Select(x => x.Nhom).Distinct().OrderBy(x => x);
+    private List<MauDonDto> DaLoc => (_ds ?? new()).Where(x =>
+        (_loaiLoc == "" || x.Nhom == _loaiLoc) && (_trangThai == "" || x.TrangThai == _trangThai)
+        && (x.TenMau.Contains(_tuKhoa.Trim(), StringComparison.CurrentCultureIgnoreCase) || x.Nhom.Contains(_tuKhoa.Trim(), StringComparison.CurrentCultureIgnoreCase))).ToList();
+    private int SoTrang => Math.Max(1, (DaLoc.Count + 9) / 10);
+    private int Trang => Math.Clamp(_trang, 1, SoTrang);
+    private void VeTrangDau() => _trang = 1;
+    protected override async Task OnInitializedAsync() => await TaiAsync();
+
+    private async Task TaiAsync()
+    {
+        if (_dangTai) return;
+        _dangTai = true; _loi = null;
+        try
+        {
+            using var res = await Http.GetAsync("api/quan-tri/mau-don");
+            if (!res.IsSuccessStatusCode) { _loi = await DocLoiApi.TuPhanHoiAsync(res, "Không tải được thư viện."); return; }
+            _ds = await res.Content.ReadFromJsonAsync<List<MauDonDto>>() ?? new();
+            if (!CacNhom.Contains(_loaiLoc)) _loaiLoc = "";
+        }
+        catch (HttpRequestException) { _loi = "Không kết nối được API. Hãy thử làm mới thư viện."; }
+        finally { _dangTai = false; }
+    }
+
+    private void ThemMoi() { DongForm(); _moForm = _canMoForm = true; _canDongForm = false; _loi = _thongBao = null; }
+    private void Sua(MauDonDto mau, bool thay = false)
+    {
+        DongForm(); _moForm = true; _dangSua = mau; _thayFile = thay;
+        _ten = mau.TenMau; _nhom = mau.Nhom; _moTa = mau.MoTa; _loi = _thongBao = null;
+        _canMoForm = true; _canDongForm = false;
+    }
+    private void DongForm()
+    {
+        _moForm = _thayFile = _canMoForm = false; _canDongForm = true;
+        _dangSua = null; _file = null; _ten = _nhom = _moTa = ""; _loi = null; _khoaForm++;
+    }
+    private void YeuCauDongForm() { if (!_dangLuu) DongForm(); }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Mở sau khi form đã có trong DOM; chỉ mở một lần, không đặt lại focus khi đang gõ.
+        if (_canMoForm) { _canMoForm = false; await Js.InvokeVoidAsync("moFormMauDon", _hopForm); }
+        else if (_canDongForm) { _canDongForm = false; await Js.InvokeVoidAsync("dongMauDon", _hopForm); }
+    }
+    private void ChonFile(InputFileChangeEventArgs e)
+    {
+        _loi = null; _file = null;
+        if (e.File.Size > 20 * 1024 * 1024 || e.File.Size < 8 || !e.File.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+        { _loi = "Chọn PDF không khóa, tối đa 20 MB."; return; }
+        _file = e.File;
+    }
+
+    private async Task LuuAsync()
+    {
+        if (_dangLuu) return;
+        _loi = _thongBao = null;
+        if (string.IsNullOrWhiteSpace(_ten) || string.IsNullOrWhiteSpace(_nhom)) { _loi = "Nhập tên mẫu và loại mẫu."; return; }
+        bool coFile = _dangSua == null || _thayFile;
+        if (coFile && _file == null) { _loi = "Chọn file PDF cho mẫu đơn."; return; }
+        _dangLuu = true;
+        try
+        {
+            using var req = new HttpRequestMessage(_dangSua == null ? HttpMethod.Post : HttpMethod.Put,
+                "api/quan-tri/mau-don" + (_dangSua == null ? "" : "/" + _dangSua.MaMau + (_thayFile ? "/file" : "")));
+            if (coFile)
+            {
+                var form = new MultipartFormDataContent(); req.Content = form;
+                var content = new StreamContent(_file.OpenReadStream(20 * 1024 * 1024));
+                content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/pdf");
+                form.Add(content, "file", _file.Name);
+                form.Add(new StringContent(_ten.Trim()), "tenMau"); form.Add(new StringContent(_nhom.Trim()), "nhom"); form.Add(new StringContent(_moTa.Trim()), "moTa");
+                if (_dangSua != null) form.Add(new StringContent(_dangSua.PhienBan.ToString()), "phienBan");
+            }
+            else req.Content = JsonContent.Create(new LuuMauDonRequest { TenMau = _ten.Trim(), Nhom = _nhom.Trim(), MoTa = _moTa.Trim(), PhienBan = _dangSua.PhienBan });
+            using var res = await Http.SendAsync(req);
+            if (!res.IsSuccessStatusCode) { _loi = await DocLoiApi.TuPhanHoiAsync(res, "Không lưu được mẫu."); return; }
+            _thongBao = "Đã lưu mẫu. Web/app chọn được mẫu mới khi mở hoặc làm mới thư viện.";
+            DongForm(); await TaiAsync();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException)
+        { _loi = "Chưa xác nhận được kết quả lưu. Làm mới thư viện trước khi gửi lại để tránh tạo trùng."; }
+        finally { _dangLuu = false; }
+    }
+
+    private async Task DoiHienAsync(MauDonDto mau)
+    {
+        if (_dangLuu) return;
+        string thaoTac = mau.TrangThai == "HIEN" ? "Ẩn" : "Hiện";
+        if (await _xacNhan.HoiAsync(thaoTac + " mẫu “" + mau.TenMau + "” trong thư viện?", thaoTac + " mẫu đơn", thaoTac))
+            await CapNhatAsync(mau, false);
+    }
+    private async Task GoAsync(MauDonDto mau)
+    {
+        if (_dangLuu) return;
+        if (await _xacNhan.HoiAsync("Gỡ mẫu “" + mau.TenMau + "” khỏi thư viện? Tài liệu của đơn đã tạo vẫn được giữ nguyên.", "Gỡ mẫu đơn", "Gỡ mẫu", true))
+            await CapNhatAsync(mau, true);
+    }
+    private async Task CapNhatAsync(MauDonDto mau, bool go)
+    {
+        if (_dangLuu) return;
+        _dangLuu = true; _loi = _thongBao = null;
+        try
+        {
+            using var res = go ? await Http.DeleteAsync($"api/quan-tri/mau-don/{mau.MaMau}?phienBan={mau.PhienBan}")
+                : await Http.PutAsJsonAsync($"api/quan-tri/mau-don/{mau.MaMau}/trang-thai", new HienMauDonRequest { Hien = mau.TrangThai != "HIEN", PhienBan = mau.PhienBan });
+            if (!res.IsSuccessStatusCode) { _loi = await DocLoiApi.TuPhanHoiAsync(res, "Không cập nhật được mẫu."); return; }
+            _thongBao = go ? "Đã gỡ khỏi danh mục. Các file cũ vẫn được giữ an toàn." : "Đã cập nhật hiển thị mẫu.";
+            if (_dangSua?.MaMau == mau.MaMau) DongForm();
+            await TaiAsync();
+        }
+        catch (HttpRequestException) { _loi = "Không kết nối được API. Làm mới thư viện để kiểm tra kết quả."; }
+        finally { _dangLuu = false; }
+    }
+
+    private async Task XemAsync(MauDonDto mau)
+    {
+        _mauXem = mau; _anh = null; _phong = 100;
+        await Js.InvokeVoidAsync("moMauDon", _hopXem);
+        await TaiAnhAsync(1);
+    }
+    private async Task TaiAnhAsync(int trang)
+    {
+        if (_mauXem == null || _dangXem || trang < 1 || trang > _mauXem.SoTrang) return;
+        _dangXem = true; _loiXem = null; _anh = null; _trangXem = trang;
+        try
+        {
+            using var res = await Http.GetAsync($"api/quan-tri/mau-don/{_mauXem.MaMau}/trang/{trang}?phienBan={_mauXem.PhienBan}");
+            if (!res.IsSuccessStatusCode) { _loiXem = await DocLoiApi.TuPhanHoiAsync(res, "Không xem được trang mẫu."); return; }
+            _anh = "data:image/png;base64," + Convert.ToBase64String(await res.Content.ReadAsByteArrayAsync());
+        }
+        catch (HttpRequestException) { _loiXem = "Không tải được bản xem trước. Hãy thử lại."; }
+        finally { _dangXem = false; }
+    }
+}

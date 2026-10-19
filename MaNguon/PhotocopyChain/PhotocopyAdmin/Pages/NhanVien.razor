@@ -3,45 +3,29 @@
 @inject HttpClient Http
 @inject PhienDangNhap Phien
 @inject PhamViChiNhanh PhamVi
-@inject IJSRuntime JS
 
 <PageTitle>Nhân viên · PhotocopyChain</PageTitle>
 
-@* F-24 (phần danh sách) + F-04: nhân viên quên mật khẩu thì cấp trên cấp mật khẩu tạm.
-   Tạo / khóa tài khoản nhân viên làm ở Tuần 3. *@
+@* Quản lý danh sách, tạo và khóa/mở khóa nhân viên theo phân quyền hiện có. *@
 <TieuDeTrang TieuDe="Nhân viên" MoTa="@MoTa()" />
 
 <div class="than-trang khoi-doc">
-    @if (_ketQua != null)
-    {
-        <div class="the the-mat-khau">
-            <div class="mkt-dau">
-                <span class="o-dung">@((MarkupString)Svg.DauTich(18))</span>
-                <b>Mật khẩu tạm của @_tenVuaCap</b>
-                <button class="nut-dong" title="Đóng" @onclick="() => _ketQua = null">✕</button>
-            </div>
-            <div class="mkt-than">
-                <span class="mk-tam">@_ketQua.MatKhauTam</span>
-                <button class="nut-nho" @onclick="ChepAsync">@(_daChep ? "Đã chép" : "Chép")</button>
-            </div>
-            <p class="the-mo-ta nho">@_ketQua.Message</p>
-        </div>
-    }
-
-    @if (_loi != null)
+    @if (_loi != null && !_moTao)
     {
         <div class="o-loi">@((MarkupString)Svg.ChamThan())<span>@_loi</span></div>
     }
 
-    <form @onsubmit="TaoNhanVienAsync" @onsubmit:preventDefault class="the the-rong">
-        <h2 class="the-tieu-de nho">Tạo tài khoản nhân viên mới</h2>
+    <button type="button" class="nut-chinh" disabled="@_dangCap" @onclick="MoTao">Thêm nhân viên</button>
+    <HopThoaiQuanTri Mo="@_moTao" TieuDe="Tạo tài khoản nhân viên mới" Loi="@_loi" DangLuu="@_dangCap" Dong="DongTao" Rong="true">
+    <NoiDung>
+    <form id="nv-form-tao" @onsubmit="TaoNhanVienAsync" @onsubmit:preventDefault>
         <div class="ca-loc-luoi">
-            <div class="truong"><label class="nhan">Họ tên</label><input required maxlength="100" class="ca-o-loc" placeholder="VD: Nguyễn Văn B" @bind="_tao.HoTen" /></div>
-            <div class="truong"><label class="nhan">Email</label><input required maxlength="100" class="ca-o-loc" type="email" placeholder="nhanvien@gmail.com" @bind="_tao.Email" /></div>
-            <div class="truong"><label class="nhan">Số điện thoại</label><input inputmode="numeric" pattern="0[0-9]{9}" title="10 chữ số, bắt đầu bằng 0" maxlength="10" class="ca-o-loc" placeholder="09xxxxxxxx" @bind="_tao.SoDienThoai" /></div>
+            <div class="truong"><label class="nhan" for="nv-ten">Họ tên</label><input id="nv-ten" required maxlength="100" class="ca-o-loc" placeholder="VD: Nguyễn Văn B" @bind="_tao.HoTen" /></div>
+            <div class="truong"><label class="nhan" for="nv-email">Email</label><input id="nv-email" required maxlength="100" class="ca-o-loc" type="email" placeholder="nhanvien@gmail.com" @bind="_tao.Email" /></div>
+            <div class="truong"><label class="nhan" for="nv-sdt">Số điện thoại</label><input id="nv-sdt" inputmode="numeric" pattern="0[0-9]{9}" title="10 chữ số, bắt đầu bằng 0" maxlength="10" class="ca-o-loc" placeholder="09xxxxxxxx" @bind="_tao.SoDienThoai" /></div>
             <div class="truong">
-                <label class="nhan">Vai trò</label>
-                <select class="ca-o-loc" @bind="_tao.VaiTro">
+                <label class="nhan" for="nv-vai-tro">Vai trò</label>
+                <select id="nv-vai-tro" class="ca-o-loc" @bind="_tao.VaiTro">
                     @if (Phien.NguoiDung?.TenVaiTro == "SUPER_ADMIN")
                     {
                         <option value="BRANCH_ADMIN">Quản lý chi nhánh (BRANCH_ADMIN)</option>
@@ -53,8 +37,8 @@
             @if (Phien.NguoiDung?.TenVaiTro == "SUPER_ADMIN")
             {
                 <div class="truong">
-                    <label class="nhan">Chi nhánh công tác</label>
-                    <select class="ca-o-loc" disabled="@(PhamVi.MaChiNhanh != null)" @bind="_tao.MaChiNhanh">
+                    <label class="nhan" for="nv-cn">Chi nhánh công tác</label>
+                    <select id="nv-cn" class="ca-o-loc" disabled="@(PhamVi.MaChiNhanh != null)" @bind="_tao.MaChiNhanh">
                         @foreach (ChiNhanhDto c in _chiNhanh)
                         {
                             <option value="@c.MaChiNhanh">@c.TenChiNhanh</option>
@@ -62,14 +46,13 @@
                     </select>
                 </div>
             }
-            <div class="truong"><label class="nhan">Mật khẩu ban đầu</label><input required maxlength="72" class="ca-o-loc" type="password" placeholder="••••••••" @bind="_tao.MatKhau" /></div>
-        </div>
-        <div style="margin-top: 14px;">
-            <button type="submit" class="nut-chinh" disabled="@_dangCap">
-                @(_dangCap ? "Đang tạo…" : "Tạo nhân viên")
-            </button>
+            <div class="truong"><label class="nhan" for="nv-mk">Mật khẩu ban đầu</label><input id="nv-mk" required maxlength="72" class="ca-o-loc" type="password" autocomplete="new-password" placeholder="••••••••" @bind="_tao.MatKhau" /></div>
         </div>
     </form>
+    </NoiDung>
+    <Chan><button type="button" class="nut-phu" disabled="@_dangCap" @onclick="DongTao">Hủy</button><button type="submit" form="nv-form-tao" class="nut-chinh" disabled="@_dangCap">@(_dangCap ? "Đang tạo…" : "Tạo nhân viên")</button></Chan>
+    </HopThoaiQuanTri>
+    <XacNhanThaoTac @ref="_xacNhan" />
 
     <div class="the the-bang">
         <div class="bang-tieu-de">
@@ -96,7 +79,7 @@
         else
         {
             <div class="bang-cuon">
-                <table role="table" class="bang">
+                <table role="table" class="bang bang-thao-tac-trai">
                     <thead>
                         <tr>
                             <th scope="col">Nhân viên</th>
@@ -104,7 +87,7 @@
                             <th scope="col">Chi nhánh</th>
                             <th scope="col">Trạng thái</th>
                             <th scope="col">Ngày tạo</th>
-                            <th scope="col"></th>
+                            <th scope="col" class="cot-hanh-dong">Thao tác</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -136,32 +119,20 @@
                                     <span class="chu-mo">@nv.NgayTao.ToString("dd/MM/yyyy")</span>
                                 </td>
                                 <td class="cot-hanh-dong" data-nhan="Thao tác">
-                                    @if (!nv.DuocCapLai)
-                                    {
-                                        <span class="chu-mo">@LyDoKhongCapLai(nv)</span>
-                                    }
-                                    else if (_dangXacNhan == nv.MaNguoiDung)
-                                    {
-                                        <div class="xac-nhan-o">
-                                            <span class="chu-mo">Cấp mật khẩu tạm mới?</span>
-                                            <button class="nut-nho chinh" disabled="@_dangCap" @onclick="() => CapLaiAsync(nv)">@(_dangCap ? "Đang cấp…" : "Xác nhận")</button>
-                                            <button class="nut-nho" disabled="@_dangCap" @onclick="() => _dangXacNhan = null">Hủy</button>
-                                        </div>
-                                    }
-                                    else
-                                    {
-                                        <button class="nut-nho" @onclick="() => _dangXacNhan = nv.MaNguoiDung">@((MarkupString)Svg.Khoa(13)) Cấp lại mật khẩu</button>
-                                    }
                                     @if (DuocDoiTrangThai(nv))
                                     {
                                         @if (nv.TrangThai == "KHOA")
                                         {
-                                            <button class="nut-nho" title="Mở khóa tài khoản nhân viên" @onclick="() => DoiTrangThaiAsync(nv)">Mở khóa</button>
+                                            <button class="nut-nho" disabled="@_dangCap" title="Mở khóa tài khoản nhân viên" @onclick="() => DoiTrangThaiAsync(nv)">Mở khóa</button>
                                         }
                                         else
                                         {
-                                            <button class="nut-nho nguy-hiem" title="Khóa tài khoản này" @onclick="() => DoiTrangThaiAsync(nv)">Khóa</button>
+                                            <button class="nut-nho nguy-hiem" disabled="@_dangCap" title="Khóa tài khoản này" @onclick="() => DoiTrangThaiAsync(nv)">Khóa</button>
                                         }
+                                    }
+                                    else
+                                    {
+                                        <span class="chu-mo">@(LaChinhMinh(nv) ? "Tài khoản của bạn" : "Không có thao tác")</span>
                                     }
                                 </td>
                             </tr>
@@ -173,12 +144,10 @@
     </div>
 
     <div class="the ghi-chu-quy-tac">
-        <h2 class="the-tieu-de nho">Ai cấp lại mật khẩu cho ai?</h2>
+        <h2 class="the-tieu-de nho">Đổi và khôi phục mật khẩu</h2>
         <ul>
-            <li><b>Quản lý chi nhánh</b> cấp lại cho <span class="mono">STAFF</span> và <span class="mono">SHIPPER</span> thuộc chi nhánh mình.</li>
-            <li>Tài khoản <b>Quản lý chi nhánh</b> chỉ <b>Super Admin</b> cấp lại — quản lý không cấp cho người cùng cấp.</li>
-            <li><b>Super Admin</b> và <b>khách hàng</b> tự khôi phục bằng mã OTP gửi qua email.</li>
-            <li>Mật khẩu tạm chỉ hiện một lần; CSDL chỉ lưu bản băm. Nhân viên nên đổi sang mật khẩu riêng ngay sau khi đăng nhập.</li>
+            <li>Nhân viên tự đổi mật khẩu tại <b>Thông tin cá nhân</b>.</li>
+            <li>Khi quên mật khẩu, dùng chức năng <b>Quên mật khẩu</b> ở trang đăng nhập để nhận mã OTP qua email đã đăng ký.</li>
         </ul>
     </div>
 </div>
@@ -187,12 +156,12 @@
     private List<NhanVienDto> _ds;              // danh sách lấy từ API (null = đang tải)
     private string _tuKhoa = "";                // ô tìm kiếm
     private string _loi;
-    private int? _dangXacNhan;                  // mã nhân viên đang hiện nút "Xác nhận / Hủy"
+    private bool _moTao;
+    private XacNhanThaoTac _xacNhan;
+    private void MoTao() { if (_dangCap) return; _tao = new() { VaiTro = "STAFF", MaChiNhanh = PhamVi.MaChiNhanh ?? _chiNhanh.FirstOrDefault()?.MaChiNhanh }; _loi = null; _moTao = true; }
+    private void DongTao() { if (!_dangCap) { _moTao = false; _tao.MatKhau = ""; _loi = null; } }
     private bool _dangCap = false;
-    private CapLaiMatKhauKetQuaDto _ketQua;     // mật khẩu tạm vừa cấp (hiện 1 lần)
-    private string _tenVuaCap;
-    private bool _daChep = false;
-    private TaoNhanVienRequest _tao = new() { VaiTro = "STAFF", MatKhau = "Nhanvien2026" };
+    private TaoNhanVienRequest _tao = new() { VaiTro = "STAFF" };
     private List<ChiNhanhDto> _chiNhanh = new();
 
     protected override async Task OnInitializedAsync()
@@ -208,18 +177,21 @@
 
     private async Task TaoNhanVienAsync()
     {
+        if (_dangCap) return;
         _tao.Email = _tao.Email.Trim();
         _loi = QuyTacNhap.LayLoi(_tao);
         if (_loi != null) return;
         _loi = null; _dangCap = true;
-        var res = await Http.PostAsJsonAsync("api/nhan-vien", _tao);
-        if (res.IsSuccessStatusCode)
+        try
         {
-            _tao = new TaoNhanVienRequest { VaiTro = "STAFF", MatKhau = "Nhanvien2026", MaChiNhanh = PhamVi.MaChiNhanh ?? _chiNhanh.FirstOrDefault()?.MaChiNhanh };
+            using var res = await Http.PostAsJsonAsync("api/nhan-vien", _tao);
+            if (!res.IsSuccessStatusCode) { _loi = await DocLoiApi.TuPhanHoiAsync(res, "Không tạo được nhân viên."); return; }
+            _tao = new() { VaiTro = "STAFF", MaChiNhanh = PhamVi.MaChiNhanh ?? _chiNhanh.FirstOrDefault()?.MaChiNhanh };
+            _moTao = false;
             await TaiDanhSach();
         }
-        else _loi = (await res.Content.ReadFromJsonAsync<ApiError>()).Message;
-        _dangCap = false;
+        catch (HttpRequestException) { _loi = "Mất kết nối API. Làm mới danh sách trước khi thử lại."; }
+        finally { _dangCap = false; }
     }
 
     private bool DuocDoiTrangThai(NhanVienDto nv)
@@ -231,10 +203,18 @@
 
     private async Task DoiTrangThaiAsync(NhanVienDto nv)
     {
+        if (_dangCap || !DuocDoiTrangThai(nv)) return;
         string moi = nv.TrangThai == "KHOA" ? "HOAT_DONG" : "KHOA";
-        var res = await Http.PutAsJsonAsync("api/nhan-vien/" + nv.MaNguoiDung + "/trang-thai", new CapNhatTrangThaiRequest { TrangThai = moi });
-        if (res.IsSuccessStatusCode) await TaiDanhSach();
-        else _loi = (await res.Content.ReadFromJsonAsync<ApiError>()).Message;
+        if (!await _xacNhan.HoiAsync((moi == "KHOA" ? "Khóa" : "Mở khóa") + " tài khoản “" + nv.HoTen + "”? Không xóa lịch sử làm việc.", "Trạng thái nhân viên", "Xác nhận", moi == "KHOA")) return;
+        _dangCap = true; _loi = null;
+        try
+        {
+            using var res = await Http.PutAsJsonAsync("api/nhan-vien/" + nv.MaNguoiDung + "/trang-thai", new CapNhatTrangThaiRequest { TrangThai = moi });
+            if (res.IsSuccessStatusCode) await TaiDanhSach();
+            else _loi = await DocLoiApi.TuPhanHoiAsync(res, "Không đổi được trạng thái nhân viên.");
+        }
+        catch (HttpRequestException) { _loi = "Mất kết nối API. Làm mới danh sách để kiểm tra kết quả."; }
+        finally { _dangCap = false; }
     }
 
     // GET api/nhan-vien — API tự lọc: Super Admin thấy toàn chuỗi, Quản lý CN chỉ thấy chi nhánh mình
@@ -277,69 +257,16 @@
         return ketQua;
     }
 
-    // POST api/nhan-vien/{id}/cap-lai-mat-khau — thủ tục sp_CapLaiMatKhau kiểm tra ai được cấp cho ai
-    private async Task CapLaiAsync(NhanVienDto nv)
-    {
-        _loi = null;
-        _dangCap = true;
-        try
-        {
-            var res = await Http.PostAsync("api/nhan-vien/" + nv.MaNguoiDung + "/cap-lai-mat-khau", null);
-            if (res.IsSuccessStatusCode)
-            {
-                _ketQua = await res.Content.ReadFromJsonAsync<CapLaiMatKhauKetQuaDto>();
-                _tenVuaCap = nv.HoTen;
-                _daChep = false;
-                _dangXacNhan = null;
-                await TaiDanhSach();
-            }
-            else
-            {
-                var loi = await res.Content.ReadFromJsonAsync<ApiError>();
-                _loi = loi.Message;
-            }
-        }
-        catch
-        {
-            _loi = "Không kết nối được máy chủ API. Kiểm tra PhotocopyApi đã chạy chưa.";
-        }
-        _dangCap = false;
-    }
-
-    // Chép mật khẩu tạm vào bộ nhớ tạm của máy (gọi hàm JavaScript của trình duyệt)
-    private async Task ChepAsync()
-    {
-        try
-        {
-            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _ketQua.MatKhauTam);
-            _daChep = true;
-        }
-        catch
-        {
-            // trình duyệt chặn chép thì thôi — vẫn đọc được trên màn hình
-        }
-    }
-
     private string MoTa()
     {
         if (Phien.NguoiDung != null && Phien.NguoiDung.TenVaiTro == "SUPER_ADMIN")
-            return (PhamVi.MaChiNhanh == null ? "Toàn chuỗi" : "Chi nhánh đang chọn") + " · cấp lại mật khẩu cho nhân viên quên mật khẩu";
-        return Phien.NguoiDung?.TenChiNhanh + " · cấp lại mật khẩu cho nhân viên quên mật khẩu";
+            return (PhamVi.MaChiNhanh == null ? "Toàn chuỗi" : "Chi nhánh đang chọn") + " · quản lý tài khoản và trạng thái nhân viên";
+        return Phien.NguoiDung?.TenChiNhanh + " · quản lý tài khoản và trạng thái nhân viên";
     }
 
     private bool LaChinhMinh(NhanVienDto nv)
     {
         return Phien.NguoiDung != null && nv.MaNguoiDung == Phien.NguoiDung.MaNguoiDung;
-    }
-
-    // Dòng nào không có nút "Cấp lại mật khẩu" thì ghi lý do
-    private string LyDoKhongCapLai(NhanVienDto nv)
-    {
-        if (LaChinhMinh(nv)) return "Tự đổi ở Thông tin cá nhân";
-        if (nv.TrangThai == "KHOA") return "Tài khoản đã khóa";
-        if (nv.TenVaiTro == "SUPER_ADMIN") return "Tự khôi phục qua OTP email";
-        if (nv.TenVaiTro == "BRANCH_ADMIN") return "Chỉ Super Admin cấp lại";
-        return "Ngoài phạm vi chi nhánh";
     }
 
     // "Phạm Văn Thợ" → "VT"

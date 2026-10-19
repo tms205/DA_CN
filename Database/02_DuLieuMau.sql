@@ -34,12 +34,13 @@ INSERT INTO MayIn (MaChiNhanh, TenMay, KhoGiay, InMau, In2Mat, TocDo) VALUES
 GO
 
 INSERT INTO VatTu (TenVatTu, DonViTinh, DonGia) VALUES
-(N'Giấy A4',    N'Tờ',  120),
-(N'Giấy A3',    N'Tờ',  240),
+(N'Giấy A4 70gsm', N'Tờ', 120),
+(N'Giấy A3 70gsm', N'Tờ', 240),
 (N'Mực đen',    N'Hộp', 850000),
 (N'Mực màu',    N'Hộp', 1200000),
 (N'Bìa kiếng',  N'Cái', 2000),
-(N'Lò xo',      N'Cái', 3500);
+(N'Lò xo',      N'Cái', 3500),
+(N'Giấy A4 80gsm', N'Tờ', 0); -- Chưa nhập hàng: chưa xác định giá vốn.
 GO
 
 -- Ma 1-12: in an (gia / trang), ma 13-16: gia cong (gia / cuon)
@@ -48,13 +49,13 @@ INSERT INTO DichVu (TenDichVu, LoaiDichVu, KhoGiay, LoaiGiay, MatIn, MauSac, Nho
 (N'In A4 70gsm 1 mặt đen trắng', 'IN_AN', 'A4', '70gsm', '1_MAT', 'DEN_TRANG', NULL,  300, 1),
 (N'In A4 70gsm 2 mặt đen trắng', 'IN_AN', 'A4', '70gsm', '2_MAT', 'DEN_TRANG', NULL,  250, 1),
 (N'In A4 70gsm 1 mặt màu',       'IN_AN', 'A4', '70gsm', '1_MAT', 'MAU',       NULL, 3000, 1),
-(N'In A4 80gsm 1 mặt đen trắng', 'IN_AN', 'A4', '80gsm', '1_MAT', 'DEN_TRANG', NULL,  400, 1),
+(N'In A4 80gsm 1 mặt đen trắng', 'IN_AN', 'A4', '80gsm', '1_MAT', 'DEN_TRANG', NULL,  400, 7),
 (N'In A3 70gsm 1 mặt đen trắng', 'IN_AN', 'A3', '70gsm', '1_MAT', 'DEN_TRANG', NULL,  600, 2),
 (N'In A3 70gsm 1 mặt màu',       'IN_AN', 'A3', '70gsm', '1_MAT', 'MAU',       NULL, 6000, 2),
 (N'In A4 70gsm 2 mặt màu',       'IN_AN', 'A4', '70gsm', '2_MAT', 'MAU',       NULL, 2500, 1),
-(N'In A4 80gsm 2 mặt đen trắng', 'IN_AN', 'A4', '80gsm', '2_MAT', 'DEN_TRANG', NULL,  350, 1),
-(N'In A4 80gsm 1 mặt màu',       'IN_AN', 'A4', '80gsm', '1_MAT', 'MAU',       NULL, 3500, 1),
-(N'In A4 80gsm 2 mặt màu',       'IN_AN', 'A4', '80gsm', '2_MAT', 'MAU',       NULL, 3000, 1),
+(N'In A4 80gsm 2 mặt đen trắng', 'IN_AN', 'A4', '80gsm', '2_MAT', 'DEN_TRANG', NULL,  350, 7),
+(N'In A4 80gsm 1 mặt màu',       'IN_AN', 'A4', '80gsm', '1_MAT', 'MAU',       NULL, 3500, 7),
+(N'In A4 80gsm 2 mặt màu',       'IN_AN', 'A4', '80gsm', '2_MAT', 'MAU',       NULL, 3000, 7),
 (N'In A3 70gsm 2 mặt đen trắng', 'IN_AN', 'A3', '70gsm', '2_MAT', 'DEN_TRANG', NULL,  500, 2),
 (N'In A3 70gsm 2 mặt màu',       'IN_AN', 'A3', '70gsm', '2_MAT', 'MAU',       NULL, 5000, 2),
 (N'Đóng bìa kiếng',              'GIA_CONG', NULL, NULL, NULL, NULL, 'DONG_GAY',  5000, 5),
@@ -70,7 +71,8 @@ GO
 
 INSERT INTO TonKho (MaChiNhanh, MaVatTu, SoLuong, MucToiThieu) VALUES
 (1, 1, 50000, 10000), (1, 2, 20000, 5000), (1, 3, 8, 2), (1, 4, 1, 2), (1, 5, 30, 10), (1, 6, 30, 10),
-(2, 1, 40000, 10000), (2, 2, 15000, 5000), (2, 3, 6, 2), (2, 4, 4, 2), (2, 5, 25, 10), (2, 6, 25, 10);
+(2, 1, 40000, 10000), (2, 2, 15000, 5000), (2, 3, 6, 2), (2, 4, 4, 2), (2, 5, 25, 10), (2, 6, 25, 10),
+(1, 7, 0, 0), (2, 7, 0, 0);
 GO
 
 INSERT INTO KhuyenMai (MaChiNhanh, MaCode, TenKhuyenMai, PhanTramGiam, GiamToiDa,

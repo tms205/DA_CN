@@ -37,10 +37,12 @@ public class DanhMucController : ControllerBase
             return BadRequest(new { message = "Hãy chọn chi nhánh để xem bảng giá." });
 
         string sql = @"SELECT dv.MaDichVu, dv.TenDichVu, dv.LoaiDichVu, dv.KhoGiay, dv.LoaiGiay,
-                              dv.MatIn, dv.MauSac, dv.NhomGiaCong, bg.DonGia, dv.KichThuocAnh
+                              dv.MatIn, dv.MauSac, dv.NhomGiaCong, bg.DonGia, dv.KichThuocAnh,
+                              dv.MaVatTu, vt.TenVatTu
                        FROM BangGiaChiNhanh bg
                        JOIN DichVu dv ON dv.MaDichVu = bg.MaDichVu
                        JOIN ChiNhanh cn ON cn.MaChiNhanh = bg.MaChiNhanh
+                       LEFT JOIN VatTu vt ON vt.MaVatTu = dv.MaVatTu
                        WHERE bg.MaChiNhanh = @MaChiNhanh AND bg.TrangThai = N'HIEN'
                          AND cn.TrangThai = N'HOAT_DONG'
                        ORDER BY dv.LoaiDichVu DESC, dv.KhoGiay, dv.LoaiGiay, dv.MatIn, dv.MauSac";

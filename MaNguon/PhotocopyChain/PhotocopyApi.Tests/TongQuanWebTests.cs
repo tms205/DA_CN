@@ -46,7 +46,10 @@ public class TongQuanWebTests
             Assert.Contains("Hôm nay", html);
             Assert.Contains("Tuần này", html);
             Assert.Contains("Tháng này", html);
-            Assert.Contains("Chi tiết doanh thu", html);
+            Assert.DoesNotContain("Chi tiết doanh thu", html);
+            Assert.DoesNotContain("Số dòng báo cáo", html);
+            Assert.Contains("Xu hướng doanh thu", html);
+            Assert.Contains("href=\"bao-cao\"", html);
             Assert.Contains("<svg", html);
             Assert.Contains("role=\"img\"", html);
             Assert.DoesNotContain("NaN", html);

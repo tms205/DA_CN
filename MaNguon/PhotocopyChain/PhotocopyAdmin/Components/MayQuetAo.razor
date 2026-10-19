@@ -1,0 +1,228 @@
+@implements IDisposable
+@inject HttpClient Http
+@inject IJSRuntime Js
+
+<section class="sq-may" aria-label="Máy quét ảo">
+    <header class="sq-dau">
+        <div><strong>Máy quét mặt kính</strong><span>SCANNER / ID COPY</span></div>
+        <span class="sq-nhan">MÔ PHỎNG</span>
+    </header>
+    <div class="sq-man-hinh" role="status" aria-live="polite">
+        <strong>@(_dang ? _tacVu : TenTrangThai)</strong>
+        <span>@(_daLuu ? "Đã đưa PDF vào đơn. Xóa file bên dưới nếu cần quét lại." : "Hai mặt thẻ → cùng một mặt giấy A4 · không tự tạo đơn hoặc in")</span>
+    </div>
+    <p class="sq-huong-dan">Chọn ảnh thay cho đặt thẻ lên kính, rồi bấm quét từng mặt. Có thể dùng ảnh minh họa để thử mà không cần giấy tờ thật.</p>
+    @if (_loi != null) { <div class="o-loi" role="alert">@_loi</div> }
+    <div class="sq-hai-mat">
+        @foreach (var mat in _haiMat)
+        {
+            <fieldset class="sq-mat" disabled="@KhongThaoTac" @key="mat.Ma">
+                <legend>@mat.Ten</legend>
+                <div class="sq-kinh">
+                    @if (mat.AnhHienThi != null)
+                    {
+                        <img src="@mat.AnhHienThi" alt="@(mat.Ten + (mat.KetQua != null ? " đã quét" : " ảnh nguồn chưa quét"))" />
+                    }
+                    else { <span>Đặt ảnh @mat.Ten.ToLower() vào đây</span> }
+                </div>
+                <label class="nhan" for="@("sq-file-" + mat.Ma)">Ảnh nguồn @mat.Ten.ToLower()</label>
+                <InputFile @key="mat.LanChonFile" id="@("sq-file-" + mat.Ma)" OnChange="e => ChonAnhAsync(mat, e)" accept=".jpg,.jpeg,.png" />
+                <p class="sq-ten-file">@(mat.TenFile ?? "Chưa chọn ảnh · JPG/PNG, tối đa 10 MB và 20 MP")</p>
+                <div class="sq-nut">
+                    <button type="button" class="nut-nho" @onclick="() => DungAnhMauAsync(mat)">Ảnh minh họa @mat.Ten.ToLower()</button>
+                    <button type="button" class="nut-nho" disabled="@(KhongThaoTac || mat.Nguon == null)" @onclick="() => Xoay(mat)">Xoay @mat.Ten.ToLower() · @mat.QuyCach.GocXoay°</button>
+                </div>
+                <details class="sq-cat">
+                    <summary>Cắt viền @mat.Ten.ToLower() (tùy chọn)</summary>
+                    <p>Tọa độ phần trăm của ảnh nguồn. Cắt trước, xoay sau; để 0 / 0 / 100 / 100 nếu ảnh đã sát thẻ.</p>
+                    <div class="sq-cat-luoi">
+                        <label>Trái (%)<input class="ca-o-loc" type="number" min="0" max="99" step="0.1" @bind="mat.QuyCach.CatTrai" @bind:after="() => VoHieuHoa(mat)" /></label>
+                        <label>Trên (%)<input class="ca-o-loc" type="number" min="0" max="99" step="0.1" @bind="mat.QuyCach.CatTren" @bind:after="() => VoHieuHoa(mat)" /></label>
+                        <label>Rộng (%)<input class="ca-o-loc" type="number" min="0.1" max="100" step="0.1" @bind="mat.QuyCach.CatRong" @bind:after="() => VoHieuHoa(mat)" /></label>
+                        <label>Cao (%)<input class="ca-o-loc" type="number" min="0.1" max="100" step="0.1" @bind="mat.QuyCach.CatCao" @bind:after="() => VoHieuHoa(mat)" /></label>
+                    </div>
+                </details>
+                <button type="button" class="nut-nho chinh sq-quet" disabled="@(KhongThaoTac || mat.Nguon == null)" @onclick="() => QuetAsync(mat)">Quét @mat.Ten.ToLower()</button>
+                <span class="sq-ket-qua">@(mat.KetQua != null ? $"Đã quét · {mat.KetQua.RongPixel} × {mat.KetQua.CaoPixel} px" : "Chưa quét")</span>
+            </fieldset>
+        }
+    </div>
+    <div class="sq-dieu-khien">
+        <button type="button" class="nut-nho chinh" disabled="@(KhongThaoTac || _haiMat.Any(m => m.KetQua == null))" @onclick="GhepAsync">Ghép &amp; xem trước A4</button>
+        <details>
+            <summary>Thử sự cố máy ảo</summary>
+            <div class="sq-nut">
+                <button type="button" class="nut-nho" disabled="@(_dang || Khoa)" @onclick='() => SuCo("MAT_KET_NOI")'>Mô phỏng mất kết nối</button>
+                <button type="button" class="nut-nho" disabled="@(_dang || Khoa)" @onclick='() => SuCo("LOI")'>Mô phỏng lỗi quét</button>
+                <button type="button" class="nut-nho" disabled="@(_dang || Khoa || _trangThai == "SAN_SANG")" @onclick="KhoiPhuc">Khôi phục máy ảo</button>
+            </div>
+        </details>
+    </div>
+    @if (_banGhep != null)
+    {
+        <div class="sq-ban-ghep">
+            <img src="@("data:image/png;base64," + _banGhep.AnhXemTruocBase64)" alt="Bản ghép hai mặt trên cùng một mặt A4" />
+            <div>
+                <h3>Bản sao chụp · 1 trang A4</h3>
+                <p>Hai khung 86 × 54 mm, giữ tỉ lệ và thêm nền trắng nếu cần. Không phải bản sao chứng thực.</p>
+                <p>Kiểm tra chiều và phần bị cắt trước khi xác nhận. Giá theo trang A4 và số bản, chưa thu phí scan riêng.</p>
+                <div class="sq-nut">
+                    <button type="button" class="nut-nho" @onclick="XemToAsync">Xem toàn màn hình</button>
+                    <button type="button" class="nut-nho chinh" disabled="@KhongThaoTac" @onclick="LuuAsync">Dùng bản sao chụp để lập đơn</button>
+                </div>
+            </div>
+        </div>
+        <dialog class="sq-toan-man-hinh" @ref="_hopXem" aria-label="Bản sao chụp A4">
+            <div class="sq-nut"><strong>Bản sao chụp A4 · hai mặt thẻ trên cùng một mặt giấy</strong><button type="button" class="nut-nho" autofocus @onclick="DongXemAsync">Đóng bản sao chụp</button></div>
+            <img src="@("data:image/png;base64," + _banGhep.AnhXemTruocBase64)" alt="Bản sao chụp A4 phóng lớn" />
+        </dialog>
+    }
+    <p class="sq-rieng-tu">Ảnh scan/preview tạm không lưu vào localStorage. Chỉ PDF được xác nhận mới vào kho file của khách theo chính sách hiện có. Nguồn máy thật chưa được kết nối.</p>
+</section>
+
+@code {
+    [Parameter] public int MaKhachHang { get; set; }
+    [Parameter] public bool Khoa { get; set; }
+    [Parameter] public EventCallback<bool> DangXuLyThayDoi { get; set; }
+    [Parameter] public EventCallback<FileInDto> FileDaTao { get; set; }
+
+    private readonly MatQuet[] _haiMat = { new("TRUOC", "Mặt trước"), new("SAU", "Mặt sau") };
+    private readonly CancellationTokenSource _vongDoi = new();
+    private BanSaoChupDto _banGhep;
+    private string _trangThai = "SAN_SANG", _tacVu = "", _loi;
+    private bool _dang, _daHuy, _daLuu;
+    private ElementReference _hopXem;
+    private bool KhongThaoTac => Khoa || _dang || _trangThai != "SAN_SANG";
+    private string TenTrangThai => _trangThai switch {
+        "MAT_KET_NOI" => "Mất kết nối · mô phỏng", "LOI" => "Lỗi quét · mô phỏng", _ => "Sẵn sàng · máy quét ảo"
+    };
+
+    protected override void OnParametersSet()
+    {
+        if (_daLuu && !Khoa && !_dang)
+        {
+            _daLuu = false; _banGhep = null;
+            foreach (var mat in _haiMat) mat.Xoa();
+        }
+    }
+
+    private void VoHieuHoa(MatQuet mat) { mat.KetQua = null; _banGhep = null; _loi = null; }
+    private void Xoay(MatQuet mat) { if (KhongThaoTac) return; mat.QuyCach.GocXoay = (mat.QuyCach.GocXoay + 90) % 360; VoHieuHoa(mat); }
+    private void SuCo(string trangThai)
+    {
+        if (_dang || Khoa) return;
+        _trangThai = trangThai; _banGhep = null; _loi = null;
+        foreach (var mat in _haiMat) mat.KetQua = null;
+    }
+    private void KhoiPhuc() { if (!_dang && !Khoa) { _trangThai = "SAN_SANG"; _loi = null; } }
+
+    private Task ChonAnhAsync(MatQuet mat, InputFileChangeEventArgs e) => XuLyAsync("Đang nạp ảnh nguồn…", async dung => {
+        mat.Xoa(false); _banGhep = null; // Giữ InputFile trong lúc đang đọc stream của file vừa chọn.
+        var file = e.File;
+        if (file.Size < 1 || file.Size > 10 * 1024 * 1024 ||
+            Path.GetExtension(file.Name).ToLowerInvariant() is not (".jpg" or ".jpeg" or ".png"))
+            throw new InvalidOperationException("Chỉ nhận ảnh JPG/PNG, mỗi mặt tối đa 10 MB.");
+        using var stream = file.OpenReadStream(10 * 1024 * 1024, dung);
+        using var boNho = new MemoryStream();
+        await stream.CopyToAsync(boNho, dung);
+        mat.Nguon = boNho.ToArray(); mat.TenFile = file.Name;
+        mat.Mime = Path.GetExtension(file.Name).Equals(".png", StringComparison.OrdinalIgnoreCase) ? "image/png" : "image/jpeg";
+    });
+
+    private Task DungAnhMauAsync(MatQuet mat) => XuLyAsync("Đang nạp ảnh minh họa…", async dung => {
+        mat.Xoa(); _banGhep = null;
+        mat.Nguon = await Http.GetByteArrayAsync("api/may-quet/anh-minh-hoa/" + mat.Ma, dung);
+        mat.TenFile = "Minh_hoa_" + mat.Ma + ".png"; mat.Mime = "image/png";
+    });
+
+    private Task QuetAsync(MatQuet mat) => XuLyAsync("Đang quét " + mat.Ten.ToLower() + " · mô phỏng…", async dung => {
+        VoHieuHoa(mat);
+        if (mat.Nguon == null) throw new InvalidOperationException("Hãy nạp ảnh nguồn trước khi quét.");
+        using var form = new MultipartFormDataContent();
+        form.Add(new ByteArrayContent(mat.Nguon), "file", mat.Mime == "image/png" ? "nguon.png" : "nguon.jpg");
+        form.Add(new StringContent(mat.QuyCach.GocXoay.ToString()), "gocXoay");
+        foreach (var (ten, value) in new[] { ("catTrai", mat.QuyCach.CatTrai), ("catTren", mat.QuyCach.CatTren), ("catRong", mat.QuyCach.CatRong), ("catCao", mat.QuyCach.CatCao) })
+            form.Add(new StringContent(value.ToString(System.Globalization.CultureInfo.InvariantCulture)), ten);
+        using var res = await Http.PostAsync("api/may-quet/quet", form, dung);
+        await KiemTraPhanHoi(res, dung);
+        var ketQua = await res.Content.ReadFromJsonAsync<AnhQuetDto>(cancellationToken: dung);
+        if (ketQua == null || ketQua.CheDo != "AO" || string.IsNullOrEmpty(ketQua.AnhBase64))
+            throw new InvalidOperationException("Máy quét chưa trả ảnh hợp lệ.");
+        mat.KetQua = ketQua;
+    });
+
+    private Task GhepAsync() => XuLyAsync("Đang ghép bản sao chụp A4…", async dung => {
+        _banGhep = null;
+        if (_haiMat.Any(m => m.KetQua == null)) throw new InvalidOperationException("Cần quét đủ mặt trước và mặt sau.");
+        using var form = new MultipartFormDataContent();
+        form.Add(new ByteArrayContent(Convert.FromBase64String(_haiMat[0].KetQua.AnhBase64)), "matTruoc", "truoc.jpg");
+        form.Add(new ByteArrayContent(Convert.FromBase64String(_haiMat[1].KetQua.AnhBase64)), "matSau", "sau.jpg");
+        using var res = await Http.PostAsync("api/may-quet/ghep", form, dung);
+        await KiemTraPhanHoi(res, dung);
+        var ban = await res.Content.ReadFromJsonAsync<BanSaoChupDto>(cancellationToken: dung);
+        if (ban == null || ban.SoTrang != 1 || string.IsNullOrEmpty(ban.PdfBase64) || string.IsNullOrEmpty(ban.AnhXemTruocBase64))
+            throw new InvalidOperationException("Không nhận được bản ghép A4 hợp lệ.");
+        _banGhep = ban;
+    });
+
+    private Task LuuAsync() => XuLyAsync("Đang đưa bản sao chụp vào đơn…", async dung => {
+        if (_banGhep == null || MaKhachHang < 1) throw new InvalidOperationException("Hãy chọn khách và kiểm tra bản ghép trước.");
+        using var form = new MultipartFormDataContent();
+        form.Add(new ByteArrayContent(Convert.FromBase64String(_banGhep.PdfBase64)), "file", "Sao_chup_the_hai_mat.pdf");
+        using var res = await Http.PostAsync("api/file-in?maKhachHang=" + MaKhachHang, form, dung);
+        await KiemTraPhanHoi(res, dung);
+        var file = await res.Content.ReadFromJsonAsync<FileInDto>(cancellationToken: dung);
+        if (file == null || file.MaFileIn < 1 || file.SoTrang != 1) throw new InvalidOperationException("Không nhận được file A4 hợp lệ.");
+        _daLuu = true; _banGhep = null;
+        foreach (var mat in _haiMat) mat.Xoa();
+        await FileDaTao.InvokeAsync(file);
+    });
+
+    private async Task XuLyAsync(string tacVu, Func<CancellationToken, Task> thaoTac)
+    {
+        if (KhongThaoTac || _daHuy) return;
+        _dang = true; _tacVu = tacVu; _loi = null;
+        using var cho = CancellationTokenSource.CreateLinkedTokenSource(_vongDoi.Token);
+        cho.CancelAfter(TimeSpan.FromSeconds(30));
+        try { await DangXuLyThayDoi.InvokeAsync(true); await thaoTac(cho.Token); }
+        catch (OperationCanceledException) { if (!_daHuy) _loi = "Thao tác quá thời gian. Kiểm tra kết nối rồi thử lại."; }
+        catch (InvalidOperationException ex) { if (!_daHuy) _loi = ex.Message; }
+        catch { if (!_daHuy) _loi = "Không thực hiện được. Kiểm tra API và ảnh nguồn rồi thử lại."; }
+        finally { _dang = false; if (!_daHuy) await DangXuLyThayDoi.InvokeAsync(false); }
+    }
+
+    private static async Task KiemTraPhanHoi(HttpResponseMessage res, CancellationToken dung)
+    {
+        if (res.IsSuccessStatusCode) return;
+        string message = "API chưa sẵn sàng. Nếu vừa cập nhật, hãy chạy lại chay_web.cmd khi không có giao dịch.";
+        try { message = (await res.Content.ReadFromJsonAsync<ApiError>(cancellationToken: dung))?.Message ?? message; }
+        catch (System.Text.Json.JsonException) { }
+        throw new InvalidOperationException(message);
+    }
+
+    private Task XemToAsync() => Js.InvokeVoidAsync("moMauDon", _hopXem).AsTask();
+    private Task DongXemAsync() => Js.InvokeVoidAsync("dongMauDon", _hopXem).AsTask();
+    public void Dispose()
+    {
+        _daHuy = true; _vongDoi.Cancel(); _vongDoi.Dispose(); _banGhep = null;
+        foreach (var mat in _haiMat) mat.Xoa();
+    }
+
+    private sealed class MatQuet(string ma, string ten)
+    {
+        public string Ma { get; } = ma;
+        public string Ten { get; } = ten;
+        public byte[] Nguon { get; set; }
+        public string TenFile { get; set; }
+        public string Mime { get; set; } = "image/png";
+        public int LanChonFile { get; private set; }
+        public QuyCachQuet QuyCach { get; private set; } = new();
+        public AnhQuetDto KetQua { get; set; }
+        public string AnhHienThi => KetQua != null ? "data:image/jpeg;base64," + KetQua.AnhBase64 : Nguon != null ? "data:" + Mime + ";base64," + Convert.ToBase64String(Nguon) : null;
+        public void Xoa(bool xoaOChonFile = true)
+        {
+            Nguon = null; TenFile = null; KetQua = null; QuyCach = new();
+            if (xoaOChonFile) LanChonFile++;
+        }
+    }
+}

@@ -27,6 +27,44 @@ void main() {
       },
     ];
 
+  testWidgets('Bỏ tìm bằng chữ, GPS tự điền và chọn điểm nhận từ API', (
+    tester,
+  ) async {
+    DiaChiNhan giaTri = const DiaChiNhan();
+    Map<String, dynamic>? daGui;
+    await mo(
+      tester,
+      DiaChiGiao(
+        giaTri: giaTri,
+        onChanged: (v) => giaTri = v,
+        layGps: () async => const DiemGps(10.71, 106.71, 10),
+        timDiaChi: (req) async {
+          daGui = req;
+          return timDuoc();
+        },
+      ),
+    );
+    expect(find.text('Tìm địa chỉ'), findsNothing);
+    expect(
+      tester.widget<TextField>(find.byType(TextField).first).readOnly,
+      isTrue,
+    );
+    expect(daGui, isNull);
+    await tester.tap(find.text('Dùng vị trí hiện tại'));
+    await tester.pumpAndSettle();
+    expect(daGui, {'viDo': 10.71, 'kinhDo': 106.71});
+    expect(
+      tester.widget<TextField>(find.byType(TextField).first).controller!.text,
+      '140 Lê Trọng Tấn, TP Hồ Chí Minh',
+    );
+    expect(giaTri.daChon, isTrue);
+    expect(giaTri.viDo, 10.7);
+    expect(giaTri.kinhDo, 106.7);
+    expect(giaTri.maViTriGiao, 'fixture-vi-tri');
+    expect(find.text('Chạm để xác nhận điểm nhận này'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets(
     'Đổi sang GPS phải vô hiệu điểm nhận cũ ngay, không đặt bằng báo giá cũ',
     (tester) async {
@@ -52,72 +90,79 @@ void main() {
       expect(giaTri.daChon, isFalse);
       gps.complete(const DiemGps(10.71, 106.71, 10));
       await tester.pumpAndSettle();
+      expect(giaTri.daChon, isTrue);
+      expect(giaTri.maViTriGiao, 'fixture-vi-tri');
       await tester.pumpWidget(const SizedBox());
     },
   );
 
-  testWidgets('Từ chối GPS vẫn tìm địa chỉ và nhập chi tiết được', (
+  testWidgets('Từ chối GPS báo lỗi, thử lại được và vẫn sửa chi tiết', (
     tester,
   ) async {
     DiaChiNhan giaTri = const DiaChiNhan();
+    bool tuChoi = true;
+    int soLanApi = 0;
     await mo(
       tester,
       DiaChiGiao(
         giaTri: giaTri,
         onChanged: (v) => giaTri = v,
-        layGps: () async => throw StateError('Chưa được cấp quyền vị trí.'),
-        timDiaChi: (_) async => timDuoc(),
+        layGps: () async {
+          if (tuChoi) throw StateError('Chưa được cấp quyền vị trí.');
+          return const DiemGps(10.71, 106.71, 10);
+        },
+        timDiaChi: (_) async {
+          soLanApi++;
+          return timDuoc();
+        },
       ),
     );
     await tester.tap(find.text('Dùng vị trí hiện tại'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Chưa được cấp quyền vị trí'), findsOneWidget);
-    await tester.enterText(
-      find.byType(TextField).at(0),
-      '140 Lê Trọng Tấn, TP Hồ Chí Minh',
-    );
-    await tester.ensureVisible(find.text('Tìm địa chỉ'));
-    await tester.tap(find.text('Tìm địa chỉ'));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Chạm để xác nhận điểm nhận này'));
-    await tester.tap(find.text('Chạm để xác nhận điểm nhận này'));
+    expect(soLanApi, 0);
+    expect(giaTri.daChon, isFalse);
+    expect(find.text('Tìm địa chỉ'), findsNothing);
+    expect(find.text('Mở cài đặt quyền vị trí'), findsOneWidget);
+    tuChoi = false;
+    await tester.tap(find.text('Dùng vị trí hiện tại'));
     await tester.pumpAndSettle();
     expect(giaTri.daChon, isTrue);
     await tester.ensureVisible(find.byType(TextField).at(1));
     await tester.enterText(find.byType(TextField).at(1), 'Tầng 2, phòng 201');
     expect(giaTri.chiTiet, 'Tầng 2, phòng 201');
     expect(giaTri.viDo, 10.7);
-    await tester.enterText(find.byType(TextField).first, 'Địa chỉ mới');
-    expect(giaTri.daChon, isFalse);
+    expect(giaTri.daChon, isTrue);
+    expect(giaTri.maViTriGiao, 'fixture-vi-tri');
     await tester.pumpWidget(const SizedBox());
   });
 
-  testWidgets('Kết quả địa chỉ cũ về muộn không ghi đè chữ khách vừa sửa', (
+  testWidgets('Thoát khi chờ địa chỉ không cập nhật widget đã hủy', (
     tester,
   ) async {
     final doi = Completer<KetQuaApi>();
+    int soLanThayDoi = 0;
     await mo(
       tester,
       DiaChiGiao(
         giaTri: const DiaChiNhan(diaChi: 'Địa chỉ đủ để tìm'),
-        onChanged: (_) {},
+        onChanged: (_) => soLanThayDoi++,
+        layGps: () async => const DiemGps(10.7, 106.7, 10),
         timDiaChi: (_) => doi.future,
       ),
     );
-    await tester.tap(find.text('Tìm địa chỉ'));
+    await tester.tap(find.text('Dùng vị trí hiện tại'));
     await tester.pump();
-    await tester.enterText(
-      find.byType(TextField).first,
-      'Khách vừa đổi sang địa chỉ khác',
-    );
+    expect(find.text('Đang tìm vị trí…'), findsOneWidget);
+    final truocKhiThoat = soLanThayDoi;
+    await tester.pumpWidget(const SizedBox());
     doi.complete(timDuoc());
     await tester.pumpAndSettle();
-    expect(find.text('Chạm để xác nhận điểm nhận này'), findsNothing);
-    expect(find.text('Khách vừa đổi sang địa chỉ khác'), findsOneWidget);
-    await tester.pumpWidget(const SizedBox());
+    expect(tester.takeException(), isNull);
+    expect(soLanThayDoi, truocKhiThoat);
   });
 
-  testWidgets('GPS sai lệch lớn không tự chấp nhận, có hướng nhập tay', (
+  testWidgets('GPS sai lệch lớn không tự chấp nhận, hướng dẫn bật chính xác', (
     tester,
   ) async {
     int soLanTim = 0;
@@ -136,7 +181,112 @@ void main() {
     await tester.tap(find.text('Dùng vị trí hiện tại'));
     await tester.pumpAndSettle();
     expect(find.textContaining('sai lệch lớn'), findsOneWidget);
+    expect(find.textContaining('nhập tay'), findsNothing);
     expect(soLanTim, 0);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  for (final loi in ['rong', 'thieu-ma', 'toa-do-sai', 'mat-mang']) {
+    testWidgets('Kết quả $loi không tự nhận địa chỉ hợp lệ', (tester) async {
+      DiaChiNhan giaTri = const DiaChiNhan();
+      await mo(
+        tester,
+        DiaChiGiao(
+          giaTri: giaTri,
+          onChanged: (v) => giaTri = v,
+          layGps: () async => const DiemGps(10.7, 106.7, 10),
+          timDiaChi: (_) async {
+            if (loi == 'mat-mang') {
+              return KetQuaApi()
+                ..thanhCong = false
+                ..loi = 'Không kết nối được máy chủ.';
+            }
+            var kq = timDuoc();
+            if (loi == 'rong') kq.duLieu = [];
+            if (loi == 'thieu-ma') kq.duLieu.first.remove('maViTriGiao');
+            if (loi == 'toa-do-sai') kq.duLieu.first['viDo'] = 999;
+            return kq;
+          },
+        ),
+      );
+      await tester.tap(find.text('Dùng vị trí hiện tại'));
+      await tester.pumpAndSettle();
+      expect(giaTri.daChon, isFalse);
+      expect(find.text('Dùng vị trí hiện tại'), findsOneWidget);
+      expect(find.text('Mở cài đặt quyền vị trí'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
+
+  testWidgets('Bấm liên tiếp chỉ lấy GPS một lần, giữ chi tiết đang nhập', (
+    tester,
+  ) async {
+    int soLanGps = 0;
+    DiaChiNhan giaTri = const DiaChiNhan();
+    final gps = Completer<DiemGps>();
+    await mo(
+      tester,
+      DiaChiGiao(
+        giaTri: giaTri,
+        onChanged: (v) => giaTri = v,
+        layGps: () {
+          soLanGps++;
+          return gps.future;
+        },
+        timDiaChi: (_) async => timDuoc(),
+      ),
+    );
+    await tester.tap(find.text('Dùng vị trí hiện tại'));
+    await tester.tap(find.text('Dùng vị trí hiện tại'));
+    await tester.pump();
+    expect(soLanGps, 1);
+    await tester.ensureVisible(find.byType(TextField).at(1));
+    await tester.enterText(find.byType(TextField).at(1), 'Tầng 2, phòng 201');
+    gps.complete(const DiemGps(10.7, 106.7, 10));
+    await tester.pumpAndSettle();
+    expect(giaTri.daChon, isTrue);
+    expect(giaTri.chiTiet, 'Tầng 2, phòng 201');
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('Địa chỉ tự điền không tràn ở 320px và chữ lớn gấp đôi', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(2)),
+          child: child!,
+        ),
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: DiaChiGiao(
+                giaTri: const DiaChiNhan(),
+                onChanged: (_) {},
+                layGps: () async => const DiemGps(10.7, 106.7, 10),
+                timDiaChi: (_) async => timDuoc(),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Dùng vị trí hiện tại'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<TextField>(find.byType(TextField).first).controller!.text,
+      '140 Lê Trọng Tấn, TP Hồ Chí Minh',
+    );
+    expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });
 }

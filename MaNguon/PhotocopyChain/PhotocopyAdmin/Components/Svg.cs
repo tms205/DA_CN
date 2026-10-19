@@ -3,6 +3,7 @@ namespace PhotocopyAdmin.Components;
 /// <summary>Icon nét (stroke) dùng chung, giữ cùng phong cách với bộ icon Figma.</summary>
 public static class Svg
 {
+    public static string BieuMau(int co = 18) => Tao(co, """<path d="M8 3h9l4 4v14H8z"/><path d="M17 3v5h4M4 7H2v14h3M11 12h7M11 16h7"/>""");
     private static string Tao(int co, string duong, double net = 1.7) =>
         $"""<svg width="{co}" height="{co}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{net.ToString(System.Globalization.CultureInfo.InvariantCulture)}" stroke-linecap="round" stroke-linejoin="round">{duong}</svg>""";
 

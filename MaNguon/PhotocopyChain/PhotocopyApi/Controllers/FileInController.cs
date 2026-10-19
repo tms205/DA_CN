@@ -30,6 +30,7 @@ public class FileInController : ControllerBase
     private readonly string _chuoiKetNoi;
     private readonly IConfiguration _config;
     private readonly ILogger<FileInController> _logger;
+    private readonly ThuVienMauDon _thuVienMau;
 
     // Các loại file nhận in (ngoài PDF)
     private static readonly string[] DuoiWord = { "doc", "docx", "rtf", "odt", "txt" };
@@ -40,8 +41,9 @@ public class FileInController : ControllerBase
     // Office đổi 2 file cùng lúc hay bị treo → mỗi lúc chỉ cho đổi 1 file
     private static readonly object _khoaOffice = new object();
 
-    public FileInController(IConfiguration config, ILogger<FileInController> logger)
+    public FileInController(IConfiguration config, ILogger<FileInController> logger, ThuVienMauDon thuVienMau = null)
     {
+        _thuVienMau = thuVienMau;
         _config = config;
         _logger = logger;
         _chuoiKetNoi = config.GetConnectionString("PhotocopyChain");
@@ -178,39 +180,46 @@ public class FileInController : ControllerBase
 
     // xem lại thông tin 1 file (chỉ xem được file của chính mình)
     [HttpGet("mau")]
-    public IActionResult DanhSachMau() => Ok(MauDonPdf.DanhSach);
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public IActionResult DanhSachMau() => XuLyMau(() => Ok(_thuVienMau?.DanhSach() ?? MauDonPdf.DanhSach));
 
     [HttpGet("mau/{maMau}/pdf")]
-    public IActionResult XemMau(string maMau)
-    {
-        if (!MauDonPdf.DanhSach.Any(x => x.MaMau == maMau)) return NotFound(new { message = "Mẫu đơn không tồn tại." });
-        try { return File(MauDonPdf.Tao(maMau), "application/pdf"); }
-        catch (Exception ex) when (ex is IOException or InvalidDataException)
-        { return StatusCode(503, new { message = "File mẫu chưa sẵn sàng. Vui lòng liên hệ cửa hàng." }); }
-    }
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public IActionResult XemMau(string maMau, [FromQuery] long? phienBan = null) => XuLyMau(() =>
+        File(_thuVienMau == null ? MauDonPdf.Tao(maMau) : _thuVienMau.DocPdf(maMau, phienBan: phienBan).Bytes, "application/pdf"));
 
     [HttpGet("mau/{maMau}/trang/{soTrang:int}")]
-    public IActionResult XemTrangMau(string maMau, int soTrang)
-    {
-        var mau = MauDonPdf.DanhSach.FirstOrDefault(x => x.MaMau == maMau);
-        if (mau == null || soTrang < 1 || soTrang > mau.SoTrang)
-            return NotFound(new { message = "Trang mẫu đơn không tồn tại." });
-        try { return File(MauDonPdf.DocAnhTrang(maMau, soTrang), "image/png"); }
-        catch (IOException) { return StatusCode(503, new { message = "Bản xem trước chưa sẵn sàng. Vui lòng thử lại sau." }); }
-    }
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public IActionResult XemTrangMau(string maMau, int soTrang, [FromQuery] long? phienBan = null) => XuLyMau(() =>
+        File(_thuVienMau == null ? MauDonPdf.DocAnhTrang(maMau, soTrang) : _thuVienMau.DocAnh(maMau, soTrang, phienBan: phienBan), "image/png"));
 
     [HttpPost("mau/{maMau}")]
-    public async Task<IActionResult> ChonMau(string maMau, [FromQuery] [Range(1, int.MaxValue)] int? maKhachHang)
+    public async Task<IActionResult> ChonMau(string maMau, [FromQuery] [Range(1, int.MaxValue)] int? maKhachHang, [FromQuery] long? phienBan = null)
     {
-        var mau = MauDonPdf.DanhSach.FirstOrDefault(x => x.MaMau == maMau);
-        if (mau == null) return NotFound(new { message = "Mẫu đơn không tồn tại." });
-        byte[] bytes;
-        try { bytes = MauDonPdf.Tao(maMau); }
-        catch (Exception ex) when (ex is IOException or InvalidDataException)
-        { return StatusCode(503, new { message = "File mẫu chưa sẵn sàng. Vui lòng liên hệ cửa hàng." }); }
+        MauDonDto mau = null;
+        byte[] bytes = null;
+        var loi = XuLyMau(() => {
+            if (_thuVienMau != null) (mau, bytes) = _thuVienMau.DocPdf(maMau, phienBan: phienBan);
+            else { mau = MauDonPdf.DanhSach.FirstOrDefault(x => x.MaMau == maMau); bytes = MauDonPdf.Tao(maMau); }
+            return Ok();
+        });
+        if (loi is not OkResult) return loi;
         using var stream = new MemoryStream(bytes);
         // Dùng đúng quyền và cách lưu file tại quầy / khách hàng, không bỏ qua kiểm tra chủ sở hữu.
         return await TaiLen(new FormFile(stream, 0, stream.Length, "file", mau.TenMau + ".pdf"), maKhachHang);
+    }
+
+    private IActionResult XuLyMau(Func<IActionResult> viec)
+    {
+        try { return viec(); }
+        catch (MauDonDaDoiException ex) { return Conflict(new { message = ex.Message }); }
+        catch (Exception ex) when (ex is KeyNotFoundException or ArgumentException)
+        { return NotFound(new { message = "Mẫu/trang không còn trong thư viện. Hãy làm mới danh sách mẫu." }); }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException)
+        {
+            _logger.LogError(ex, "Không đọc được mẫu đơn.");
+            return StatusCode(503, new { message = "Thư viện mẫu đơn chưa sẵn sàng. Vui lòng liên hệ cửa hàng." });
+        }
     }
 
     [HttpGet("{maFileIn}")]

@@ -8,6 +8,7 @@ public static class QuyTacCaDangNhap
 
     public static bool CanTuDongMoCa(bool laWeb, string vaiTro)
     {
-        return laWeb && vaiTro == VaiTro.Staff;
+        // CEO mở ca thủ công; chỉ nhân viên và quản lý được tự mở khi đăng nhập Web.
+        return laWeb && (vaiTro == VaiTro.Staff || vaiTro == VaiTro.BranchAdmin);
     }
 }

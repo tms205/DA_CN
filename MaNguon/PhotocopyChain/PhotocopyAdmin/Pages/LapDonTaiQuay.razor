@@ -71,6 +71,7 @@
                     <option value="TAI_LIEU">In tài liệu của khách</option>
                     <option value="MAU_DON">In mẫu đơn trống để viết tay</option>
                     <option value="ANH_THE">In ảnh thẻ · tính từng ảnh</option>
+                    <option value="SAO_CHUP">Sao chụp giấy tờ/thẻ · hai mặt trên A4</option>
                 </select>
             </div>
             @if (LaAnhThe)
@@ -97,33 +98,56 @@
                 @if (_loaiTai == "MAU_DON")
                 {
                     <p class="the-mo-ta">Chọn bản trống từ file tải sẵn. Xem đúng biểu mẫu và nguồn trước khi đặt in.</p>
+                    <section class="mau-khung-thu-vien" aria-label="Thư viện mẫu đơn">
+                    <div class="mau-thanh-dau">
+                        <div><strong>Thư viện mẫu đơn</strong><span>@_dsMau.Count mẫu có sẵn · 6 mẫu mỗi trang</span></div>
+                        <button type="button" class="nut-nho" disabled="@(_dangTaiFile || _dangGui || _dangXemMau || _dangTaiMau)" @onclick="TaiThuVienMauAsync">Làm mới thư viện mẫu</button>
+                        <button type="button" class="nut-nho" disabled="@(_timMau == "" && _nhomMau == "")" @onclick="XoaLocMau">Xóa bộ lọc mẫu</button>
+                    </div>
                     <div class="mau-bo-loc">
                         <div class="truong"><label class="nhan" for="mau-tu-khoa">Tìm mẫu đơn</label>
-                            <input id="mau-tu-khoa" class="ca-o-loc" placeholder="Tên mẫu hoặc nơi công bố" @bind="_timMau" @bind:event="oninput" />
+                            <input id="mau-tu-khoa" class="ca-o-loc" placeholder="Tên mẫu hoặc nơi công bố" @bind="_timMau" @bind:event="oninput" @bind:after="VeTrangDauMau" />
                         </div>
                         <div class="truong"><label class="nhan" for="mau-nhom">Nhóm mẫu</label>
-                            <select id="mau-nhom" class="ca-o-loc" @bind="_nhomMau"><option value="">Tất cả</option>
+                            <select id="mau-nhom" class="ca-o-loc" @bind="_nhomMau" @bind:after="VeTrangDauMau"><option value="">Tất cả</option>
                                 @foreach (var nhom in _dsMau.Select(x => x.Nhom).Distinct()) { <option value="@nhom">@nhom</option> }
                             </select>
                         </div>
                     </div>
+                    <div id="mau-danh-sach" class="mau-danh-sach" role="region" aria-label="Danh sách mẫu đơn" tabindex="0" @key="(_timMau, _nhomMau, TrangThuVienMau)">
                     <div class="mau-thu-vien">
-                    @foreach (var mau in MauDaLoc)
+                    @foreach (var mau in MauTrenTrang)
                     {
                         <article class="mau-the" @key="mau.MaMau">
+                            <div class="mau-the-noi-dung">
                             <span class="nv-phu">@mau.Nhom · @mau.SoTrang trang</span>
                             <h3>@mau.TenMau</h3>
-                            <p>@mau.Nguon</p>
-                            <details><summary>Phạm vi sử dụng & nguồn</summary>
-                                <p>@mau.PhamVi</p><a href="@mau.UrlNguon" target="_blank" rel="noopener noreferrer">Xem nguồn công bố</a>
+                            </div>
+                            <button type="button" class="nut-nho mau-nut-xem" disabled="@(_dangGui || _dangTaiFile || _dangXemMau)" @onclick="() => XemMauAsync(mau)">Xem mẫu</button>
+                            <details><summary>Thông tin &amp; nguồn</summary>
+                                <p><strong>@mau.Nguon</strong></p><p>@mau.MoTa</p><p>@mau.PhamVi</p>
+                                @if (!string.IsNullOrWhiteSpace(mau.UrlNguon)) { <a href="@mau.UrlNguon" target="_blank" rel="noopener noreferrer">Xem nguồn công bố</a> }
                             </details>
-                            <button class="nut-nho" disabled="@(_dangGui || _dangTaiFile || _dangXemMau)" @onclick="() => XemMauAsync(mau)">Xem mẫu</button>
                         </article>
                     }
                     </div>
                     @if (_dsMau.Count == 0) { <button class="nut-nho" @onclick="DoiLoaiTaiAsync">Tải lại mẫu đơn</button> }
                     else if (!MauDaLoc.Any()) { <p role="status">Không có mẫu phù hợp. Thử tên khác hoặc chọn tất cả nhóm.</p> }
+                    </div>
+                    <nav class="mau-phan-trang" aria-label="Phân trang thư viện mẫu">
+                        <span class="nv-phu" role="status">@SoMauDaLoc mẫu phù hợp · Trang @TrangThuVienMau / @SoTrangThuVienMau</span>
+                        <div>
+                            <button type="button" class="nut-nho" aria-controls="mau-danh-sach" disabled="@(TrangThuVienMau <= 1)" @onclick="() => DoiTrangThuVienMau(TrangThuVienMau - 1)">Trang mẫu trước</button>
+                            <button type="button" class="nut-nho" aria-controls="mau-danh-sach" disabled="@(TrangThuVienMau >= SoTrangThuVienMau)" @onclick="() => DoiTrangThuVienMau(TrangThuVienMau + 1)">Trang mẫu sau</button>
+                        </div>
+                    </nav>
+                    </section>
                     @if (_dangXemMau) { <p role="status">Đang mở bản xem trước…</p> }
+                }
+                else if (LaSaoChup)
+                {
+                    @if (_maDichVu == 0) { <div class="o-canh-bao">Chi nhánh chưa có giá in A4 một mặt. Hãy cấu hình bảng giá trước khi lập đơn sao chụp.</div> }
+                    <p class="the-mo-ta">Dùng bảng máy quét bên dưới để lấy hai mặt thẻ và kiểm tra bản ghép trước khi lập đơn.</p>
                 }
                 else
                 {
@@ -133,7 +157,7 @@
                 {
                     <p class="nv-phu">Mẫu vừa xem: @_mauDangXem.TenMau</p>
                 }
-                @if (_dangTaiFile) { <p class="the-mo-ta nho">Đang chuẩn hóa PDF và đếm trang…</p> }
+                @if (_dangTaiFile && !LaSaoChup) { <p class="the-mo-ta nho">Đang chuẩn hóa PDF và đếm trang…</p> }
                 @foreach (FileInDto file in _dsFile)
                 {
                     <div class="hd-dong-in">
@@ -145,6 +169,15 @@
             }
         </div>
     </div>
+
+    @if (_khach != null && LaSaoChup)
+    {
+        <div class="the the-rong">
+            <MayQuetAo @key="(_khach.MaKhachHang, _lanPhienQuet)" MaKhachHang="_khach.MaKhachHang"
+                Khoa="@(_dangGui || _dangTaiFile || _dsFile.Count > 0 || _maDichVu == 0)"
+                DangXuLyThayDoi="DangQuetThayDoi" FileDaTao="NhanFileSaoChupAsync" />
+        </div>
+    }
 
     @if (_khach != null && _dsFile.Count > 0)
     {
@@ -158,13 +191,14 @@
                 else
                 {
                 <div class="truong">
-                    <label class="nhan">Khổ giấy & loại giấy</label>
+                    <label class="nhan">Giấy in trong kho</label>
                     <select class="ca-o-loc" value="@_khoaGiay" @onchange="DoiKhoGiay">
                         @foreach (DichVuDto dv in DsKhoGiay())
                         {
-                            <option value="@KhoaGiay(dv)">@dv.KhoGiay @dv.LoaiGiay</option>
+                            <option value="@KhoaGiay(dv)">@(string.IsNullOrWhiteSpace(dv.TenVatTu) ? dv.KhoGiay + " " + dv.LoaiGiay : dv.TenVatTu)</option>
                         }
                     </select>
+                    <small class="nv-phu">Giấy đã cấu hình dịch vụ và đang bán tại chi nhánh.</small>
                 </div>
                 <div class="truong">
                     <label class="nhan">Mặt in</label>
@@ -177,7 +211,7 @@
                 </div>
                 <div class="truong">
                     <label class="nhan">Hướng giấy</label>
-                    <select class="ca-o-loc" @bind="_huongGiay" @bind:after="XoaBaoGia">
+                    <select class="ca-o-loc" @bind="_huongGiay" @bind:after="XoaBaoGia" disabled="@LaSaoChup">
                         <option value="DUNG">Giấy đứng</option>
                         <option value="NGANG">Giấy ngang</option>
                     </select>
@@ -291,7 +325,7 @@
         </form>
     }
 </div>
-
+<XacNhanThaoTac @ref="_xacNhan" />
 <dialog class="mau-xem-truoc" @ref="_hopMau" aria-label="Bản xem trước mẫu đơn" aria-labelledby="mau-xem-tieu-de">
     @if (_mauDangXem != null)
     {
@@ -322,6 +356,7 @@
 </dialog>
 
 @code {
+    private XacNhanThaoTac _xacNhan;
     [Parameter]
     [SupplyParameterFromQuery(Name = "maDonHang")]
     public int? MaDonHangTuPayOS { get; set; }
@@ -334,6 +369,8 @@
     private string _kichThuocAnh = "3X4";
     private int _soLuongAnh = 8;
     private bool LaAnhThe => _loaiTai == "ANH_THE";
+    private bool LaSaoChup => _loaiTai == "SAO_CHUP";
+    private int _lanPhienQuet;
     private List<MauDonDto> _dsMau = new();
     private string _mauXem;
     private MauDonDto _mauDangXem;
@@ -344,23 +381,55 @@
     private bool _dangXemMau;
     private string _timMau = "";
     private string _nhomMau = "";
+    private const int SoMauMoiTrang = 6;
+    private int _trangThuVienMau = 1;
     private IEnumerable<MauDonDto> MauDaLoc => _dsMau.Where(x =>
         (_nhomMau == "" || x.Nhom == _nhomMau) &&
         (x.TenMau.Contains(_timMau.Trim(), StringComparison.CurrentCultureIgnoreCase)
          || x.Nguon.Contains(_timMau.Trim(), StringComparison.CurrentCultureIgnoreCase)));
+    private int SoMauDaLoc => MauDaLoc.Count();
+    private int SoTrangThuVienMau => Math.Max(1, (SoMauDaLoc + SoMauMoiTrang - 1) / SoMauMoiTrang);
+    private int TrangThuVienMau => Math.Clamp(_trangThuVienMau, 1, SoTrangThuVienMau);
+    private IEnumerable<MauDonDto> MauTrenTrang => MauDaLoc.Skip((TrangThuVienMau - 1) * SoMauMoiTrang).Take(SoMauMoiTrang);
+    private void VeTrangDauMau() => _trangThuVienMau = 1;
+    private void DoiTrangThuVienMau(int trang) => _trangThuVienMau = Math.Clamp(trang, 1, SoTrangThuVienMau);
+    private void XoaLocMau() { _timMau = ""; _nhomMau = ""; VeTrangDauMau(); }
 
     private async Task DoiLoaiTaiAsync()
     {
         _mauXem = null; _mauDangXem = null; _timMau = ""; _nhomMau = "";
+        VeTrangDauMau();
         _loi = null; _soBan = 1; _huongGiay = "DUNG"; _dsGiaCong.Clear();
         DoiQuyCachAnh();
         if (_loaiTai != "MAU_DON") return;
-        try { _dsMau = await Http.GetFromJsonAsync<List<MauDonDto>>("api/file-in/mau") ?? new(); }
+        await TaiThuVienMauAsync();
+    }
+
+    private bool _dangTaiMau;
+    private async Task TaiThuVienMauAsync()
+    {
+        if (_dangTaiMau) return;
+        _dangTaiMau = true; _loi = null;
+        try
+        {
+            _dsMau = await Http.GetFromJsonAsync<List<MauDonDto>>("api/file-in/mau") ?? new();
+            if (!_dsMau.Any(x => x.Nhom == _nhomMau)) _nhomMau = "";
+            VeTrangDauMau();
+        }
         catch { _loi = "Không tải được mẫu đơn. Bạn có thể thử lại."; }
+        finally { _dangTaiMau = false; }
     }
 
     private IEnumerable<DichVuDto> DichVuInHopLe() => _dsDichVu.Where(x => x.LoaiDichVu == "IN_AN" &&
-        (LaAnhThe ? x.KichThuocAnh == _kichThuocAnh : x.KichThuocAnh == null));
+        (LaAnhThe ? x.KichThuocAnh == _kichThuocAnh : x.KichThuocAnh == null) &&
+        (!LaSaoChup || (x.KhoGiay == "A4" && x.MatIn == "1_MAT")));
+
+    private void DangQuetThayDoi(bool dang) => _dangTaiFile = dang;
+    private async Task NhanFileSaoChupAsync(FileInDto file)
+    {
+        _dsFile.Add(file); XoaBaoGia();
+        await BaoGiaAsync();
+    }
 
     private void DoiQuyCachAnh()
     {
@@ -384,11 +453,11 @@
         _trangMau = trang; _phongMau = 1.5;
         try
         {
-            byte[] bytes = await Http.GetByteArrayAsync("api/file-in/mau/" + maMau + "/trang/" + trang);
+            byte[] bytes = await Http.GetByteArrayAsync("api/file-in/mau/" + maMau + "/trang/" + trang + "?phienBan=" + _mauDangXem.PhienBan);
             if (_loaiTai != "MAU_DON" || _mauDangXem?.MaMau != maMau) return;
             _mauXem = "data:image/png;base64," + Convert.ToBase64String(bytes);
         }
-        catch { _loi = "Không mở được bản xem trước mẫu đơn."; }
+        catch { _loi = "Không mở được bản xem trước. Mẫu có thể đã đổi hoặc ẩn; hãy làm mới thư viện mẫu."; }
         finally { _dangXemMau = false; }
     }
 
@@ -411,7 +480,7 @@
         _dangTaiFile = true; _loi = null; XoaBaoGia();
         try
         {
-            using var res = await Http.PostAsync("api/file-in/mau/" + mau.MaMau + "?maKhachHang=" + _khach.MaKhachHang, null);
+            using var res = await Http.PostAsync("api/file-in/mau/" + mau.MaMau + "?maKhachHang=" + _khach.MaKhachHang + "&phienBan=" + mau.PhienBan, null);
             if (res.IsSuccessStatusCode)
             {
                 _dsFile.Add(await res.Content.ReadFromJsonAsync<FileInDto>());
@@ -478,7 +547,7 @@
         catch { _loi = "Không tải được bảng giá."; }
     }
 
-    private string KhoaGiay(DichVuDto dichVu) => (dichVu.KhoGiay ?? "") + "|" + (dichVu.LoaiGiay ?? "");
+    private string KhoaGiay(DichVuDto dichVu) => (dichVu.KhoGiay ?? "") + "|" + (dichVu.LoaiGiay ?? "") + "|" + dichVu.MaVatTu;
 
     private List<DichVuDto> DsKhoGiay()
     {
@@ -551,6 +620,7 @@
             {
                 await XoaTatCaFileDangChonAsync();
                 _khach = await res.Content.ReadFromJsonAsync<KhachTaiQuayDto>();
+                _lanPhienQuet++;
                 _dsFile.Clear(); XoaBaoGia(); _thanhToanVuaLap = null; _lienKetPayOS = null; _maDonVuaLap = null;
             }
             else _loi = (await res.Content.ReadFromJsonAsync<ApiError>()).Message;
@@ -588,14 +658,18 @@
     private async Task XoaFileAsync(FileInDto file)
     {
         if (_khach == null || _dangGui || _dangTaiFile) return;
+        if (!await _xacNhan.HoiAsync("Xóa file “" + file.TenFileGoc + "” khỏi đơn đang lập?", "Xóa tài liệu", "Xóa file", true)) return;
+        _dangTaiFile = true;
         _loi = null;
-        var res = await Http.DeleteAsync("api/file-in/" + file.MaFileIn + "?maKhachHang=" + _khach.MaKhachHang);
-        if (res.IsSuccessStatusCode)
+        try
         {
+            using var res = await Http.DeleteAsync("api/file-in/" + file.MaFileIn + "?maKhachHang=" + _khach.MaKhachHang);
+            if (!res.IsSuccessStatusCode) { _loi = await DocLoiApi.TuPhanHoiAsync(res, "Không xóa được file."); return; }
             _dsFile.Remove(file);
             XoaBaoGia();
         }
-        else _loi = (await res.Content.ReadFromJsonAsync<ApiError>()).Message;
+        catch (HttpRequestException) { _loi = "Mất kết nối API. Kiểm tra lại file trước khi thử lại."; }
+        finally { _dangTaiFile = false; }
     }
 
     private async Task XoaTatCaFileDangChonAsync()
@@ -637,7 +711,7 @@
     {
         var ds = new List<DongInRequest>();
         foreach (FileInDto file in _dsFile)
-            ds.Add(new DongInRequest { MaFileIn = file.MaFileIn, MaDichVu = _maDichVu, SoBanIn = _soBan, HuongGiay = _huongGiay, DsGiaCong = new List<int>(_dsGiaCong) });
+            ds.Add(new DongInRequest { MaFileIn = file.MaFileIn, MaDichVu = _maDichVu, SoBanIn = _soBan, HuongGiay = LaSaoChup ? "DUNG" : _huongGiay, DsGiaCong = new List<int>(_dsGiaCong) });
         return ds;
     }
 

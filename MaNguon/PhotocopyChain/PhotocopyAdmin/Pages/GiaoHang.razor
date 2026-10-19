@@ -10,7 +10,7 @@
 <TieuDeTrang TieuDe="Giao hàng nội bộ" MoTa="Bàn giao tài liệu cho shipper, theo dõi từng lượt giao và lý do thất bại. Khách thanh toán QR trước, không thu COD." />
 
 <div class="than-trang khoi-doc">
-    @if (_loi != null) { <div class="o-loi" role="alert">@_loi</div> }
+    @if (_loi != null && _donGiao == null) { <div class="o-loi" role="alert">@_loi</div> }
     @if (_thongBao != null) { <div class="o-thanh-cong" role="status">@_thongBao</div> }
     <div class="the the-bang">
         <div class="bang-tieu-de"><div><h2>Đơn giao và lịch sử</h2><p class="bang-mo-ta">Chỉ đơn đã thanh toán đầy đủ. Tối đa 100 đơn/lượt trong nhóm đang xem.</p></div><span class="bang-dem">@(_ds?.Count ?? 0) mục</span></div>
@@ -44,18 +44,7 @@
                         <td data-nhan="Shipper / thao tác">
                             @if (_nhom == "CHO_GIAO" && don.SoLanGiao < 3)
                             {
-                                <label class="nhan" for="@($"shipper-{don.MaDonHang}")">Shipper chi nhánh này</label>
-                                <select id="@($"shipper-{don.MaDonHang}")" class="ca-o-loc" disabled="@_dangGui" value="@ShipperChon(don.MaDonHang)" @onchange="e => ChonShipper(don.MaDonHang, e.Value)">
-                                    <option value="0">Chọn shipper</option>
-                                    @foreach (var sp in _shipper.Where(x => x.MaChiNhanh == don.MaChiNhanh)) { <option value="@sp.MaShipper">@sp.HoTen</option> }
-                                </select>
-                                <button class="nut-nho chinh gh-nut-giao" disabled="@(_dangGui || ShipperChon(don.MaDonHang) == 0)" @onclick="() => MoXacNhan(don)">Bàn giao đi giao</button>
-                                @if (_xacNhan == don.MaDonHang)
-                                {
-                                    <p class="nv-phu">Chỉ xác nhận khi đã bàn giao đúng tài liệu cho shipper. Đơn sẽ chuyển sang Đang giao.</p>
-                                    <button class="nut-nho chinh" disabled="@_dangGui" @onclick="() => PhanCong(don)">Xác nhận bàn giao</button>
-                                    <button class="nut-nho" disabled="@_dangGui" @onclick="() => _xacNhan = null">Hủy</button>
-                                }
+                                <button class="nut-nho chinh gh-nut-giao" disabled="@_dangGui" @onclick="() => MoXacNhan(don)">Bàn giao đi giao</button>
                             }
                             else { <b>@(string.IsNullOrWhiteSpace(don.TenShipper) ? "Chưa phân công" : don.TenShipper)</b> }
                         </td>
@@ -68,12 +57,22 @@
     </div>
 </div>
 
+<HopThoaiQuanTri Mo="@(_donGiao != null)" TieuDe="Phân công & bàn giao shipper" Loi="@_loi" DangLuu="@_dangGui" Dong="DongPhanCong">
+    <NoiDung>
+        <p><b>@_donGiao?.MaDonHangHienThi · @_donGiao?.TenKhachHang</b></p><p>@_donGiao?.DiaChiGiao</p>
+        <label class="nhan" for="gh-shipper">Shipper thuộc chi nhánh này</label>
+        <select id="gh-shipper" class="ca-o-loc" disabled="@_dangGui" value="@ShipperChon(_donGiao.MaDonHang)" @onchange="e => ChonShipper(_donGiao.MaDonHang, e.Value)"><option value="0">Chọn shipper</option>@foreach (var sp in _shipper.Where(x => x.MaChiNhanh == _donGiao.MaChiNhanh)) { <option value="@sp.MaShipper">@sp.HoTen</option> }</select>
+        <p>Chỉ xác nhận khi đã bàn giao đúng tài liệu cho shipper. Đơn chuyển sang Đang giao, không thu COD.</p>
+    </NoiDung>
+    <Chan><button type="button" class="nut-phu" disabled="@_dangGui" @onclick="DongPhanCong">Hủy</button><button type="button" class="nut-chinh" disabled="@(_dangGui || ShipperChon(_donGiao?.MaDonHang ?? 0) == 0)" @onclick="() => PhanCong(_donGiao)">Xác nhận bàn giao</button></Chan>
+</HopThoaiQuanTri>
 @code {
     private List<DonGiaoDto> _ds;
     private List<ShipperDto> _shipper = new();
     private readonly Dictionary<int, int> _daChon = new();
     private string _nhom = "CHO_GIAO", _tim = "", _loi, _thongBao;
-    private int? _xacNhan;
+    private DonGiaoDto _donGiao;
+    private void DongPhanCong() { if (!_dangGui) { _donGiao = null; _loi = null; } }
     private bool _dangGui, _daDong;
     private int _lanTai;
     private HubConnection _ketNoi;
@@ -107,20 +106,21 @@
         catch { if (!_daDong && lan == _lanTai) { _loi = "Chưa tải được giao hàng. Kiểm tra API rồi bấm Làm mới."; _ds = new(); } }
     }
 
-    private async Task DoiNhom(string nhom) { _nhom = nhom; _xacNhan = null; _ds = null; _thongBao = null; await TaiAsync(); }
+    private async Task DoiNhom(string nhom) { _nhom = nhom; _donGiao = null; _ds = null; _thongBao = null; await TaiAsync(); }
     private string NutNhom(string nhom) => _nhom == nhom ? "nut-nho chinh" : "nut-nho";
     private int ShipperChon(int ma) => _daChon.GetValueOrDefault(ma);
-    private void ChonShipper(int ma, object giaTri) { _daChon[ma] = int.TryParse(giaTri?.ToString(), out int sp) ? sp : 0; _xacNhan = null; }
-    private void MoXacNhan(DonGiaoDto don) { _xacNhan = don.MaDonHang; _loi = null; _thongBao = null; }
+    private void ChonShipper(int ma, object giaTri) { _daChon[ma] = int.TryParse(giaTri?.ToString(), out int sp) ? sp : 0; }
+    private void MoXacNhan(DonGiaoDto don) { if (_dangGui) return; _donGiao = don; _loi = _thongBao = null; }
 
     private async Task PhanCong(DonGiaoDto don)
     {
+        if (_dangGui || don == null || ShipperChon(don.MaDonHang) == 0) return;
         _dangGui = true; _loi = null; _thongBao = null;
         try
         {
             using var res = await Http.PostAsJsonAsync("api/giao-hang/" + don.MaDonHang + "/phan-cong", new PhanCongGiaoRequest { MaShipper = ShipperChon(don.MaDonHang) });
             if (!res.IsSuccessStatusCode) _loi = await Loi(res);
-            else { _thongBao = "Đã bàn giao " + don.MaDonHangHienThi + " cho shipper. Đơn bắt đầu giao, không thu COD."; _xacNhan = null; await TaiAsync(); }
+            else { _thongBao = "Đã bàn giao " + don.MaDonHangHienThi + " cho shipper. Đơn bắt đầu giao, không thu COD."; _donGiao = null; await TaiAsync(); }
         }
         catch { _loi = "Chưa xác nhận được bàn giao. Hãy tải lại để kiểm tra kết quả trước khi thử lại."; }
         finally { _dangGui = false; }

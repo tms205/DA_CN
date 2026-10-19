@@ -14,7 +14,7 @@ import '../../widgets/widgets.dart';
 import 'thanh_toan_screen.dart';
 
 // F-09 / F-34 — Bước 3/4: chọn chi nhánh, hình thức nhận, mã giảm giá rồi đặt đơn.
-// Giá được tính lại theo đúng chi nhánh khách chọn (bước 2 chỉ tạm tính theo chi nhánh đầu tiên),
+// Giá được tính lại theo đúng chi nhánh khách chọn (bước 2 tạm tính theo chi nhánh đang xem giấy),
 // vì giao tận nơi còn cộng phí ship và giờ in xong dự kiến tùy hàng đợi từng chi nhánh.
 class ChonChiNhanhScreen extends StatefulWidget {
   const ChonChiNhanhScreen({
@@ -28,11 +28,14 @@ class ChonChiNhanhScreen extends StatefulWidget {
     this.huongGiay = 'DUNG',
     this.ghiChu,
     this.guiYeuCau,
+    this.maChiNhanhGoiY,
   });
 
   final FileIn file;
-  final int maDichVu;          // dòng giá in ấn đã chọn ở bước 2
-  final String tenCauHinh;     // "A4 70gsm · 2 mặt · Đen trắng" — chỉ để hiện lại cho khách xem
+  final int maDichVu; // dòng giá in ấn đã chọn ở bước 2
+  final int? maChiNhanhGoiY;
+  final String
+  tenCauHinh; // "A4 70gsm · 2 mặt · Đen trắng" — chỉ để hiện lại cho khách xem
   final int soBan;
   final List<int> dsGiaCong;
   final bool hoaToc;
@@ -48,7 +51,7 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
   Future<KetQuaApi> _post(String path, Map<String, dynamic> body) =>
       widget.guiYeuCau?.call(path, body) ?? Api.post(path, body);
   // Dữ liệu tải từ API
-  List<ChiNhanh>? _dsChiNhanh;    // null = đang tải
+  List<ChiNhanh>? _dsChiNhanh; // null = đang tải
   String? _loiTai;
 
   // Lựa chọn của khách
@@ -111,6 +114,10 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
     int? chonSan;
     for (ChiNhanh cn in ds) {
       if (cn.dapUngDuoc && chonSan == null) chonSan = cn.maChiNhanh;
+      if (cn.dapUngDuoc && cn.maChiNhanh == widget.maChiNhanhGoiY) {
+        chonSan = cn.maChiNhanh;
+        break;
+      }
     }
 
     setState(() {
@@ -150,11 +157,12 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
       });
       return;
     }
-    // Giao tận nơi mà chưa nhập địa chỉ thì chưa tính được phí ship
+    // Chưa có điểm nhận xác thực từ GPS thì không tính phí theo địa chỉ cũ.
     if (_hinhThucNhan == 'GIAO_HANG' && !_diaChiNhan.daChon) {
       setState(() {
         _baoGia = null;
-        _loiBaoGia = 'Tìm và chọn đúng điểm nhận để tính phí giao hàng.';
+        _loiBaoGia =
+            'Bấm Dùng vị trí hiện tại để lấy địa chỉ nhận hàng và tính phí giao hàng.';
       });
       return;
     }
@@ -172,7 +180,9 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
       'hinhThucNhan': _hinhThucNhan,
       if (_hinhThucNhan == 'GIAO_HANG') ..._diaChiNhan.duLieu,
       'inGap': widget.hoaToc,
-      'maCodeKhuyenMai': _oMaGiam.text.trim().isEmpty ? null : _oMaGiam.text.trim(),
+      'maCodeKhuyenMai': _oMaGiam.text.trim().isEmpty
+          ? null
+          : _oMaGiam.text.trim(),
       'fileIn': [
         {
           'maFileIn': widget.file.maFileIn,
@@ -180,7 +190,7 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
           'soBanIn': widget.soBan,
           'huongGiay': widget.huongGiay,
           'dsGiaCong': widget.dsGiaCong,
-        }
+        },
       ],
     });
 
@@ -210,9 +220,13 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
       'hinhThucNhan': _hinhThucNhan,
       if (_hinhThucNhan == 'GIAO_HANG') ..._diaChiNhan.duLieu,
       'sdtNhan': _oSdt.text.trim().isEmpty ? null : _oSdt.text.trim(),
-      'maBaoGiaGiao': _hinhThucNhan == 'GIAO_HANG' ? _baoGia!.maBaoGiaGiao : null,
+      'maBaoGiaGiao': _hinhThucNhan == 'GIAO_HANG'
+          ? _baoGia!.maBaoGiaGiao
+          : null,
       'inGap': widget.hoaToc,
-      'maCodeKhuyenMai': _oMaGiam.text.trim().isEmpty ? null : _oMaGiam.text.trim(),
+      'maCodeKhuyenMai': _oMaGiam.text.trim().isEmpty
+          ? null
+          : _oMaGiam.text.trim(),
       'ghiChu': widget.ghiChu,
       'fileIn': [
         {
@@ -221,7 +235,7 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
           'soBanIn': widget.soBan,
           'huongGiay': widget.huongGiay,
           'dsGiaCong': widget.dsGiaCong,
-        }
+        },
       ],
     });
     if (!mounted) return;
@@ -238,7 +252,9 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
     int maDonHang = kq.duLieu['maDonHang'];
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => ThanhToanScreen(maDonHang: maDonHang)),
+      MaterialPageRoute(
+        builder: (context) => ThanhToanScreen(maDonHang: maDonHang),
+      ),
     );
   }
 
@@ -248,7 +264,9 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
   Widget build(BuildContext context) {
     Widget noiDung;
     if (_dsChiNhanh == null && _loiTai == null) {
-      noiDung = const Center(child: CircularProgressIndicator(color: AppColors.accent));
+      noiDung = const Center(
+        child: CircularProgressIndicator(color: AppColors.accent),
+      );
     } else if (_loiTai != null) {
       noiDung = Padding(
         padding: const EdgeInsets.all(20),
@@ -282,7 +300,12 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
               const SizedBox(height: 8),
               const NhanTruong('Số điện thoại người nhận'),
               const SizedBox(height: 6),
-              ONhap(controller: _oSdt, hint: '09xx xxx xxx', icon: Ico.dienThoai, keyboardType: TextInputType.phone),
+              ONhap(
+                controller: _oSdt,
+                hint: '09xx xxx xxx',
+                icon: Ico.dienThoai,
+                keyboardType: TextInputType.phone,
+              ),
             ],
             const SizedBox(height: 14),
             const NhanTruong('Chi nhánh in'),
@@ -304,8 +327,10 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
             if (_baoGia != null && _baoGia!.khuyenMaiHopLe == false)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
-                child: HopThongBao(_baoGia!.lyDoKhuyenMai ?? 'Mã giảm giá không dùng được.',
-                    loai: LoaiThongBao.canhBao),
+                child: HopThongBao(
+                  _baoGia!.lyDoKhuyenMai ?? 'Mã giảm giá không dùng được.',
+                  loai: LoaiThongBao.canhBao,
+                ),
               ),
             const SizedBox(height: 14),
             const NhanTruong('Thanh toán'),
@@ -327,7 +352,9 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
       body: noiDung,
       bottomNavigationBar: _dsChiNhanh != null && _loiTai == null
           ? ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .45),
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height * .45,
+              ),
               child: SingleChildScrollView(child: _bangTongTien()),
             )
           : null,
@@ -353,25 +380,49 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
               border: Border.all(color: AppColors.accentTint),
               borderRadius: BorderRadius.circular(7),
             ),
-            child: const Center(child: AppIcon(Ico.taiLieu, size: 20, color: AppColors.accent, net: 1.6)),
+            child: const Center(
+              child: AppIcon(
+                Ico.taiLieu,
+                size: 20,
+                color: AppColors.accent,
+                net: 1.6,
+              ),
+            ),
           ),
           const SizedBox(width: 11),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(widget.file.tenFileGoc,
-                    maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTheme.font(size: 13, weight: FontWeight.w600)),
+                Text(
+                  widget.file.tenFileGoc,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTheme.font(size: 13, weight: FontWeight.w600),
+                ),
                 const SizedBox(height: 3),
-                Text(widget.file.laAnhThe ? widget.file.moTaSoLuong : '${widget.file.soTrang ?? 0} trang × ${widget.soBan} bản',
-                    style: AppTheme.font(size: 11, color: AppColors.chuPhu)),
+                Text(
+                  widget.file.laAnhThe
+                      ? widget.file.moTaSoLuong
+                      : '${widget.file.soTrang ?? 0} trang × ${widget.soBan} bản',
+                  style: AppTheme.font(size: 11, color: AppColors.chuPhu),
+                ),
                 const SizedBox(height: 2),
-                Text(widget.tenCauHinh,
-                    maxLines: 1, overflow: TextOverflow.ellipsis, style: AppTheme.font(size: 11, color: AppColors.chuPhu)),
+                Text(
+                  widget.tenCauHinh,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTheme.font(size: 11, color: AppColors.chuPhu),
+                ),
               ],
             ),
           ),
-          if (widget.hoaToc) const NhanNho('Hỏa tốc', mau: AppColors.hoaTocChu, nen: AppColors.hoaTocNen),
+          if (widget.hoaToc)
+            const NhanNho(
+              'Hỏa tốc',
+              mau: AppColors.hoaTocChu,
+              nen: AppColors.hoaTocNen,
+            ),
         ],
       ),
     );
@@ -381,9 +432,23 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
   Widget _chonHinhThucNhan() {
     return Row(
       children: [
-        Expanded(child: _nutHinhThuc('TAI_QUAY', Ico.cuaHang, 'Nhận tại quầy', 'Miễn phí')),
+        Expanded(
+          child: _nutHinhThuc(
+            'TAI_QUAY',
+            Ico.cuaHang,
+            'Nhận tại quầy',
+            'Miễn phí',
+          ),
+        ),
         const SizedBox(width: 8),
-        Expanded(child: _nutHinhThuc('GIAO_HANG', Ico.xeGiao, 'Giao tận nơi', 'Tính theo chi nhánh')),
+        Expanded(
+          child: _nutHinhThuc(
+            'GIAO_HANG',
+            Ico.xeGiao,
+            'Giao tận nơi',
+            'Tính theo chi nhánh',
+          ),
+        ),
       ],
     );
   }
@@ -397,29 +462,42 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 11),
         decoration: BoxDecoration(
           color: daChon ? AppColors.accentSoft : AppColors.trang,
-          border: Border.all(color: daChon ? AppColors.accent : AppColors.vien, width: daChon ? 1.5 : 1),
+          border: Border.all(
+            color: daChon ? AppColors.accent : AppColors.vien,
+            width: daChon ? 1.5 : 1,
+          ),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
-            AppIcon(icon, size: 19, color: daChon ? AppColors.accent : AppColors.iconMo, net: 1.7),
+            AppIcon(
+              icon,
+              size: 19,
+              color: daChon ? AppColors.accent : AppColors.iconMo,
+              net: 1.7,
+            ),
             const SizedBox(width: 9),
             Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(nhan,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTheme.font(
-                          size: 12.5,
-                          weight: FontWeight.w700,
-                          color: daChon ? AppColors.accentDeep : AppColors.chu)),
-                  Text(phu,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTheme.font(size: 10.5, color: AppColors.chuPhu)),
+                  Text(
+                    nhan,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTheme.font(
+                      size: 12.5,
+                      weight: FontWeight.w700,
+                      color: daChon ? AppColors.accentDeep : AppColors.chu,
+                    ),
+                  ),
+                  Text(
+                    phu,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTheme.font(size: 10.5, color: AppColors.chuPhu),
+                  ),
                 ],
               ),
             ),
@@ -438,7 +516,11 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
       onTap: () {
         if (!inDuoc) {
           // Bấm vào chi nhánh không in được thì báo lý do chứ không chọn
-          hienThongBaoNhanh(context, cn.lyDoKhongDapUng ?? 'Chi nhánh này không in được cấu hình bạn chọn.');
+          hienThongBaoNhanh(
+            context,
+            cn.lyDoKhongDapUng ??
+                'Chi nhánh này không in được cấu hình bạn chọn.',
+          );
           return;
         }
         _doiLuaChon(() => _maChiNhanh = cn.maChiNhanh);
@@ -449,7 +531,10 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
           padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
           decoration: BoxDecoration(
             color: daChon ? AppColors.accentSoft : AppColors.trang,
-            border: Border.all(color: daChon ? AppColors.accent : AppColors.vach, width: daChon ? 1.5 : 1),
+            border: Border.all(
+              color: daChon ? AppColors.accent : AppColors.vach,
+              width: daChon ? 1.5 : 1,
+            ),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -457,40 +542,84 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
             children: [
               Row(
                 children: [
-                  AppIcon(Ico.cuaHang, size: 16, color: inDuoc ? AppColors.accent : AppColors.iconMo, net: 1.7),
+                  AppIcon(
+                    Ico.cuaHang,
+                    size: 16,
+                    color: inDuoc ? AppColors.accent : AppColors.iconMo,
+                    net: 1.7,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(cn.tenChiNhanh,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTheme.font(size: 13, weight: FontWeight.w700)),
+                    child: Text(
+                      cn.tenChiNhanh,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTheme.font(size: 13, weight: FontWeight.w700),
+                    ),
                   ),
-                  if (daChon) const AppIcon(Ico.dauTich, size: 15, color: AppColors.accent, net: 3),
+                  if (daChon)
+                    const AppIcon(
+                      Ico.dauTich,
+                      size: 15,
+                      color: AppColors.accent,
+                      net: 3,
+                    ),
                 ],
               ),
               const SizedBox(height: 5),
-              Text(cn.diaChi, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppTheme.font(size: 11.5, color: AppColors.chuPhu)),
+              Text(
+                cn.diaChi,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppTheme.font(size: 11.5, color: AppColors.chuPhu),
+              ),
               const SizedBox(height: 5),
               Row(
                 children: [
-                  const AppIcon(Ico.dongHo, size: 12, color: AppColors.iconMo, net: 1.9),
+                  const AppIcon(
+                    Ico.dongHo,
+                    size: 12,
+                    color: AppColors.iconMo,
+                    net: 1.9,
+                  ),
                   const SizedBox(width: 5),
-                  Text('${cn.gioMoCua ?? ''}–${cn.gioDongCua ?? ''}', style: AppTheme.font(size: 11, color: AppColors.chuPhu)),
+                  Text(
+                    '${cn.gioMoCua ?? ''}–${cn.gioDongCua ?? ''}',
+                    style: AppTheme.font(size: 11, color: AppColors.chuPhu),
+                  ),
                   const SizedBox(width: 10),
-                  const AppIcon(Ico.sao, size: 12, color: AppColors.cbIcon, net: 1.9),
+                  const AppIcon(
+                    Ico.sao,
+                    size: 12,
+                    color: AppColors.cbIcon,
+                    net: 1.9,
+                  ),
                   const SizedBox(width: 5),
-                  Text(cn.soLuotDanhGia == 0 ? 'Chưa có đánh giá' : '${cn.diemDanhGiaTB.toStringAsFixed(1)} (${cn.soLuotDanhGia})',
-                      style: AppTheme.font(size: 11, color: AppColors.chuPhu)),
+                  Text(
+                    cn.soLuotDanhGia == 0
+                        ? 'Chưa có đánh giá'
+                        : '${cn.diemDanhGiaTB.toStringAsFixed(1)} (${cn.soLuotDanhGia})',
+                    style: AppTheme.font(size: 11, color: AppColors.chuPhu),
+                  ),
                 ],
               ),
               if (_hinhThucNhan == 'GIAO_HANG') ...[
                 const SizedBox(height: 5),
-                Text('Giao trong ${cn.banKinhGiao.toStringAsFixed(0)} km · phí theo quãng đường',
-                    style: AppTheme.font(size: 11, weight: FontWeight.w600, color: AppColors.thanhCong)),
+                Text(
+                  'Giao trong ${cn.banKinhGiao.toStringAsFixed(0)} km · phí theo quãng đường',
+                  style: AppTheme.font(
+                    size: 11,
+                    weight: FontWeight.w600,
+                    color: AppColors.thanhCong,
+                  ),
+                ),
               ],
               if (!inDuoc) ...[
                 const SizedBox(height: 7),
-                HopThongBao(cn.lyDoKhongDapUng ?? 'Chi nhánh chưa in được cấu hình này.', loai: LoaiThongBao.canhBao),
+                HopThongBao(
+                  cn.lyDoKhongDapUng ?? 'Chi nhánh chưa in được cấu hình này.',
+                  loai: LoaiThongBao.canhBao,
+                ),
               ],
             ],
           ),
@@ -511,18 +640,35 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
       ),
       child: Row(
         children: [
-          const AppIcon(Ico.dauTichKep, size: 19, color: AppColors.accent, net: 1.7),
+          const AppIcon(
+            Ico.dauTichKep,
+            size: 19,
+            color: AppColors.accent,
+            net: 1.7,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Chuyển khoản VietQR',
-                    style: AppTheme.font(size: 12.5, weight: FontWeight.w700, color: AppColors.accentDeep)),
+                Text(
+                  'Chuyển khoản VietQR',
+                  style: AppTheme.font(
+                    size: 12.5,
+                    weight: FontWeight.w700,
+                    color: AppColors.accentDeep,
+                  ),
+                ),
                 const SizedBox(height: 2),
-                Text('Đặt qua ứng dụng thì thanh toán trước, đơn mới vào hàng đợi in. '
-                    'Muốn trả tiền mặt thì tới trực tiếp chi nhánh, nhân viên in và thu tiền tại quầy.',
-                    style: AppTheme.font(size: 10.5, color: AppColors.chuNhan, height: 1.45)),
+                Text(
+                  'Đặt qua ứng dụng thì thanh toán trước, đơn mới vào hàng đợi in. '
+                  'Muốn trả tiền mặt thì tới trực tiếp chi nhánh, nhân viên in và thu tiền tại quầy.',
+                  style: AppTheme.font(
+                    size: 10.5,
+                    color: AppColors.chuNhan,
+                    height: 1.45,
+                  ),
+                ),
               ],
             ),
           ),
@@ -540,18 +686,26 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
     if (b != null && b.ngayHenTra != null) {
       int soPhut = b.ngayHenTra!.difference(DateTime.now()).inMinutes;
       if (soPhut < 1) soPhut = 1;
-      dongHenTra = 'Dự kiến in xong sau $soPhut phút — lúc ${gioPhut(b.ngayHenTra!)}';
+      dongHenTra =
+          'Dự kiến in xong sau $soPhut phút — lúc ${gioPhut(b.ngayHenTra!)}';
     }
 
     // Chỉ cho bấm Đặt đơn khi đã báo giá xong và chọn được chi nhánh in được
-    bool datDuoc = b != null && cn != null && cn.dapUngDuoc && !_dangTinh && !_dangDatDon;
+    bool datDuoc =
+        b != null && cn != null && cn.dapUngDuoc && !_dangTinh && !_dangDatDon;
 
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.trang,
         border: Border(top: BorderSide(color: AppColors.vien)),
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        boxShadow: [BoxShadow(color: Color(0x1A17140F), blurRadius: 28, offset: Offset(0, -8))],
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x1A17140F),
+            blurRadius: 28,
+            offset: Offset(0, -8),
+          ),
+        ],
       ),
       padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
       child: SafeArea(
@@ -564,47 +718,112 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
               child: Container(
                 width: 38,
                 height: 4,
-                decoration: BoxDecoration(color: AppColors.vienHop, borderRadius: BorderRadius.circular(2)),
+                decoration: BoxDecoration(
+                  color: AppColors.vienHop,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
             const SizedBox(height: 8),
             Row(
               children: [
-                Text('Tổng thanh toán', style: AppTheme.font(size: 13, weight: FontWeight.w700)),
+                Text(
+                  'Tổng thanh toán',
+                  style: AppTheme.font(size: 13, weight: FontWeight.w700),
+                ),
                 if (_dangTinh) ...[
                   const SizedBox(width: 8),
-                  const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 1.6, color: AppColors.accent)),
+                  const SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 1.6,
+                      color: AppColors.accent,
+                    ),
+                  ),
                 ],
                 const SizedBox(width: 12),
-                Expanded(child: Text(cn?.tenChiNhanh ?? '—', textAlign: TextAlign.right,
-                    maxLines: 2, overflow: TextOverflow.ellipsis,
-                    style: AppTheme.font(size: 10.5, color: AppColors.chuPhu))),
+                Expanded(
+                  child: Text(
+                    cn?.tenChiNhanh ?? '—',
+                    textAlign: TextAlign.right,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTheme.font(size: 10.5, color: AppColors.chuPhu),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 8),
             if (_loiBaoGia != null)
-              Padding(padding: const EdgeInsets.only(bottom: 8), child: HopThongBao(_loiBaoGia!))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: HopThongBao(_loiBaoGia!),
+              )
             else if (b != null) ...[
-              _dongTien('Tiền in', widget.file.laAnhThe ? widget.file.moTaSoLuong : '${widget.file.soTrang ?? 0} trang × ${widget.soBan} bản', tien(b.tienIn)),
-              if (b.tienGiaCong > 0) _dongTien('Tiền gia công', null, tien(b.tienGiaCong)),
-              if (b.phuPhiGap > 0) _dongTien('Phụ phí in hỏa tốc', null, '+${tien(b.phuPhiGap)}', mau: AppColors.hoaToc),
+              _dongTien(
+                'Tiền in',
+                widget.file.laAnhThe
+                    ? widget.file.moTaSoLuong
+                    : '${widget.file.soTrang ?? 0} trang × ${widget.soBan} bản',
+                tien(b.tienIn),
+              ),
+              if (b.tienGiaCong > 0)
+                _dongTien('Tiền gia công', null, tien(b.tienGiaCong)),
+              if (b.phuPhiGap > 0)
+                _dongTien(
+                  'Phụ phí in hỏa tốc',
+                  null,
+                  '+${tien(b.phuPhiGap)}',
+                  mau: AppColors.hoaToc,
+                ),
               if (b.phiShip > 0)
-                _dongTien('Phí giao nội bộ', b.khoangCachKm == null ? null : '${b.khoangCachKm!.toStringAsFixed(2)} km · khoảng ${b.phutDiChuyen ?? 0} phút di chuyển', '+${tien(b.phiShip)}'),
-              if (b.giamGia > 0) _dongTien('Mã khuyến mãi', null, '−${tien(b.giamGia)}', mau: AppColors.thanhCong),
+                _dongTien(
+                  'Phí giao nội bộ',
+                  b.khoangCachKm == null
+                      ? null
+                      : '${b.khoangCachKm!.toStringAsFixed(2)} km · khoảng ${b.phutDiChuyen ?? 0} phút di chuyển',
+                  '+${tien(b.phiShip)}',
+                ),
+              if (b.giamGia > 0)
+                _dongTien(
+                  'Mã khuyến mãi',
+                  null,
+                  '−${tien(b.giamGia)}',
+                  mau: AppColors.thanhCong,
+                ),
             ] else
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 18),
-                child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent)),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.accent,
+                  ),
+                ),
               ),
-            const Padding(padding: EdgeInsets.symmetric(vertical: 9), child: Divider(height: 1, color: AppColors.vach)),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 9),
+              child: Divider(height: 1, color: AppColors.vach),
+            ),
             Row(
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
               children: [
-                Text('Phải trả', style: AppTheme.font(size: 13, weight: FontWeight.w700)),
+                Text(
+                  'Phải trả',
+                  style: AppTheme.font(size: 13, weight: FontWeight.w700),
+                ),
                 const Spacer(),
-                Text(b == null ? '—' : tien(b.tongTien),
-                    style: AppTheme.mono(size: 21, weight: FontWeight.w800, color: AppColors.accentDeep, letterSpacing: -0.42)),
+                Text(
+                  b == null ? '—' : tien(b.tongTien),
+                  style: AppTheme.mono(
+                    size: 21,
+                    weight: FontWeight.w800,
+                    color: AppColors.accentDeep,
+                    letterSpacing: -0.42,
+                  ),
+                ),
               ],
             ),
             if (dongHenTra != null)
@@ -612,11 +831,23 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
                 padding: const EdgeInsets.only(top: 5),
                 child: Row(
                   children: [
-                    const AppIcon(Ico.dongHo, size: 13, color: AppColors.thanhCong, net: 1.9),
+                    const AppIcon(
+                      Ico.dongHo,
+                      size: 13,
+                      color: AppColors.thanhCong,
+                      net: 1.9,
+                    ),
                     const SizedBox(width: 6),
                     Expanded(
-                        child: Text(dongHenTra,
-                            style: AppTheme.font(size: 11.5, weight: FontWeight.w600, color: AppColors.thanhCong))),
+                      child: Text(
+                        dongHenTra,
+                        style: AppTheme.font(
+                          size: 11.5,
+                          weight: FontWeight.w600,
+                          color: AppColors.thanhCong,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -624,11 +855,14 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
               const SizedBox(height: 8),
               HopThongBao(_loiDatDon!),
             ],
-            Align(alignment: Alignment.centerRight, child: TextButton.icon(
-              onPressed: _dangTinh || _dangDatDon ? null : _goiBaoGia,
-              icon: const Icon(Icons.refresh, size: 18),
-              label: const Text('Tính lại phí'),
-            )),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: _dangTinh || _dangDatDon ? null : _goiBaoGia,
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('Tính lại phí'),
+              ),
+            ),
             const SizedBox(height: 12),
             NutChinh(
               nhan: 'Đặt đơn và chuyển khoản',
@@ -643,7 +877,12 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
     );
   }
 
-  Widget _dongTien(String nhan, String? phu, String giaTri, {Color mau = AppColors.chu}) {
+  Widget _dongTien(
+    String nhan,
+    String? phu,
+    String giaTri, {
+    Color mau = AppColors.chu,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 5),
       child: Row(
@@ -652,16 +891,29 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
         children: [
           Expanded(
             child: Text.rich(
-              TextSpan(children: [
-                TextSpan(text: nhan),
-                if (phu != null) TextSpan(text: ' $phu', style: AppTheme.font(size: 11, color: AppColors.chuPhu)),
-              ]),
+              TextSpan(
+                children: [
+                  TextSpan(text: nhan),
+                  if (phu != null)
+                    TextSpan(
+                      text: ' $phu',
+                      style: AppTheme.font(size: 11, color: AppColors.chuPhu),
+                    ),
+                ],
+              ),
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
               style: AppTheme.font(size: 12, color: AppColors.chuNhan),
             ),
           ),
-          Text(giaTri, style: AppTheme.mono(size: 12.5, weight: FontWeight.w600, color: mau)),
+          Text(
+            giaTri,
+            style: AppTheme.mono(
+              size: 12.5,
+              weight: FontWeight.w600,
+              color: mau,
+            ),
+          ),
         ],
       ),
     );

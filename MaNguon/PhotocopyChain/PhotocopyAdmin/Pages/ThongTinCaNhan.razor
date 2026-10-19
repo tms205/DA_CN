@@ -22,7 +22,7 @@
             </div>
 
             <h2 class="the-tieu-de nho">Hồ sơ</h2>
-            @if (_loiHoSo != null)
+            @if (_loiHoSo != null && !_moHoSo)
             {
                 <div class="o-loi">@((MarkupString)Svg.ChamThan())<span>@_loiHoSo</span></div>
             }
@@ -31,7 +31,11 @@
                 <div class="o-thanh-cong">@((MarkupString)Svg.DauTich(15))<span>@_tbHoSo</span></div>
             }
 
-            <EditForm Model="_hoSo" OnValidSubmit="LuuHoSoAsync" class="dn-form">
+            <dl class="bang-thong-tin gon"><dt>Email</dt><dd>@_nd?.Email</dd><dt>Số điện thoại</dt><dd>@(_nd?.SoDienThoai ?? "Chưa cập nhật")</dd><dt>Chi nhánh</dt><dd>@(_nd?.TenChiNhanh ?? "Toàn chuỗi")</dd></dl>
+            <button type="button" class="nut-chinh" @onclick="MoHoSo">Sửa hồ sơ</button>
+            <HopThoaiQuanTri Mo="@_moHoSo" TieuDe="Sửa hồ sơ cá nhân" Loi="@_loiHoSo" DangLuu="@_dangLuuHoSo" Dong="DongHoSo">
+            <NoiDung>
+            <EditForm id="hs-form" Model="_hoSo" OnValidSubmit="LuuHoSoAsync" class="dn-form">
                 <DataAnnotationsValidator />
                 <div class="truong">
                     <label class="nhan" for="ho-ten">Họ và tên</label>
@@ -69,15 +73,17 @@
                     <dd>@Phien.HetHanLuc?.ToLocalTime().ToString("HH:mm dd/MM/yyyy")</dd>
                 </dl>
 
-                <button type="submit" class="nut-chinh" disabled="@_dangLuuHoSo">@(_dangLuuHoSo ? "Đang lưu…" : "Lưu thay đổi")</button>
             </EditForm>
+            </NoiDung>
+            <Chan><button type="button" class="nut-phu" disabled="@_dangLuuHoSo" @onclick="DongHoSo">Hủy</button><button type="submit" form="hs-form" class="nut-chinh" disabled="@_dangLuuHoSo">@(_dangLuuHoSo ? "Đang lưu…" : "Lưu thay đổi")</button></Chan>
+            </HopThoaiQuanTri>
         </section>
 
         <section class="the">
             <h2 class="the-tieu-de nho">Đổi mật khẩu</h2>
             <p class="the-mo-ta nho">Nếu vừa được cấp mật khẩu tạm, hãy đổi ngay sang mật khẩu của riêng bạn.</p>
 
-            @if (_loiMk != null)
+            @if (_loiMk != null && !_moMatKhau)
             {
                 <div class="o-loi">@((MarkupString)Svg.ChamThan())<span>@_loiMk</span></div>
             }
@@ -86,13 +92,20 @@
                 <div class="o-thanh-cong">@((MarkupString)Svg.DauTich(15))<span>@_tbMk</span></div>
             }
 
-            <EditForm Model="_mk" OnValidSubmit="DoiMatKhauAsync" class="dn-form">
+            <button type="button" class="nut-chinh" @onclick="MoMatKhau">Đổi mật khẩu</button>
+            <HopThoaiQuanTri Mo="@_moMatKhau" TieuDe="Đổi mật khẩu" MoTa="Nhập mật khẩu hiện tại và xác nhận mật khẩu mới hai lần." Loi="@_loiMk" DangLuu="@_dangDoiMk" Dong="DongMatKhau">
+            <NoiDung>
+            <EditForm id="mk-form" Model="_mk" OnValidSubmit="DoiMatKhauAsync" class="dn-form">
                 <DataAnnotationsValidator />
                 <div class="truong">
                     <label class="nhan" for="mk-cu">Mật khẩu hiện tại</label>
                     <div class="o-nhap">
                         <span class="o-icon">@((MarkupString)Svg.Khoa(18))</span>
-                        <InputText id="mk-cu" type="@(_hienMk ? "text" : "password")" @bind-Value="_mk.MatKhauCu" autocomplete="current-password" />
+                        <InputText id="mk-cu" type="@(_hienMkCu ? "text" : "password")" @bind-Value="_mk.MatKhauCu" autocomplete="current-password" />
+                        <button type="button" class="o-nut-mat" title="@(_hienMkCu ? "Ẩn mật khẩu hiện tại" : "Hiện mật khẩu hiện tại")"
+                                aria-label="@(_hienMkCu ? "Ẩn mật khẩu hiện tại" : "Hiện mật khẩu hiện tại")" aria-controls="mk-cu" aria-pressed="@(_hienMkCu ? "true" : "false")" @onclick="DoiHienMatKhauCu">
+                            @((MarkupString)(_hienMkCu ? Svg.MatGach() : Svg.Mat()))
+                        </button>
                     </div>
                     <ValidationMessage For="() => _mk.MatKhauCu" class="loi-truong" />
                 </div>
@@ -102,28 +115,35 @@
                         <span class="o-icon">@((MarkupString)Svg.Khoa(18))</span>
                         @* @bind:event="oninput": gõ tới đâu cập nhật tới đó để 3 dòng quy tắc bên dưới sáng lên ngay *@
                         <input id="mk-moi" type="@(_hienMk ? "text" : "password")" @bind="_mk.MatKhauMoi" @bind:event="oninput"
-                               autocomplete="new-password" />
-                        <button type="button" class="o-nut-mat" title="@(_hienMk ? "Ẩn mật khẩu" : "Hiện mật khẩu")" @onclick="DoiHienMatKhau">
+                               autocomplete="new-password" aria-describedby="mk-quy-tac" />
+                        <button type="button" class="o-nut-mat" title="@(_hienMk ? "Ẩn mật khẩu mới" : "Hiện mật khẩu mới")"
+                                aria-label="@(_hienMk ? "Ẩn mật khẩu mới" : "Hiện mật khẩu mới")" aria-controls="mk-moi" aria-pressed="@(_hienMk ? "true" : "false")" @onclick="DoiHienMatKhau">
                             @((MarkupString)(_hienMk ? Svg.MatGach() : Svg.Mat()))
                         </button>
                     </div>
                     <ValidationMessage For="() => _mk.MatKhauMoi" class="loi-truong" />
                 </div>
-                <ul class="ds-quy-tac">
-                    <li class="@(_mk.MatKhauMoi.Length >= 8 ? "dat" : "")">@((MarkupString)Svg.DauTich(12)) Tối thiểu 8 ký tự</li>
-                    <li class="@(CoChuHoa(_mk.MatKhauMoi) ? "dat" : "")">@((MarkupString)Svg.DauTich(12)) Có ít nhất 1 chữ hoa</li>
-                    <li class="@(CoChuSo(_mk.MatKhauMoi) ? "dat" : "")">@((MarkupString)Svg.DauTich(12)) Có ít nhất 1 chữ số</li>
-                </ul>
                 <div class="truong">
                     <label class="nhan" for="mk-lai">Nhập lại mật khẩu mới</label>
                     <div class="o-nhap">
                         <span class="o-icon">@((MarkupString)Svg.Khoa(18))</span>
-                        <InputText id="mk-lai" type="@(_hienMk ? "text" : "password")" @bind-Value="_mk.NhapLai" autocomplete="new-password" />
+                        <InputText id="mk-lai" type="@(_hienMkLai ? "text" : "password")" @bind-Value="_mk.NhapLai" autocomplete="new-password" />
+                        <button type="button" class="o-nut-mat" title="@(_hienMkLai ? "Ẩn mật khẩu nhập lại" : "Hiện mật khẩu nhập lại")"
+                                aria-label="@(_hienMkLai ? "Ẩn mật khẩu nhập lại" : "Hiện mật khẩu nhập lại")" aria-controls="mk-lai" aria-pressed="@(_hienMkLai ? "true" : "false")" @onclick="DoiHienMatKhauLai">
+                            @((MarkupString)(_hienMkLai ? Svg.MatGach() : Svg.Mat()))
+                        </button>
                     </div>
                     <ValidationMessage For="() => _mk.NhapLai" class="loi-truong" />
                 </div>
-                <button type="submit" class="nut-chinh" disabled="@_dangDoiMk">@(_dangDoiMk ? "Đang đổi…" : "Đổi mật khẩu")</button>
+                <ul class="ds-quy-tac" id="mk-quy-tac" aria-label="Yêu cầu mật khẩu mới">
+                    <li class="@(_mk.MatKhauMoi.Length >= 8 ? "dat" : "")">@((MarkupString)Svg.DauTich(12)) Tối thiểu 8 ký tự</li>
+                    <li class="@(CoChuHoa(_mk.MatKhauMoi) ? "dat" : "")">@((MarkupString)Svg.DauTich(12)) Có ít nhất 1 chữ hoa</li>
+                    <li class="@(CoChuSo(_mk.MatKhauMoi) ? "dat" : "")">@((MarkupString)Svg.DauTich(12)) Có ít nhất 1 chữ số</li>
+                </ul>
             </EditForm>
+            </NoiDung>
+            <Chan><button type="button" class="nut-phu" disabled="@_dangDoiMk" @onclick="DongMatKhau">Hủy</button><button type="submit" form="mk-form" class="nut-chinh" disabled="@_dangDoiMk">@(_dangDoiMk ? "Đang đổi…" : "Lưu mật khẩu mới")</button></Chan>
+            </HopThoaiQuanTri>
         </section>
     </div>
 </div>
@@ -151,7 +171,13 @@
     private bool _dangLuuHoSo = false;
     private bool _dangDoiMk = false;
     private bool _hienMk = false;
+    private bool _hienMkCu, _hienMkLai;
     private string _loiHoSo, _tbHoSo, _loiMk, _tbMk;
+    private bool _moHoSo, _moMatKhau;
+    private void MoHoSo() { DoVaoForm(); _loiHoSo = _tbHoSo = null; _moHoSo = true; }
+    private void DongHoSo() { if (!_dangLuuHoSo) { _moHoSo = false; DoVaoForm(); _loiHoSo = null; } }
+    private void MoMatKhau() { _mk = new(); _hienMk = _hienMkCu = _hienMkLai = false; _loiMk = _tbMk = null; _moMatKhau = true; }
+    private void DongMatKhau() { if (!_dangDoiMk) { _moMatKhau = false; _mk = new(); _hienMk = _hienMkCu = _hienMkLai = false; _loiMk = null; } }
 
     protected override async Task OnInitializedAsync()
     {
@@ -187,6 +213,7 @@
     // PUT api/auth/me — lưu họ tên, số điện thoại
     private async Task LuuHoSoAsync()
     {
+        if (_dangLuuHoSo) return;
         _loiHoSo = null;
         _tbHoSo = null;
         _dangLuuHoSo = true;
@@ -205,6 +232,7 @@
                 _nd = await res.Content.ReadFromJsonAsync<NguoiDungDto>();
                 await Phien.CapNhatNguoiDung(_nd);   // sidebar đổi tên ngay
                 _tbHoSo = "Đã lưu thông tin cá nhân.";
+                _moHoSo = false;
             }
             else
             {
@@ -222,6 +250,7 @@
     // PUT api/auth/me/password
     private async Task DoiMatKhauAsync()
     {
+        if (_dangDoiMk) return;
         _loiMk = null;
         _tbMk = null;
         _dangDoiMk = true;
@@ -234,6 +263,7 @@
                 var kq = await res.Content.ReadFromJsonAsync<KetQuaDto>();
                 _tbMk = kq.Message + " Lần đăng nhập sau dùng mật khẩu mới.";
                 _mk = new DoiMatKhauForm();   // xóa trắng 3 ô
+                _moMatKhau = false; _hienMk = _hienMkCu = _hienMkLai = false;
             }
             else
             {
@@ -252,6 +282,8 @@
     {
         _hienMk = !_hienMk;
     }
+    private void DoiHienMatKhauCu() => _hienMkCu = !_hienMkCu;
+    private void DoiHienMatKhauLai() => _hienMkLai = !_hienMkLai;
 
     private bool CoChuHoa(string chuoi)
     {

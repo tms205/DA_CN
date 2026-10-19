@@ -44,6 +44,16 @@ public class SidebarHeaderFooterTests
     }
 
     [Fact]
+    public async Task Sidebar_MauDonTrongQuanLy_ChiCeoVaDungTieuDe()
+    {
+        string html = await Render("SUPER_ADMIN", "mau-don");
+        Assert.Contains("href=\"mau-don\"", Regex.Match(html, "<div id=\"menu-quan-ly\"(.*?)</section>", RegexOptions.Singleline).Value);
+        Assert.Contains("<strong>Mẫu đơn in sẵn</strong>", html);
+        Assert.DoesNotContain("href=\"mau-don\"", await Render("BRANCH_ADMIN", "dich-vu"));
+        Assert.DoesNotContain("href=\"mau-don\"", await Render("STAFF", ""));
+    }
+
+    [Fact]
     public async Task Sidebar_KhachHangVaDichVuNamTrongQuanLy_GiuQuyenCu()
     {
         string ceo = await Render("SUPER_ADMIN", "khach-hang");

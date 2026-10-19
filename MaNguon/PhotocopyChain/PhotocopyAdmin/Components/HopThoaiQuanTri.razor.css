@@ -1,0 +1,30 @@
+.qt-popup { width: min(760px, calc(100vw - 32px)); max-width: none; max-height: calc(100dvh - 40px); margin: auto; padding: 0; border: 1px solid var(--vien); border-radius: 14px; color: var(--chu); background: var(--trang); box-shadow: 0 24px 80px #0b243c40; font-family: inherit; }
+.qt-popup[open] { display: flex; flex-direction: column; }
+.qt-popup-rong { width: min(1040px, calc(100vw - 32px)); }
+.qt-popup-toan-man { width: calc(100vw - 32px); height: calc(100dvh - 40px); }
+.qt-popup-toan-man .qt-popup-than { flex: 1; }
+.qt-popup::backdrop { background: #10263e80; }
+.qt-popup-dau { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 22px 26px; border-bottom: 1px solid var(--vien); flex-shrink: 0; }
+.qt-popup-dau h2 { margin: 0; font-size: 22px; font-weight: 700; line-height: 1.4; }
+.qt-popup-dau p { margin: 6px 0 0; color: var(--chu-nhan); font-size: 15px; line-height: 1.6; }
+.qt-popup-dong { flex: 0 0 44px; width: 44px; height: 44px; border: 1px solid var(--vien); border-radius: 8px; background: var(--nen); font-size: 28px; cursor: pointer; }
+.qt-popup-dong:disabled { opacity: .5; cursor: wait; }
+.qt-popup-than { padding: 24px 26px; overflow: auto; min-height: 0; overscroll-behavior: contain; overflow-wrap: anywhere; }
+.qt-popup-truong { margin: 0; padding: 0; border: 0; min-width: 0; width: 100%; }
+.qt-popup-than ::deep form { margin: 0; max-width: none; }
+.qt-popup-than ::deep form.the { padding: 0; border: 0; box-shadow: none; background: transparent; }
+.qt-popup-than ::deep .ca-loc-luoi { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.qt-popup-toan-man .qt-popup-than ::deep form.the { padding: 20px; border: 1px solid var(--vien); border-radius: var(--ban-kinh); background: var(--trang); }
+.qt-popup-toan-man .qt-popup-than ::deep .ca-loc-luoi { grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); }
+.qt-popup-than ::deep .truong { min-width: 0; }
+.qt-popup-than ::deep input, .qt-popup-than ::deep select, .qt-popup-than ::deep textarea { max-width: 100%; }
+.qt-popup-than ::deep .o-loi { margin-bottom: 18px; }
+.qt-popup-chan { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 12px; padding: 18px 26px; border-top: 1px solid var(--vien); background: var(--nen); flex-shrink: 0; }
+.qt-popup ::deep button:focus-visible, .qt-popup ::deep input:focus-visible, .qt-popup ::deep select:focus-visible, .qt-popup ::deep textarea:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+@media (max-width: 600px) {
+    .qt-popup, .qt-popup-rong { width: calc(100vw - 20px); max-height: calc(100dvh - 20px); border-radius: 10px; }
+    .qt-popup-dau, .qt-popup-than, .qt-popup-chan { padding: 16px; }
+    .qt-popup-dau h2 { font-size: 20px; }
+    .qt-popup-than ::deep .ca-loc-luoi { grid-template-columns: minmax(0, 1fr); }
+    .qt-popup-chan ::deep button { flex: 1 1 auto; }
+}

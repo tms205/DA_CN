@@ -61,6 +61,9 @@ builder.Services.AddControllers()
 
 // Bộ nhớ tạm của API: giữ mã OTP, đếm số lần nhập sai mật khẩu, quãng đường đã hỏi bản đồ (tắt API là mất)
 builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<PhotocopyApi.DichVu.ThuVienMauDon>();
+// Chỉ nguồn ảo đã có; adapter máy thật phải chạy qua connector/driver được kiểm chứng tại tiệm.
+builder.Services.AddSingleton<PhotocopyApi.MayQuet.IMayQuet, PhotocopyApi.MayQuet.MayQuetAo>();
 builder.Services.AddSingleton<PhotocopyApi.GiaoHang.GeoapifyService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<OtpDatLaiStore>();

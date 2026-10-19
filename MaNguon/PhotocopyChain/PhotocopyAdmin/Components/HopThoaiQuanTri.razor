@@ -1,0 +1,43 @@
+@inject IJSRuntime Js
+
+<dialog class="qt-popup @(Rong ? "qt-popup-rong" : "") @(ToanMan ? "qt-popup-toan-man" : "")" @ref="_hop" aria-labelledby="@_id" aria-busy="@(DangLuu ? "true" : "false")">
+    @if (Mo)
+    {
+        <header class="qt-popup-dau">
+            <div><h2 id="@_id">@TieuDe</h2>@if (!string.IsNullOrWhiteSpace(MoTa)) { <p>@MoTa</p> }</div>
+            <button type="button" class="qt-popup-dong" data-dong-popup aria-label="Đóng hộp thoại" disabled="@DangLuu" @onclick="DongAsync">×</button>
+        </header>
+        <div class="qt-popup-than">
+            @if (!string.IsNullOrWhiteSpace(Loi)) { <div class="o-loi" role="alert">@Loi</div> }
+            <fieldset class="qt-popup-truong" disabled="@DangLuu">@NoiDung</fieldset>
+        </div>
+        @if (Chan != null) { <footer class="qt-popup-chan">@Chan</footer> }
+    }
+</dialog>
+
+@code {
+    [Parameter] public bool Mo { get; set; }
+    [Parameter] public string TieuDe { get; set; } = "";
+    [Parameter] public string MoTa { get; set; }
+    [Parameter] public string Loi { get; set; }
+    [Parameter] public bool DangLuu { get; set; }
+    [Parameter] public bool Rong { get; set; }
+    [Parameter] public bool ToanMan { get; set; }
+    [Parameter] public EventCallback Dong { get; set; }
+    [Parameter] public RenderFragment NoiDung { get; set; }
+    [Parameter] public RenderFragment Chan { get; set; }
+
+    private readonly string _id = "qt-" + Guid.NewGuid().ToString("N");
+    private ElementReference _hop;
+    private bool _daMo;
+
+    private async Task DongAsync() { if (!DangLuu) await Dong.InvokeAsync(); }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Chỉ mở khi đổi trạng thái, không giành lại focus mỗi lần gõ hoặc báo lỗi.
+        if (Mo == _daMo) return;
+        _daMo = Mo;
+        await Js.InvokeVoidAsync(Mo ? "moHopThoaiQuanTri" : "dongMauDon", _hop);
+    }
+}

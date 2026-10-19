@@ -66,7 +66,39 @@ async function main() {
         await page.getByPlaceholder('Nguyễn Văn An').fill('Khách thử');
         await page.getByRole('button', { name: 'Tìm / tạo khách hàng', exact: true }).click();
         await page.getByLabel('Dịch vụ đặt in').selectOption('MAU_DON');
-        await expect(page.getByRole('article')).toHaveCount(catalog.length);
+        await expect(page.getByRole('article')).toHaveCount(Math.min(6, catalog.length));
+        const library = page.getByRole('region', { name: 'Thư viện mẫu đơn', exact: true });
+        const list = library.getByRole('region', { name: 'Danh sách mẫu đơn', exact: true });
+        const pagination = library.getByRole('navigation', { name: 'Phân trang thư viện mẫu' });
+        await expect(pagination).toContainText(`Trang 1 / ${Math.ceil(catalog.length / 6)}`);
+        await expect(pagination.getByRole('button', { name: 'Trang mẫu trước', exact: true })).toBeDisabled();
+        const names = new Set(await page.getByRole('article').getByRole('heading', { level: 3 }).allTextContents());
+        for (let i = 2; i <= Math.ceil(catalog.length / 6); i++) {
+          await pagination.getByRole('button', { name: 'Trang mẫu sau', exact: true }).click();
+          await expect(pagination).toContainText(`Trang ${i} / ${Math.ceil(catalog.length / 6)}`);
+          (await page.getByRole('article').getByRole('heading', { level: 3 }).allTextContents()).forEach(n => names.add(n));
+        }
+        assert.equal(names.size, catalog.length, 'Mẫu ở các trang sau vẫn phải truy cập được, không cắt bỏ danh mục.');
+        await expect(pagination.getByRole('button', { name: 'Trang mẫu sau', exact: true })).toBeDisabled();
+        const sizeLibrary = await list.boundingBox();
+        assert.ok(sizeLibrary.height <= 442, 'Danh sách mẫu phải cuộn trong khung giới hạn, không kéo dài trang.');
+        await list.focus();
+        await expect(list).toBeFocused();
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+        await page.getByLabel('Nhóm mẫu').selectOption('Học vụ');
+        await expect(pagination).toContainText('Trang 1 /');
+        await page.getByLabel('Tìm mẫu đơn').fill('khong-co-mau');
+        await expect(page.getByRole('article')).toHaveCount(0);
+        await expect(pagination.getByRole('button', { name: 'Trang mẫu sau', exact: true })).toBeDisabled();
+        await library.getByRole('button', { name: 'Xóa bộ lọc mẫu', exact: true }).click();
+        await expect(page.getByRole('article')).toHaveCount(6);
+        await expect(page.getByLabel('Nhóm mẫu')).toHaveValue('');
+        const listWidth = await list.evaluate(element => element.clientWidth);
+        const cardSize = await page.getByRole('article').first().boundingBox();
+        assert.ok(cardSize.width >= Math.min(280, listWidth - 8),
+          'Thẻ mẫu phải theo bề rộng vùng tài liệu, không ép hai cột hẹp khiến tên xuống dòng từng chữ.');
+        await library.scrollIntoViewIfNeeded();
+        await page.screenshot({ path: path.join(output, `thu-vien-gon-${width}.png`) });
         await page.getByLabel('Nhóm mẫu').selectOption('Việc làm');
         await expect(page.getByRole('article')).toHaveCount(2);
         await page.getByLabel('Tìm mẫu đơn').fill('khong-co-mau');
@@ -74,7 +106,8 @@ async function main() {
         await page.getByLabel('Tìm mẫu đơn').fill('');
         await page.getByRole('article').filter({ hasText: 'Đơn xin việc' }).getByRole('button', { name: 'Xem mẫu', exact: true }).click();
         await expect(page.getByRole('dialog', { name: 'Đơn xin việc · 1 trang' })).toBeVisible();
-        const dialogSize = await page.getByRole('dialog').boundingBox();
+        const preview = page.locator('dialog[aria-label="Bản xem trước mẫu đơn"]');
+        const dialogSize = await preview.boundingBox();
         assert.ok(Math.abs(dialogSize.x) < 1 && Math.abs(dialogSize.y) < 1
           && Math.abs(dialogSize.width - width) < 1 && Math.abs(dialogSize.height - 1000) < 1,
           'Cửa sổ xem mẫu phải phủ toàn bộ màn hình trình duyệt.');
@@ -87,21 +120,21 @@ async function main() {
         }));
         assert.ok(Math.abs(size.image / size.frame - 1.5) < .01, 'Bản xem trước phải lớn hơn mặc định cũ 50%.');
         assert.deepEqual(selections, [], 'Chỉ xem chưa được tạo file.');
-        await page.getByRole('dialog').screenshot({ path: path.join(output, `xem-truoc-${width}.png`) });
+        await preview.screenshot({ path: path.join(output, `xem-truoc-${width}.png`) });
         await page.getByRole('button', { name: 'Đóng bản xem trước' }).focus();
         await page.keyboard.press('Shift+Tab');
         await expect(page.getByRole('button', { name: 'Chọn mẫu này để in' })).toBeFocused();
         await page.keyboard.press('Escape');
-        await expect(page.getByRole('dialog')).not.toBeVisible();
+        await expect(preview).not.toBeVisible();
         await page.getByRole('article').filter({ hasText: 'Đơn xin việc' }).getByRole('button', { name: 'Xem mẫu', exact: true }).click();
-        await expect(page.getByRole('dialog')).toBeVisible();
+        await expect(preview).toBeVisible();
         await page.getByRole('button', { name: 'Đóng bản xem trước' }).click();
         await page.getByLabel('Nhóm mẫu').selectOption('Học vụ');
         await page.getByLabel('Tìm mẫu đơn').fill('nghỉ học có thời hạn');
         await page.getByRole('article').getByRole('button', { name: 'Xem mẫu', exact: true }).click();
         await expect(page.getByRole('dialog', { name: 'Đơn xin nghỉ học có thời hạn · 2 trang' })).toBeVisible();
         await page.getByRole('button', { name: 'Trang sau', exact: true }).click();
-        await expect(page.getByRole('dialog')).toContainText('Trang 2 / 2');
+        await expect(preview).toContainText('Trang 2 / 2');
         await expect(page.getByRole('img', { name: 'Đơn xin nghỉ học có thời hạn, trang 2', exact: true })).toBeVisible();
         await expect(page.getByRole('button', { name: 'Trang sau', exact: true })).toBeDisabled();
         await page.getByRole('button', { name: 'Phóng to', exact: true }).click();

@@ -9,7 +9,7 @@
 <TieuDeTrang TieuDe="Bảng giá in ấn" MoTa="@MoTaPhamVi()" />
 
 <div class="than-trang khoi-doc">
-    @if (_loi != null)
+    @if (_loi != null && _dangSua == null)
     {
         <div class="o-loi">
             @((MarkupString)Svg.ChamThan())
@@ -39,18 +39,22 @@
     {
         <a class="nut-phu" href="dich-vu">Quản lý danh mục dịch vụ</a>
     }
-    @if (CoTheSua() && _dangSua != null)
-    {
-        <form @onsubmit="LuuAsync" @onsubmit:preventDefault class="the the-rong">
-            <h2 class="the-tieu-de nho">Sửa giá: @_dangSua.TenDichVu · @_dangSua.TenChiNhanh</h2>
-            <p class="nv-phu">Chỉ đổi giá và trạng thái bán tại chi nhánh này. Giá các chi nhánh khác và đơn cũ giữ nguyên.</p>
+    <HopThoaiQuanTri Mo="@(CoTheSua() && _dangSua != null)" TieuDe="@("Sửa giá: " + _dangSua?.TenDichVu)"
+                    MoTa="@(_dangSua?.TenChiNhanh + " · Chỉ đổi giá và trạng thái bán tại chi nhánh này; đơn cũ và giá chi nhánh khác giữ nguyên.")"
+                    Loi="@_loi" DangLuu="@_dangLuu" Dong="DongForm">
+        <NoiDung>
+        <form id="bang-gia-form" @onsubmit="LuuAsync" @onsubmit:preventDefault>
             <div class="ca-loc-luoi">
                 <div class="truong"><label class="nhan" for="gia-ban">Đơn giá (₫)</label><input id="gia-ban" type="number" min="0" max="999999999999" step="1" required class="ca-o-loc mono" @bind="_form.DonGia" /></div>
                 <div class="truong"><label class="nhan" for="gia-trang-thai">Trạng thái bán</label><select id="gia-trang-thai" class="ca-o-loc" @bind="_form.TrangThai"><option value="HIEN">Đang bán</option><option value="AN">Ngừng bán</option></select></div>
             </div>
-            <div class="xac-nhan-o"><button class="nut-chinh" disabled="@_dangLuu">Lưu giá</button><button type="button" class="nut-phu" disabled="@_dangLuu" @onclick="BoSua">Hủy</button></div>
         </form>
-    }
+        </NoiDung>
+        <Chan>
+            <button type="button" class="nut-phu" disabled="@_dangLuu" @onclick="DongForm">Hủy</button>
+            <button type="submit" form="bang-gia-form" class="nut-chinh" disabled="@_dangLuu">@(_dangLuu ? "Đang lưu…" : "Lưu giá")</button>
+        </Chan>
+    </HopThoaiQuanTri>
 
     <div class="the the-bang">
         <div class="bang-tieu-de">
@@ -108,7 +112,7 @@
                                 <td class="cot-hanh-dong" data-nhan="Thao tác">
                                     @if (CoTheSua())
                                     {
-                                        <button class="nut-nho" title="Sửa thông tin dịch vụ này" @onclick="() => Sua(dv)">Sửa giá</button>
+                                        <button class="nut-nho" disabled="@_dangLuu" title="Sửa thông tin dịch vụ này" @onclick="() => Sua(dv)">Sửa giá</button>
                                     }
                                 </td>
                             </tr>
@@ -151,14 +155,16 @@
 
     private void Sua(DichVuQuanTriDto d)
     {
+        if (_dangLuu || !CoTheSua()) return;
         _dangSua = d;
         _loi = _thongBao = null;
         _form = new() { DonGia = d.DonGia, TrangThai = d.TrangThai };
     }
-    private void BoSua() { _dangSua = null; _form = new(); }
+    private void BoSua() { _dangSua = null; _form = new(); _loi = null; }
+    private void DongForm() { if (!_dangLuu) BoSua(); }
     private async Task LuuAsync()
     {
-        if (_dangLuu || _dangSua == null) return;
+        if (_dangLuu || _dangSua == null || !CoTheSua()) return;
         _loi = QuyTacNhap.LayLoi(_form);
         if (_loi != null) return;
         _dangLuu = true;

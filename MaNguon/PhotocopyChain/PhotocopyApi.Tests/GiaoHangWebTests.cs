@@ -42,6 +42,7 @@ public class GiaoHangWebTests
         var phamVi = new PhamViChiNhanh(null, http);
         var services = new ServiceCollection();
         services.AddLogging(); services.AddSingleton(http);
+        services.AddSingleton<Microsoft.JSInterop.IJSRuntime, JsRong>();
         services.AddSingleton(new PhienDangNhap(null, http, phamVi));
         await using var provider = services.BuildServiceProvider();
         await using var renderer = new HtmlRenderer(provider, provider.GetRequiredService<ILoggerFactory>());
@@ -52,11 +53,18 @@ public class GiaoHangWebTests
         Assert.Contains("Khách <script>", html);
         Assert.Contains("Tầng 2", html);
         Assert.Contains("19.000₫", html);
-        Assert.Contains("Shipper chi nhánh này", html);
-        Assert.Contains("Nguyễn Văn Giao", html);
+        Assert.Contains("Bàn giao đi giao", html);
+        Assert.Contains("<dialog", html);
+        Assert.DoesNotContain("<select", html); // Chọn shipper chỉ xuất hiện trong popup, không còn trong hàng bảng.
         Assert.Contains("Không thu COD", html);
         Assert.DoesNotContain("<script>", raw); // Nội dung khách nhập phải được HTML-encode.
         Assert.DoesNotContain("don.MaDonHang", html);
+    }
+
+    private sealed class JsRong : Microsoft.JSInterop.IJSRuntime
+    {
+        public ValueTask<T> InvokeAsync<T>(string name, object[] args) => ValueTask.FromResult(default(T));
+        public ValueTask<T> InvokeAsync<T>(string name, CancellationToken token, object[] args) => ValueTask.FromResult(default(T));
     }
 
     private sealed class MayChuGiao : HttpMessageHandler

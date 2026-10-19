@@ -6,6 +6,7 @@
 <TieuDeTrang TieuDe="Đánh giá khách hàng" MoTa="Phản hồi và mức độ hài lòng của khách hàng sau khi nhận tài liệu" />
 
 <div class="than-trang khoi-doc">
+    @if (_dangGui) { <p role="status">Đang cập nhật đánh giá…</p> }
     @if (_loi != null)
     {
         <div class="o-loi">
@@ -34,7 +35,7 @@
         else
         {
             <div class="bang-cuon">
-                <table role="table" class="bang">
+                <table role="table" class="bang bang-thao-tac-giua">
                     <thead>
                         <tr>
                             <th scope="col">Mã đơn</th>
@@ -68,7 +69,7 @@
                                 <td class="cot-hanh-dong" data-nhan="Trạng thái / Thao tác">
                                     @if (d.TrangThai == "HIEN")
                                     {
-                                        <button class="nut-nho" title="Ẩn đánh giá này khỏi hiển thị công khai" @onclick="() => AnAsync(d)">Ẩn đánh giá</button>
+                                        <button class="nut-nho" disabled="@_dangGui" title="Ẩn đánh giá này khỏi hiển thị công khai" @onclick="() => AnAsync(d)">Ẩn đánh giá</button>
                                     }
                                     else
                                     {
@@ -83,10 +84,20 @@
         }
     </div>
 </div>
+<XacNhanThaoTac @ref="_xacNhan" />
 @code{
+    private XacNhanThaoTac _xacNhan;
+    private bool _dangGui;
     private List<DanhGiaDto> _ds;private string _loi;
     protected override async Task OnInitializedAsync()=>await TaiAsync();
     private async Task TaiAsync(){try{_ds=await Http.GetFromJsonAsync<List<DanhGiaDto>>("api/don-hang/danh-gia")??new();}catch{_loi="Không tải được đánh giá.";_ds=new();}}
-    private async Task AnAsync(DanhGiaDto d){var r=await Http.PutAsync($"api/don-hang/danh-gia/{d.MaDanhGia}/an",null);if(r.IsSuccessStatusCode)await TaiAsync();else _loi=(await r.Content.ReadFromJsonAsync<ApiError>()).Message;}
+    private async Task AnAsync(DanhGiaDto d)
+    {
+        if (_dangGui || !await _xacNhan.HoiAsync("Ẩn đánh giá của “" + d.TenKhachHang + "” cho đơn " + d.MaDonHangHienThi + " khỏi hiển thị công khai?", "Ẩn đánh giá", "Ẩn đánh giá", true)) return;
+        _dangGui = true; _loi = null;
+        try { using var r = await Http.PutAsync($"api/don-hang/danh-gia/{d.MaDanhGia}/an", null); if (r.IsSuccessStatusCode) await TaiAsync(); else _loi = await DocLoiApi.TuPhanHoiAsync(r, "Không ẩn được đánh giá."); }
+        catch (HttpRequestException) { _loi = "Mất kết nối API. Làm mới trang để kiểm tra kết quả."; }
+        finally { _dangGui = false; }
+    }
     private string Sao(int n)=>new string('★',n)+new string('☆',5-n);
 }

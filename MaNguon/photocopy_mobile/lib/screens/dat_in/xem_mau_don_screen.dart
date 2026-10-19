@@ -40,7 +40,8 @@ class _XemMauDonScreenState extends State<XemMauDonScreen> {
       _anh = null;
     });
     _phongTo.value = Matrix4.identity();
-    final kq = await Api.getAnhMau(widget.mau['maMau'], _trang);
+    final kq = await Api.getAnhMau(widget.mau['maMau'], _trang,
+      phienBan: widget.mau['phienBan'] as int?);
     if (!mounted) return;
     setState(() {
       _dangTai = false;
@@ -97,7 +98,7 @@ class _XemMauDonScreenState extends State<XemMauDonScreen> {
                 widget.mau['phamVi'] ??
                     'Bản trống để điền bằng tay; kiểm tra yêu cầu nơi nhận.',
               ),
-              if (widget.mau['urlNguon'] != null)
+              if (Uri.tryParse(widget.mau['urlNguon'] ?? '')?.scheme == 'https')
                 TextButton(
                   onPressed: _moNguon,
                   child: const Text('Xem nguồn công bố'),

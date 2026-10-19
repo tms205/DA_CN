@@ -1,66 +1,85 @@
-// Kiểm tra bố cục UI thật, chặn toàn bộ request ghi để không sửa giá/máy/CSDL thật.
+// Kiểm tra Web thật, chặn toàn bộ API bằng fixture; không ghi dữ liệu thật.
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const { expect } = require((process.env.PLAYWRIGHT_MODULE || 'playwright') + '/test');
-const { createDanhMucFixture } = require('./quan-ly-danh-muc.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const web = process.env.PHOTOCOPY_WEB_URL || 'http://localhost:5064';
+const output = path.join(require('node:os').tmpdir(), 'PhotocopyAlignmentAdmin');
 
-async function main() {
-  const base = 'http://localhost:5064', output = process.env.PHOTOCOPY_QA_OUTPUT;
-  assert.ok(output); fs.mkdirSync(output, { recursive: true });
+async function run() {
+  fs.mkdirSync(output, { recursive: true });
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
-  const results = [];
   try {
-    for (const width of [1366, 1920, 768, 390]) {
-      const context = await browser.newContext({ viewport: { width, height: 1000 } });
-      const page = await context.newPage(), fixture = createDanhMucFixture(), errors = [];
+    for (const width of [1440, 1024, 390, 320]) {
+      const context = await browser.newContext({ viewport: { width, height: 900 } });
+      const page = await context.newPage(), errors = [], writes = [];
+      await context.tracing.start({ screenshots: true, snapshots: true });
       page.on('pageerror', e => errors.push(e.message));
-      const nd = { maNguoiDung: 1, hoTen: 'CEO kiểm thử', tenVaiTro: 'SUPER_ADMIN', maChiNhanh: 1, tenChiNhanh: 'Chi nhánh 1' };
-      await context.addInitScript(nd => {
-        localStorage.setItem('photocopychain.phien', JSON.stringify({ accessToken: 'fixture-not-real', hetHanLuc: '2099-01-01T00:00:00Z', nguoiDung: nd }));
+      const user = { maNguoiDung: 1, hoTen: 'CEO thử', email: 'ceo@example.test', tenVaiTro: 'SUPER_ADMIN', maChiNhanh: null };
+      const branch = { maChiNhanh: 1, tenChiNhanh: 'Chi nhánh thử', trangThai: 'HOAT_DONG' };
+      const fixtures = {
+        '/api/auth/me': user,
+        '/api/danh-muc/chi-nhanh': [branch],
+        '/api/ca/dang-mo': { maCa: 1, maNhanVien: 1, maChiNhanh: 1, trangThai: 'DANG_MO', tienDauCa: 200000 },
+        '/api/quan-tri/danh-muc-dich-vu': [{ maDichVu: 1, tenDichVu: 'In A4 thử', loaiDichVu: 'IN_AN', khoGiay: 'A4', loaiGiay: '70gsm', matIn: '1_MAT', mauSac: 'DEN_TRANG', donGia: 300, trangThai: 'HIEN' }],
+        '/api/quan-tri/danh-muc-vat-tu': [],
+        '/api/nhan-vien': [{ maNguoiDung: 2, hoTen: 'Nhân viên thử', email: 'staff@example.test', tenVaiTro: 'STAFF', trangThai: 'HOAT_DONG', duocCapLai: true, ngayTao: '2026-10-19T07:30:00' }],
+        '/api/don-hang/danh-gia': [{ maDanhGia: 1, maDonHangHienThi: 'DH00001', tenKhachHang: 'Khách thử', tenChiNhanh: 'Chi nhánh thử', soSao: 5, nhanXet: 'In rõ nét', trangThai: 'HIEN', ngayDanhGia: '2026-10-19T09:00:00' }],
+        '/api/quan-tri/mau-don': [],
+      };
+      await context.addInitScript(user => {
+        localStorage.setItem('photocopychain.phien', JSON.stringify({ accessToken: 'fixture-only', hetHanLuc: '2099-01-01T00:00:00Z', nguoiDung: user }));
         localStorage.setItem('photocopychain.pham-vi-chi-nhanh', '1');
-      }, nd);
+        sessionStorage.setItem('photocopychain.ca-tu-dong', '1:1');
+      }, user);
       await context.route('**/*', async route => {
-        const request = route.request(), url = new URL(request.url());
-        if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/hubs/')) {
-          const tra = (body, status = 200) => route.fulfill({ status, body: JSON.stringify(body), contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' } });
-          if (request.method() === 'OPTIONS') return tra({});
-          assert.equal(request.method(), 'GET', 'Chỉ kiểm tra UI, không ghi vào API thật.');
-          if (url.pathname === '/api/auth/me') return tra(nd);
-          if (url.pathname.startsWith('/hubs/')) return tra({}, 503);
-          const res = await fixture.response(request, 1);
-          if (res) return tra(res.body, res.status);
-          if (url.pathname.endsWith('/hien-tai')) return tra({ soPhieuChoDuyet: 0, soHoanTienChoDuyet: 0 });
-          return tra([]);
-        }
-        return route.continue();
+        const req = route.request(), p = new URL(req.url()).pathname;
+        if (!p.startsWith('/api/') && !p.startsWith('/hubs/')) return route.continue();
+        if (!['GET', 'OPTIONS'].includes(req.method())) writes.push(p);
+        return route.fulfill({ status: req.method() === 'OPTIONS' ? 204 : 200,
+          contentType: 'application/json', body: req.method() === 'OPTIONS' ? '' : JSON.stringify(fixtures[p] || []),
+          headers: { 'Access-Control-Allow-Origin': '*' } });
       });
       try {
-        for (const route of ['/bang-gia', '/quan-tri']) {
-          await page.goto(base + route);
-          await expect(page.getByRole('button', { name: route === '/bang-gia' ? 'Sửa giá' : 'Sửa chi nhánh', exact: true }).first()).toBeVisible();
-          const alignment = await page.getByRole('table').evaluateAll(tables => tables.map(table => {
-            const header = [...table.querySelectorAll('th')].find(th => th.textContent.trim() === 'Thao tác');
-            const button = table.querySelector('td[data-nhan="Thao tác"] button');
-            const range = document.createRange(); range.selectNodeContents(header);
-            return { table: getComputedStyle(table).display, delta: button.getBoundingClientRect().left - range.getBoundingClientRect().left,
-              cellAlign: getComputedStyle(button.parentElement).textAlign };
-          }));
-          for (const item of alignment) {
-            assert.equal(item.cellAlign, 'left', 'Nút thao tác phải căn trái giống tiêu đề.');
-            if (item.table !== 'block') assert.ok(Math.abs(item.delta) < 1, `Nút lệch tiêu đề ${item.delta}px`);
+        for (const [url, label, button, alignment] of [
+          ['/dich-vu', 'Thao tác', 'Sửa dịch vụ', 'left'],
+          ['/nhan-vien', 'Thao tác', 'Khóa', 'left'],
+          ['/danh-gia', 'Trạng thái / Thao tác', 'Ẩn đánh giá', 'center'],
+        ]) {
+          await page.goto(web + url, { waitUntil: 'domcontentloaded' });
+          const action = page.getByRole('button', { name: button, exact: true });
+          await expect(action).toBeVisible();
+          await action.click({ trial: true });
+          const header = page.getByRole('columnheader', { name: label, exact: true, includeHidden: true });
+          const cell = page.locator('[data-nhan="' + label + '"]');
+          assert.equal(await cell.evaluate(el => getComputedStyle(el).textAlign), alignment);
+          // Trên mobile, thead được giữ cho trình đọc màn hình nhưng bị clip 1px.
+          // Chỉ so vị trí với header khi còn bố cục bảng; ở thẻ dùng nhãn data-nhan.
+          if (await header.evaluate(el => getComputedStyle(el.closest('table')).display === 'table')) {
+            const textBox = await header.evaluate(el => { const r = document.createRange(); r.selectNodeContents(el); const b = r.getBoundingClientRect(); return { x: b.x, width: b.width }; });
+            const buttonBox = await action.boundingBox();
+            const offset = alignment === 'left' ? buttonBox.x - textBox.x : buttonBox.x + buttonBox.width / 2 - textBox.x - textBox.width / 2;
+            assert.ok(Math.abs(offset) < 2, `${url}: lệch tiêu đề ${offset}px`);
           }
-          assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
-          await page.screenshot({ path: path.join(output, `${route.slice(1)}-${width}.png`), fullPage: true });
-          results.push({ width, route, result: 'PASS' });
+          if (url === '/nhan-vien') await expect(page.getByRole('button', { name: 'Cấp lại mật khẩu', exact: true })).toHaveCount(0);
+          assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+          await page.screenshot({ path: path.join(output, url.slice(1) + '-' + width + '.png'), fullPage: true });
         }
+        await page.goto(web + '/mau-don', { waitUntil: 'domcontentloaded' });
+        await expect(page.getByRole('button', { name: 'Làm mới thư viện', exact: true })).toHaveAttribute('title', 'Tải lại danh sách mẫu từ máy chủ, không xóa hay tạo lại thư viện.');
+        await page.getByRole('button', { name: 'Làm mới thư viện', exact: true }).click();
+        assert.deepEqual(writes, []);
         assert.deepEqual(errors, []);
+        console.log(`PASS ${width}px: căn cột dịch vụ/nhân viên/đánh giá, không tràn ngang, không cấp mật khẩu, làm mới chỉ đọc.`);
       } catch (e) {
-        await page.screenshot({ path: path.join(output, `alignment-failure-${width}.png`) }); throw e;
-      } finally { await context.close(); }
+        await page.screenshot({ path: path.join(output, 'error-' + width + '.png'), fullPage: true });
+        throw e;
+      } finally {
+        await context.tracing.stop({ path: path.join(output, 'trace-' + width + '.zip') });
+        await context.close();
+      }
     }
   } finally { await browser.close(); }
-  console.log(JSON.stringify(results));
 }
-main().catch(e => { console.error(e.message); process.exitCode = 1; });
+run().catch(e => { console.error(e); process.exitCode = 1; });

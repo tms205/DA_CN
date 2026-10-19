@@ -102,6 +102,7 @@
                     @if (VaiTroLa("SUPER_ADMIN"))
                     {
                         <NavLink class="tb-muc" href="khach-hang" title="Khách hàng" @onclick="DongMenu">@((MarkupString)Svg.NguoiMot(18)) <span>Khách hàng</span></NavLink>
+                        <NavLink class="tb-muc" href="mau-don" title="Quản lý mẫu đơn in sẵn" @onclick="DongMenu">@((MarkupString)Svg.BieuMau()) <span>Mẫu đơn in sẵn</span></NavLink>
                         <NavLink class="tb-muc" href="phe-duyet" title="Phê duyệt phiếu nhập và hoàn tiền" @onclick="DongMenu">@((MarkupString)Svg.DuyetHoSo(18)) <span>Phê duyệt</span>@if (ThongBao.SoCho != 0) { <span class="tb-badge" aria-label="@(ThongBao.SoCho == null ? "Số yêu cầu chờ duyệt chưa tải được" : $"{ThongBao.SoCho} yêu cầu chờ duyệt")">@(ThongBao.SoCho?.ToString() ?? "?")</span> }</NavLink>
                     }
                 </div>
@@ -169,7 +170,10 @@
         </header>
 
         <main class="noi-dung">
-            <div class="noi-dung-trang">@Body</div>
+            <div class="noi-dung-trang">
+                @if (_daKhoiTao) { @Body }
+                else { <div class="the" role="status">Đang chuẩn bị phiên làm việc…</div> }
+            </div>
         </main>
         <footer class="chan-trang" role="contentinfo" aria-label="Thông tin hệ thống">
             <div class="ct-thuong-hieu">
@@ -213,6 +217,7 @@
 
     // Người đang đăng nhập
     private NguoiDungDto ND => Phien.NguoiDung;
+    private bool _daKhoiTao;
     private List<ChiNhanhDto> _dsChiNhanh = new();
     private ElementReference _hopLienHe;
     private string _ketQuaSaoChep;
@@ -243,6 +248,7 @@
                 "nhan-vien" => ("Quản lý", "Nhân viên"),
                 "khach-hang" => ("Quản lý", "Khách hàng"),
                 "dich-vu" => ("Quản lý", "Dịch vụ"),
+                "mau-don" => ("Quản lý", "Mẫu đơn in sẵn"),
                 "danh-gia" => ("Quản lý", "Đánh giá khách hàng"),
                 "phe-duyet" => ("Quản lý", "Phê duyệt"),
                 "bang-gia" => ("Cấu hình", "Bảng giá in ấn"),
@@ -273,7 +279,7 @@
         await PhamVi.KhoiTaoAsync();
         await TrangThaiDangNhap;
         Nav.LocationChanged += DoiTrang;
-        if (!VaiTroLa(VaiTro.SuperAdmin)) return;
+        if (!VaiTroLa(VaiTro.SuperAdmin)) { _daKhoiTao = true; return; }
 
         ThongBao.ThayDoi += VeBadge;
         await ThongBao.TaiAsync();
@@ -288,6 +294,8 @@
         {
             _dsChiNhanh = new();
         }
+        // Đọc xong phiên và phạm vi mới hiển thị trang; chọn chi nhánh không tự mở ca CEO.
+        _daKhoiTao = true;
     }
 
     private bool VaiTroLa(string vaiTro)
@@ -341,7 +349,7 @@
             _cacNhomDangMo.Add("bao-cao");
         else if (duongDan == "bang-gia" || duongDan == "khuyen-mai" || duongDan == "quan-tri")
             _cacNhomDangMo.Add("cau-hinh");
-        else if (duongDan == "kho-vat-tu" || duongDan == "nhan-vien" || duongDan == "danh-gia" || duongDan == "phe-duyet" || duongDan == "khach-hang" || duongDan == "dich-vu")
+        else if (duongDan == "kho-vat-tu" || duongDan == "nhan-vien" || duongDan == "danh-gia" || duongDan == "phe-duyet" || duongDan == "khach-hang" || duongDan == "dich-vu" || duongDan == "mau-don")
             _cacNhomDangMo.Add("quan-ly");
         else
             _cacNhomDangMo.Add("van-hanh");
