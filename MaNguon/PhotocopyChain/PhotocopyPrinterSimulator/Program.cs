@@ -4,14 +4,24 @@ using Microsoft.Extensions.Hosting;
 using PhotocopyPrinterSimulator;
 using PhotocopyChain.CauHinh;
 
+bool chanDoan = args.Contains("--kiem-tra") || args.Contains("--in-thu") || args.Contains("--tao-pdf-thu");
 var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
 {
-    Args = args,
+    Args = chanDoan ? Array.Empty<string>() : args,
     ContentRootPath = AppContext.BaseDirectory
 });
 builder.Configuration.AddUserSecrets(typeof(Program).Assembly, optional: true);
-string fileEnv = DocFileEnv.LayDuongDan(Environment.GetEnvironmentVariable("PHOTOCOPY_ENV_FILE"), AppContext.BaseDirectory);
-builder.Configuration.AddInMemoryCollection(DocFileEnv.Doc(fileEnv));
+string? fileEnv = null;
+try { fileEnv = DocFileEnv.LayDuongDan(Environment.GetEnvironmentVariable("PHOTOCOPY_ENV_FILE"), AppContext.BaseDirectory); }
+catch (DirectoryNotFoundException) when (chanDoan) { /* Chẩn đoán standalone không cần khóa API/database. */ }
+if (fileEnv != null) builder.Configuration.AddInMemoryCollection(DocFileEnv.Doc(fileEnv));
+
+if (chanDoan)
+{
+    Environment.ExitCode = await ChanDoanMayIn.Chay(args,
+        builder.Configuration.GetSection("Simulator").Get<CauHinhSimulator>() ?? new());
+    return;
+}
 
 string khoaKetNoi = builder.Configuration["PrinterConnector:ApiKey"]
     ?? throw new InvalidOperationException(

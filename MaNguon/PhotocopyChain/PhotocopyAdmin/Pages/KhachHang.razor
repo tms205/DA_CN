@@ -18,7 +18,7 @@
         else
         {
             <div class="bang-cuon"><table class="bang dm-khach-hang">
-                <thead><tr><th scope="col">Khách hàng</th><th scope="col">Số điện thoại</th><th scope="col">Tổng đơn</th><th scope="col">Tổng chi tiêu</th><th scope="col">Trạng thái</th><th scope="col">Thao tác</th></tr></thead>
+                <thead><tr><th scope="col">Khách hàng</th><th scope="col">Số điện thoại</th><th scope="col">Tổng đơn</th><th scope="col">Tổng chi tiêu</th><th scope="col">Trạng thái</th><th scope="col" class="kh-cot-hanh-dong">Thao tác</th></tr></thead>
                 <tbody>
                 @foreach (var k in DaLoc.Skip((_trang - 1) * 10).Take(10))
                 {
@@ -28,7 +28,13 @@
                         <td data-nhan="Tổng đơn" class="mono">@k.SoDon</td>
                         <td data-nhan="Tổng chi tiêu" class="mono">@TongQuanBaoCao.Tien(k.TongChiTieu)</td>
                         <td data-nhan="Trạng thái"><span class="nhan-mau @(k.TrangThai == "KHOA" ? "nhan-do" : "nhan-xanh")">@(k.TrangThai == "KHOA" ? "Bị khóa" : "Hoạt động")</span></td>
-                        <td data-nhan="Thao tác"><button type="button" class="nut-nho" @onclick="() => MoSua(k)" disabled="@_dangLuu">Sửa</button><button class="nut-nho" @onclick="() => _chiTiet = k" disabled="@_dangLuu">Chi tiết</button><button class="nut-nho @(k.TrangThai == "KHOA" ? "" : "nguy-hiem")" @onclick="() => ChonDoiTrangThai(k)" disabled="@_dangLuu">@(k.TrangThai == "KHOA" ? "Mở khóa" : "Khóa")</button></td>
+                        <td data-nhan="Thao tác" class="kh-cot-hanh-dong">
+                            <div class="kh-hanh-dong" role="group" aria-label="Thao tác với khách hàng @k.HoTen">
+                                <button type="button" class="nut-nho" @onclick="() => MoSua(k)" disabled="@_dangLuu">Sửa</button>
+                                <button type="button" class="nut-nho" @onclick="() => _chiTiet = k" disabled="@_dangLuu">Chi tiết</button>
+                                <button type="button" class="nut-nho kh-doi-trang-thai @(k.TrangThai == "KHOA" ? "" : "nguy-hiem")" @onclick="() => ChonDoiTrangThai(k)" disabled="@_dangLuu">@(k.TrangThai == "KHOA" ? "Mở khóa" : "Khóa")</button>
+                            </div>
+                        </td>
                     </tr>
                 }
                 @if (DaLoc.Count == 0) { <tr><td colspan="6">Không có khách hàng phù hợp.</td></tr> }

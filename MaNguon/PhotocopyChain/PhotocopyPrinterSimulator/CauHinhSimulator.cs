@@ -8,6 +8,7 @@ public sealed class CauHinhSimulator
     public string ApiBaseUrl { get; set; } = "http://localhost:5268/";
     public int SoGiayKiemTra { get; set; } = 2;
     public string SumatraPdfPath { get; set; } = "";
+    public bool TuPhatHienWindows { get; set; }
     public List<CauHinhTocDoMayIn> MayIn { get; set; } = new();
 
     public void KiemTraDanhSachMay()
@@ -34,6 +35,7 @@ public sealed class TienTrinhInDaLuu
     public string TenHangDoi { get; set; } = "";
     public List<string> TepDaGui { get; set; } = new();
     public bool ChoXacNhan { get; set; }
+    public bool DaGuiDuFile { get; set; }
     public string? CanhBao { get; set; }
 
     public void TangTienDoAo(double soGiay, bool biChan)

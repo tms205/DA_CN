@@ -60,11 +60,50 @@ public sealed class MayInSimulator : BackgroundService
         if (!Guid.TryParse(connectorId, out _)) throw new InvalidDataException("Mã connector đã lưu không hợp lệ.");
         _http.DefaultRequestHeaders.Add("X-Printer-Connector-Id", connectorId);
         _logger.LogInformation("Printer connector đã kết nối tới {DiaChiApi}.", _http.BaseAddress);
-        await Task.WhenAll(_config.MayIn.Select(may => ChayMotMay(may, stoppingToken)));
+        var tacVu = _config.MayIn.Select(may => ChayMotMay(may, stoppingToken)).ToList();
+        if (_config.TuPhatHienWindows) tacVu.Add(Task.Run(() => DongBoThietBi(stoppingToken), stoppingToken));
+        await Task.WhenAll(tacVu);
     }
 
-    private async Task ChayMotMay(CauHinhTocDoMayIn may, CancellationToken dung)
+    private async Task DongBoThietBi(CancellationToken dung)
     {
+        while (!dung.IsCancellationRequested)
+        {
+            var req = new BaoCaoPhatHienRequest { TenMayTinh = Environment.MachineName,
+                MaMayCauHinh = _config.MayIn.Select(x => x.MaMayIn).ToList(),
+                KetNoiCauHinh = _config.MayIn.Select(x => new LienKetMayInDto {
+                    MaMayIn = x.MaMayIn, CheDo = x.CheDo, TenHangDoi = x.TenHangDoiWindows }).ToList(),
+                BoInPdfSanSang = Path.IsPathFullyQualified(_config.SumatraPdfPath)
+                    && File.Exists(_config.SumatraPdfPath)
+                    && Path.GetFileName(_config.SumatraPdfPath).Equals("SumatraPDF.exe", StringComparison.OrdinalIgnoreCase) };
+            try { req.HangDoi = new PhatHienMayInWindows().Quet(); }
+            catch (Exception ex) { req.Loi = "Không đọc được queue Windows. Kiểm tra dịch vụ Print Spooler, driver và quyền tài khoản connector."; _logger.LogWarning(ex, "Chưa quét được máy in; máy ảo vẫn chạy độc lập."); }
+            try
+            {
+                using var res = await _http.PostAsJsonAsync("api/may-in-ao/phat-hien", req, dung);
+                res.EnsureSuccessStatusCode();
+            }
+            catch (OperationCanceledException) when (dung.IsCancellationRequested) { break; }
+            catch (Exception ex) { _logger.LogWarning(ex, "Chưa đồng bộ được danh sách máy in; sẽ thử lại."); }
+            try { await Task.Delay(TimeSpan.FromSeconds(30), dung); }
+            catch (OperationCanceledException) when (dung.IsCancellationRequested) { break; }
+        }
+    }
+
+    public static CauHinhTocDoMayIn ApDungLienKet(CauHinhTocDoMayIn goc, LienKetMayInDto? lk)
+    {
+        if (lk == null) return goc;
+        if (lk.MaMayIn != goc.MaMayIn || lk.CheDo is not ("AO" or "THAT")
+            || (lk.CheDo == "THAT" && string.IsNullOrWhiteSpace(lk.TenHangDoi)))
+            throw new InvalidDataException("Liên kết máy do API trả về không hợp lệ.");
+        return new() { MaMayIn = goc.MaMayIn, TenMay = goc.TenMay, TocDoA4 = goc.TocDoA4,
+            TocDoA3 = goc.TocDoA3, TocDoHaiMat = goc.TocDoHaiMat, SoGiayRaTrangDau = goc.SoGiayRaTrangDau,
+            CheDo = lk.CheDo, TenHangDoiWindows = lk.TenHangDoi };
+    }
+
+    private async Task ChayMotMay(CauHinhTocDoMayIn cauHinhGoc, CancellationToken dung)
+    {
+        var may = cauHinhGoc;
         _logger.LogInformation("Máy {MaMayIn} - {TenMay} đã sẵn sàng.", may.MaMayIn, may.TenMay);
         int maDonDangXuLy = 0;
         string maLenhDangXuLy = "";
@@ -76,6 +115,7 @@ public sealed class MayInSimulator : BackgroundService
                 TienTrinhInDaLuu? dangIn = await DocTienTrinh(may.MaMayIn, dung);
                 var dieuKhien = await _http.GetFromJsonAsync<DieuKhienMayInDto>($"api/may-in-ao/{may.MaMayIn}/dieu-khien", dung)
                     ?? throw new InvalidDataException("Thiếu trạng thái điều khiển máy in.");
+                may = ApDungLienKet(cauHinhGoc, dieuKhien.LienKet);
                 bool mayThat = may.CheDo == "THAT";
                 if (may.CheDo is not ("AO" or "THAT")) throw new InvalidOperationException("Chế độ máy phải là AO hoặc THAT.");
                 string? loiAo = mayThat ? null : dieuKhien.LoiMoPhong;
@@ -135,8 +175,9 @@ public sealed class MayInSimulator : BackgroundService
                     await Task.Delay(TimeSpan.FromSeconds(1), dung);
                     continue;
                 }
-                using HttpResponseMessage phanHoi = await _http.GetAsync(
-                    $"api/may-in-ao/{may.MaMayIn}/lenh-tiep-theo", dung);
+                using var nhanLenh = new HttpRequestMessage(HttpMethod.Get, $"api/may-in-ao/{may.MaMayIn}/lenh-tiep-theo");
+                if (dieuKhien.LienKet != null) nhanLenh.Headers.Add("X-Printer-Binding-Version", dieuKhien.LienKet.PhienBan);
+                using HttpResponseMessage phanHoi = await _http.SendAsync(nhanLenh, dung);
 
                 if (phanHoi.StatusCode == HttpStatusCode.NoContent)
                 {
@@ -271,11 +312,20 @@ public sealed class MayInSimulator : BackgroundService
                     await GuiVaTheoDoi(may, p, files[i], lenh.DsDongIn[i], dung);
                 }
                 p.CanhBao = "Đã gửi PDF tới Windows. Kiểm tra đủ giấy, số bản và quy cách trước khi xác nhận.";
+                p.DaGuiDuFile = true;
             }
             catch (OperationCanceledException) when (dung.IsCancellationRequested) { throw; }
             catch (Exception ex) { p.CanhBao = ex.Message; }
             p.ChoXacNhan = true;
             await LuuTienTrinh(may.MaMayIn, p, dung);
+        }
+        // Gửi lỗi hoặc crash giữa chừng không được biến thành một lệnh đã in xong chỉ vì queue rỗng.
+        // Checkpoint cũ chưa có cờ này cũng phải giữ lại để đối chiếu, không tự gửi lại.
+        if (!p.DaGuiDuFile)
+        {
+            await GuiHeartbeat(may.MaMayIn, "LOI", dung, p, may, dk,
+                loi: p.CanhBao ?? "Chưa xác minh đã gửi đủ mọi file. Kiểm tra queue và bản giấy; không tự gửi lại hoặc xác nhận hoàn tất.");
+            return;
         }
         // Sau restart, bất kỳ lệnh đã bắt đầu gửi nào đều là tình huống có thể đã in một phần.
         if (!p.ChoXacNhan)

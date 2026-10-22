@@ -48,7 +48,7 @@ internal static class TruyVanSql
             ORDER BY dh.NgayDat DESC, dh.MaDonHang DESC";
 
         public const string ChiTiet = @"
-            SELECT dh.MaDonHang,
+            SELECT dh.MaDonHang, dh.MaMayIn,
                    'DH' + RIGHT('00000' + CAST(dh.MaDonHang AS VARCHAR(10)), 5) AS MaDonHangHienThi,
                    dh.MaDonHangGoc,
                    CASE WHEN dh.MaDonHangGoc IS NULL THEN NULL

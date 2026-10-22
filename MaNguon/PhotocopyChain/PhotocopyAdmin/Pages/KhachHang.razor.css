@@ -1,0 +1,51 @@
+.dm-khach-hang th.kh-cot-hanh-dong,
+.dm-khach-hang td.kh-cot-hanh-dong {
+    width: 190px;
+    text-align: left;
+    vertical-align: middle;
+}
+
+.kh-hanh-dong {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    width: 100%;
+}
+
+.kh-hanh-dong .nut-nho {
+    width: 100%;
+    min-width: 0;
+    padding-inline: 10px;
+    white-space: nowrap;
+}
+
+.kh-doi-trang-thai {
+    grid-column: 1 / -1;
+}
+
+@container bang-du-lieu (max-width:600px) {
+    .dm-khach-hang td.kh-cot-hanh-dong {
+        width: auto;
+        grid-column: 1 / -1;
+    }
+
+    .kh-hanh-dong .nut-nho {
+        min-height: 44px;
+    }
+}
+
+@container bang-du-lieu (max-width:380px) {
+    .kh-hanh-dong {
+        grid-template-columns:minmax(0, 1fr);
+    }
+
+    .kh-doi-trang-thai {
+        grid-column: auto;
+    }
+}
+
+@media(max-width:768px) {
+    .kh-hanh-dong .nut-nho {
+        min-height: 44px;
+    }
+}

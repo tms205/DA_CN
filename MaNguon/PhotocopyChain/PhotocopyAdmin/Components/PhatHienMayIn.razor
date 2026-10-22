@@ -1,0 +1,123 @@
+@using PhotocopyShared.Dtos.MayInAo
+@using PhotocopyShared.Dtos.Tuan3
+@inject HttpClient Http
+@implements IAsyncDisposable
+
+<section class="the pd-panel" aria-label="Thiết bị Windows được phát hiện">
+    <header class="pd-dau"><div><h2>Thiết bị Windows tại cửa hàng</h2><p>Queue đã cài trên máy chạy connector · quét mỗi 30 giây</p></div>
+        <button type="button" class="nut-phu" disabled="@_dangTai" @onclick="TaiAsync">Cập nhật danh sách</button></header>
+    @if (_loiTai != null) { <div class="o-loi" role="alert">@_loiTai</div> }
+    @if (_thongBao != null) { <div class="o-thanh-cong" role="status">@_thongBao</div> }
+    @if (_ds.Count == 0 && _loiTai == null)
+    {
+        <div class="pd-trong"><AuthorizeView Roles="SUPER_ADMIN"><Authorized>
+            <strong>Chưa nhận được danh sách từ connector</strong><p>Kiểm tra connector bản mới đang chạy và gửi tới đúng API. Nếu Windows báo driver unavailable, cần cài driver trước khi liên kết máy thật.</p>
+        </Authorized><NotAuthorized>
+            <strong>Chi nhánh chưa có connector được liên kết</strong><p>Nhờ CEO mở trang này, chọn đúng chi nhánh và liên kết máy đang chọn. Thiết bị chưa liên kết không hiển thị cho nhân viên; không có nghĩa máy in không được phát hiện.</p>
+        </NotAuthorized></AuthorizeView></div>
+    }
+    @foreach (var c in _ds)
+    {
+        <details class="pd-connector">
+            <summary><strong>@c.TenMayTinh</strong><span>@(c.TrucTuyen ? "Connector đang phản hồi" : "Connector mất kết nối") · @c.HangDoi.Count queue</span></summary>
+            <p class="pd-phu">Lần quét: @c.LanCuoiPhatHien.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss") · @(c.BoInPdfSanSang ? "Có bộ gửi PDF" : "Chưa cấu hình SumatraPDF")</p>
+            @if (!string.IsNullOrEmpty(c.Loi)) { <div class="o-loi">@c.Loi Máy ảo không bị ảnh hưởng.</div> }
+            @if (c.HangDoi.Count == 0 && string.IsNullOrEmpty(c.Loi)) { <p>Windows chưa có queue cho tài khoản đang chạy connector. Cài driver USB hoặc thêm máy in mạng bằng Windows.</p> }
+            <div class="pd-queues">
+                @foreach (var q in c.HangDoi)
+                {
+                    <article class="pd-queue"><div class="pd-dau"><strong>@q.Ten</strong><span class="nhan-mau nhan-xam">@(q.LaMayAo ? "Ảo / xuất file" : "Chưa kiểm chứng vật lý")</span></div>
+                        <dl><div><dt>Driver / cổng</dt><dd>@q.Driver · @q.Cong</dd></div>
+                            <div><dt>Năng lực driver</dt><dd>Màu: @NangLuc(q.InMau) · Hai mặt: @NangLuc(q.InHaiMat)</dd></div>
+                            <div><dt>Trạng thái Windows</dt><dd>@(q.TrangThaiDriver == 0 ? "Không báo lỗi (chưa khẳng định online)" : $"Mã trạng thái: {q.TrangThaiDriver}") · @q.SoJob job</dd></div></dl>
+                    </article>
+                }
+            </div>
+        </details>
+    }
+    <div class="pd-chan"><p>Không có máy thật? Dùng bảng điều khiển máy ảo phía trên để thử tạm dừng, hết giấy, kẹt giấy và phục hồi. Queue PDF/XPS chỉ để kiểm tra Windows, không nhận đơn sản xuất.</p>
+        <AuthorizeView Roles="SUPER_ADMIN"><Authorized>
+            <button type="button" class="nut-chinh" disabled="@(May == null || _ds.Count == 0)" @onclick="MoLienKet">Liên kết máy đang chọn</button>
+        </Authorized></AuthorizeView>
+    </div>
+</section>
+
+<HopThoaiQuanTri Mo="@_mo" TieuDe="Liên kết máy in Windows" MoTa="Không thay đổi đơn hay năng lực danh mục. Chỉ áp dụng khi máy không còn lệnh đang giữ." Loi="@_loiLuu" DangLuu="@_dangLuu" Dong="Dong">
+    <NoiDung>
+        <div class="pd-form">
+            <p><strong>@May?.TenMay</strong> · @May?.TenChiNhanh</p>
+            <div class="truong"><label class="nhan" for="pd-connector">Máy chạy connector</label>
+                <select id="pd-connector" class="ca-o-loc" value="@_form.ConnectorId" @onchange="DoiConnector"><option value="">Chọn connector tại đúng chi nhánh</option>
+                    @foreach (var c in UngVien) { <option value="@c.ConnectorId">@c.TenMayTinh @(c.TrucTuyen ? "" : "(mất kết nối)")</option> }
+                </select></div>
+            <div class="truong"><label class="nhan" for="pd-che-do">Chế độ xử lý</label><select id="pd-che-do" class="ca-o-loc" @bind="_form.CheDo" @bind:after="DoiCheDo"><option value="AO">Máy ảo · mô phỏng, không in giấy</option><option value="THAT">Windows · gửi PDF qua driver USB/LAN</option></select></div>
+            @if (_form.CheDo == "THAT")
+            {
+                <div class="truong"><label class="nhan" for="pd-queue">Queue Windows</label><select id="pd-queue" class="ca-o-loc" @bind="_form.TenHangDoi" @bind:after="DoiCheDo"><option value="">Chọn queue đã cài</option>
+                    @foreach (var q in ConnectorChon?.HangDoi ?? new()) { <option value="@q.Ten" disabled="@q.LaMayAo">@q.Ten @(q.LaMayAo ? "(ảo — chỉ kiểm thử)" : "")</option> }
+                </select></div>
+                <div class="o-canh-bao">Sau khi lưu, các đơn đủ điều kiện có thể được gửi tới thiết bị. Cài SumatraPDF, thử một trang và đối chiếu khổ giấy, màu, hai mặt với danh mục trước khi kích hoạt.</div>
+                <label class="pd-xac-nhan"><input type="checkbox" @bind="_form.DaKiemTraThietBi" /> Tôi đã kiểm tra đây là đúng máy tại chi nhánh, driver và năng lực đáp ứng quy cách; không phải queue xuất file.</label>
+            }
+            else { <p>Máy ảo chỉ tính tiến độ mô phỏng. Không kết luận đã kiểm thử USB/LAN hoặc giấy thật.</p> }
+        </div>
+    </NoiDung>
+    <Chan><button type="button" class="nut-phu" disabled="@_dangLuu" @onclick="Dong">Hủy</button><button type="button" class="nut-chinh" disabled="@(_dangLuu || string.IsNullOrEmpty(_form.ConnectorId) || (_form.CheDo == "THAT" && (!_form.DaKiemTraThietBi || string.IsNullOrEmpty(_form.TenHangDoi))))" @onclick="LuuAsync">@(_dangLuu ? "Đang lưu…" : "Lưu liên kết")</button></Chan>
+</HopThoaiQuanTri>
+
+@code {
+    [Parameter] public MayInQuanTriDto May { get; set; }
+    private List<ConnectorMayInDto> _ds = new();
+    private LienKetMayInRequest _form = new();
+    private readonly CancellationTokenSource _dung = new();
+    private Task _poll;
+    private bool _dangTai, _dangLuu, _mo;
+    private int _maDangSua;
+    private string _loiTai, _loiLuu, _thongBao;
+    private IEnumerable<ConnectorMayInDto> UngVien => _ds.Where(x => May != null && x.MaMayCauHinh.Contains(May.MaMayIn) && (x.MaChiNhanh == null || x.MaChiNhanh == May.MaChiNhanh));
+    private ConnectorMayInDto ConnectorChon => _ds.FirstOrDefault(x => x.ConnectorId == _form.ConnectorId);
+    private static string NangLuc(bool? x) => x == null ? "Chưa rõ" : x.Value ? "Có" : "Không";
+    protected override async Task OnInitializedAsync() { await TaiAsync(); _poll = PollAsync(); }
+    private async Task TaiAsync()
+    {
+        if (_dangTai) return;
+        _dangTai = true;
+        try { _ds = await Http.GetFromJsonAsync<List<ConnectorMayInDto>>("api/may-in-ao/phat-hien", _dung.Token) ?? new(); _loiTai = null; }
+        catch (OperationCanceledException) when (_dung.IsCancellationRequested) { }
+        catch { _ds.Clear(); _loiTai = "Chưa tải được danh sách phát hiện. Kiểm tra API đã chạy bản mới; không đổi liên kết khi mất kết nối."; }
+        finally { _dangTai = false; }
+    }
+    private async Task PollAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(15));
+        try { while (await timer.WaitForNextTickAsync(_dung.Token)) await InvokeAsync(async () => { await TaiAsync(); StateHasChanged(); }); }
+        catch (OperationCanceledException) when (_dung.IsCancellationRequested) { }
+    }
+    private void MoLienKet()
+    {
+        if (May == null) return;
+        _maDangSua = May.MaMayIn;
+        var lk = _ds.SelectMany(x => x.LienKet).FirstOrDefault(x => x.MaMayIn == _maDangSua);
+        _form = new() { ConnectorId = lk?.ConnectorId ?? UngVien.FirstOrDefault()?.ConnectorId ?? "",
+            CheDo = lk?.CheDo ?? "AO", TenHangDoi = lk?.TenHangDoi ?? "" };
+        _loiLuu = null; _mo = true;
+    }
+    private void Dong() { if (!_dangLuu) _mo = false; }
+    private void DoiCheDo() { _form.DaKiemTraThietBi = false; }
+    private void DoiConnector(ChangeEventArgs e) { _form.ConnectorId = e.Value?.ToString() ?? ""; _form.TenHangDoi = ""; DoiCheDo(); }
+    private async Task LuuAsync()
+    {
+        if (_dangLuu || May?.MaMayIn != _maDangSua) return;
+        _dangLuu = true; _loiLuu = null;
+        try
+        {
+            using var res = await Http.PostAsJsonAsync($"api/may-in-ao/phat-hien/{_maDangSua}/lien-ket", _form, _dung.Token);
+            if (!res.IsSuccessStatusCode) { _loiLuu = await DocLoiApi.TuPhanHoiAsync(res, "Không lưu được liên kết."); return; }
+            _mo = false; _thongBao = "Đã lưu. Connector tự áp dụng liên kết khi máy rảnh; theo dõi trạng thái phía trên."; await TaiAsync();
+        }
+        catch (OperationCanceledException) when (_dung.IsCancellationRequested) { }
+        catch { _loiLuu = "Chưa xác định lưu thành công. Làm mới danh sách trước khi thử lại."; }
+        finally { _dangLuu = false; }
+    }
+    public async ValueTask DisposeAsync() { _dung.Cancel(); if (_poll != null) await _poll; _dung.Dispose(); }
+}

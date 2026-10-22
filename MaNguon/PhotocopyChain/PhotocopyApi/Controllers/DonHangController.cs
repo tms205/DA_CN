@@ -33,12 +33,17 @@ public class DonHangController : ControllerBase
     private readonly string _chuoiKetNoi;
     private readonly GeoapifyService _giaoHang;
     private readonly IHubContext<CapNhatHub> _hub;
+    private readonly TrangThaiMayInAoStore _trangThaiMay;
+    private readonly YeuCauInCodStore _yeuCauCod;
 
-    public DonHangController(IConfiguration config, IMemoryCache boNhoTam, IHubContext<CapNhatHub> hub, GeoapifyService giaoHang = null)
+    public DonHangController(IConfiguration config, IMemoryCache boNhoTam, IHubContext<CapNhatHub> hub, GeoapifyService giaoHang = null,
+        TrangThaiMayInAoStore trangThaiMay = null, YeuCauInCodStore yeuCauCod = null)
     {
         _giaoHang = giaoHang ?? new GeoapifyService(config, boNhoTam);
         _hub = hub;
         _chuoiKetNoi = config.GetConnectionString("PhotocopyChain");
+        _trangThaiMay = trangThaiMay ?? new TrangThaiMayInAoStore();
+        _yeuCauCod = yeuCauCod ?? new YeuCauInCodStore();
     }
 
     // =================================================================== PHÍA KHÁCH HÀNG (App)
@@ -484,6 +489,7 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
             "SELECT MAX(NgayNhan) FROM GiaoHang WHERE MaDonHang = @MaDonHang", new { MaDonHang = maDonHang });
 
         don.TienDo = DungTienDo(don, gioNhanGiao);
+        don.DaGuiLenhIn = don.MaMayIn != null && _yeuCauCod.DaDangKy(maDonHang, don.MaMayIn.Value);
         return Ok(don);
     }
 
@@ -663,6 +669,8 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
 
     private sealed class DonPhucHoiFile
     {
+        public string HinhThucNhan { get; set; }
+        public int? MaMayIn { get; set; }
         public int MaChiNhanh { get; set; }
         public int MaKhachHang { get; set; }
         public string TrangThai { get; set; }
@@ -682,142 +690,79 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
 
     // PUT api/don-hang/5/trang-thai-in — F-17 (+ F-21 phân công máy in).
     //   DA_XAC_NHAN → DANG_IN : thủ tục trừ vật tư trong kho
-    //   DANG_IN     → DA_IN   : đánh dấu đã in xong; file vẫn giữ tới khi đơn hoàn tất / bị hủy
+    //   DANG_IN → DA_IN chỉ đi qua callback connector, không nhận xác nhận bỏ qua bước in từ web.
     [HttpPut("{maDonHang}/trang-thai-in")]
     [Authorize(Roles = "BRANCH_ADMIN,STAFF")]
     public async Task<IActionResult> CapNhatTrangThaiIn([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maDonHang, CapNhatTrangThaiInRequest req)
     {
-        if (req.TrangThaiMoi != "DANG_IN" && req.TrangThaiMoi != "DA_IN")
+        if (req.TrangThaiMoi == "DA_IN")
+            return BadRequest(new { message = "Không xác nhận in xong thủ công. Connector phải gửi tài liệu tới máy và báo kết quả; kiểm tra tiến độ trong Điều khiển máy in." });
+        if (req.TrangThaiMoi != "DANG_IN")
             return BadRequest(new { message = "Trạng thái in không hợp lệ." });
+        if (req.MaMayIn is null or <= 0)
+            return BadRequest(new { message = "Chọn một máy đang kết nối trước khi bắt đầu in." });
 
         using var conn = new SqlConnection(_chuoiKetNoi);
 
-        int? maChiNhanhDon = await conn.ExecuteScalarAsync<int?>(
-            "SELECT MaChiNhanh FROM DonHang WHERE MaDonHang = @MaDonHang", new { MaDonHang = maDonHang });
-        if (maChiNhanhDon == null)
+        await conn.OpenAsync();
+        await using var giaoDich = (SqlTransaction)await conn.BeginTransactionAsync();
+        var don = await conn.QuerySingleOrDefaultAsync<DonPhucHoiFile>(
+            @"SELECT dh.MaChiNhanh, dh.MaMayIn, dh.TrangThai, dh.HinhThucNhan,
+                     tt.PhuongThuc, tt.TrangThai AS TrangThaiThanhToan
+              FROM DonHang dh WITH (UPDLOCK, HOLDLOCK)
+              JOIN ThanhToan tt ON tt.MaDonHang=dh.MaDonHang WHERE dh.MaDonHang=@MaDonHang",
+            new { MaDonHang = maDonHang }, giaoDich);
+        if (don == null)
             return NotFound(new { message = "Không tìm thấy đơn hàng." });
-        if (!DuocLamViecVoiChiNhanh(maChiNhanhDon.Value))
+        if (!DuocLamViecVoiChiNhanh(don.MaChiNhanh))
             return StatusCode(403, new { message = "Đơn này không thuộc chi nhánh của bạn." });
 
-        bool tuDong = await conn.ExecuteScalarAsync<bool>(
-            @"SELECT CAST(CASE WHEN EXISTS (SELECT 1 FROM ThanhToan
-              WHERE MaDonHang=@MaDonHang AND PhuongThuc='VIETQR' AND TrangThai='DA_THANH_TOAN') THEN 1 ELSE 0 END AS BIT)",
-            new { MaDonHang = maDonHang });
-        if (tuDong)
+        if (don.PhuongThuc == "VIETQR")
             return BadRequest(new { message = "Đơn VietQR đã trả tiền do connector tự in và báo hoàn tất; không xác nhận in thủ công." });
-
-        if (req.TrangThaiMoi == "DANG_IN")
+        if (!QuyTacMayInAo.DuocNhanLenh(don.PhuongThuc, don.TrangThaiThanhToan, don.HinhThucNhan))
+            return BadRequest(new { message = "Chỉ gửi in đơn COD nhận tại quầy, không phải đơn đã hoàn tiền." });
+        if (don.TrangThai == "DANG_IN")
         {
-            var dsFile = (await conn.QueryAsync<FilePhucHoi>(
-                @"SELECT f.TrangThai, f.DuongDan FROM ChiTietDonHang ct JOIN FileIn f ON f.MaFile=ct.MaFile
-                  WHERE ct.MaDonHang=@MaDonHang", new { MaDonHang = maDonHang })).ToList();
-            if (dsFile.Count == 0 || dsFile.Any(x => !QuyTacMayInAo.TepSanSang(x.TrangThai, x.DuongDan, System.IO.File.Exists(x.DuongDan))))
-                return BadRequest(new { message = "File in không còn sẵn sàng, chưa thể bắt đầu in." });
+            if (don.MaMayIn != req.MaMayIn) return Conflict(new { message = "Đơn đang có máy xử lý, không đổi máy để tránh in trùng." });
+            if (_yeuCauCod.DaDangKy(maDonHang, req.MaMayIn.Value))
+                return Ok(new KetQuaDto { Message = "Đơn đã được gửi tới hàng đợi của máy; không gửi thêm lệnh hoặc trừ kho lần hai." });
         }
-
-        // F-21: chọn máy in trước khi bắt đầu in (thủ tục tự kiểm máy có đủ khổ giấy / màu / 2 mặt không)
-        if (req.MaMayIn != null)
+        else if (don.TrangThai != "DA_XAC_NHAN") return BadRequest(new { message = "Phải tiếp nhận đơn trước khi gửi in." });
+        var ketNoi = _trangThaiMay.LayTatCa().FirstOrDefault(x => x.MaMayIn == req.MaMayIn);
+        if (ketNoi == null || ketNoi.TrangThai is not ("SAN_SANG" or "DANG_IN"))
+            return Conflict(new { message = "Máy chưa kết nối hoặc đang lỗi/tạm dừng. Kiểm tra connector trước khi gửi đơn." });
+        var dsFile = (await conn.QueryAsync<FilePhucHoi>(
+            @"SELECT f.TrangThai, f.DuongDan FROM ChiTietDonHang ct JOIN FileIn f ON f.MaFile=ct.MaFile
+              WHERE ct.MaDonHang=@MaDonHang", new { MaDonHang = maDonHang }, giaoDich)).ToList();
+        if (dsFile.Count == 0 || dsFile.Any(x => !QuyTacMayInAo.TepSanSang(x.TrangThai, x.DuongDan, System.IO.File.Exists(x.DuongDan))))
+            return BadRequest(new { message = "File PDF không còn sẵn sàng. Phục hồi đúng tài liệu trước khi gửi in." });
+        if (don.TrangThai == "DANG_IN")
         {
-            try
-            {
-                await conn.ExecuteAsync("sp_PhanCongMayIn",
-                    new { MaDonHang = maDonHang, MaMayIn = req.MaMayIn.Value },
-                    commandType: CommandType.StoredProcedure);
-            }
-            catch (SqlException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-        }
-
-        // Giữ lại mã file + đường dẫn trước khi đổi sang DA_IN.
-        // Dòng này giúp cả CSDL cũ (đang chạy) lẫn script mới đều giữ file tới khi đơn kết thúc.
-        var dsFileCanGiu = new List<FileCanXoa>();
-        if (req.TrangThaiMoi == "DA_IN")
-        {
-            dsFileCanGiu = (await conn.QueryAsync<FileCanXoa>(
-                @"SELECT DISTINCT f.MaFile, f.DuongDan
-                  FROM ChiTietDonHang ct JOIN FileIn f ON f.MaFile = ct.MaFile
-                  WHERE ct.MaDonHang = @MaDonHang AND f.DuongDan IS NOT NULL",
-                new { MaDonHang = maDonHang })).ToList();
+            if (!_yeuCauCod.DangKy(maDonHang, req.MaMayIn.Value)) return Conflict(new { message = "Đơn đã gửi tới máy khác." });
+            await giaoDich.CommitAsync();
+            return Ok(new KetQuaDto { Message = "Đã gửi yêu cầu COD cũ tới connector; không trừ kho thêm lần nữa." });
         }
 
         try
         {
-            await conn.ExecuteAsync("sp_CapNhatTrangThaiIn",
-                new { MaDonHang = maDonHang, TrangThaiMoi = req.TrangThaiMoi },
+            await conn.ExecuteAsync("sp_PhanCongMayIn",
+                new { MaDonHang = maDonHang, MaMayIn = req.MaMayIn.Value }, giaoDich,
                 commandType: CommandType.StoredProcedure);
+            await conn.ExecuteAsync("sp_CapNhatTrangThaiIn",
+                new { MaDonHang = maDonHang, TrangThaiMoi = "DANG_IN" }, giaoDich,
+                commandType: CommandType.StoredProcedure);
+            // Đăng ký trước commit: nếu lưu file lỗi thì rollback kho/trạng thái. Không nhận đơn cũ theo trạng thái đơn thuần.
+            if (!_yeuCauCod.DangKy(maDonHang, req.MaMayIn.Value))
+                return Conflict(new { message = "Đơn đã có yêu cầu in ở máy khác; không đổi đích in." });
+            await giaoDich.CommitAsync();
         }
         catch (SqlException ex)
         {
+            if (giaoDich.Connection != null) await giaoDich.RollbackAsync();
             return BadRequest(new { message = ex.Message });
         }
-
-        // Nếu CSDL trên máy chưa nạp lại thủ tục mới, thủ tục cũ sẽ đánh dấu DA_XOA lúc in xong.
-        // Ghi lại đường dẫn để đúng quy tắc mới: chỉ xóa khi đơn HOAN_THANH / DA_HUY.
-        foreach (FileCanXoa file in dsFileCanGiu)
-        {
-            await conn.ExecuteAsync(
-                "UPDATE FileIn SET TrangThai = N'SAN_SANG', DuongDan = @DuongDan WHERE MaFile = @MaFile",
-                file);
-        }
-
-        LienKetPhatSinh phatSinh = req.TrangThaiMoi == "DA_IN"
-            ? await conn.QueryFirstOrDefaultAsync<LienKetPhatSinh>(
-                "SELECT MaDonHangGoc, LoaiPhatSinh FROM DonHang WHERE MaDonHang = @MaDonHang",
-                new { MaDonHang = maDonHang })
-            : null;
-        bool laInLaiMienPhi = phatSinh?.LoaiPhatSinh == "IN_LAI_LOI_QUAY" && phatSinh.MaDonHangGoc != null;
-        bool donGocTuHoanTat = false;
-        if (laInLaiMienPhi)
-        {
-            await conn.ExecuteAsync(
-                "UPDATE DonHang SET TrangThai = 'HOAN_THANH', NgayHoanThanh = GETDATE() WHERE MaDonHang = @MaDonHang",
-                new { MaDonHang = maDonHang });
-
-            // Với đơn gốc đã trả tiền (thường là VietQR), thao tác in lại diễn ra ngay lúc khách
-            // đang nhận hàng nên hoàn tất luôn đơn gốc. COD chưa thu tuyệt đối không được tự chốt:
-            // đơn gốc vẫn ở bàn giao để nhân viên thu tiền vào đúng ca.
-            donGocTuHoanTat = await conn.ExecuteAsync(
-                @"UPDATE dh
-                  SET TrangThai = 'HOAN_THANH', NgayHoanThanh = GETDATE()
-                  FROM DonHang dh
-                  JOIN ThanhToan tt ON tt.MaDonHang = dh.MaDonHang
-                  WHERE dh.MaDonHang = @MaDonHangGoc
-                    AND dh.TrangThai = 'DA_IN'
-                    AND tt.TrangThai = 'DA_THANH_TOAN'", new { phatSinh.MaDonHangGoc }) > 0;
-
-            // Đây là việc nội bộ của quầy, khách chỉ cần nhận thông báo gắn với đơn gốc.
-            // Xóa các thông báo trạng thái mà stored procedure vừa tạo cho đơn in lại 0đ
-            // để khách không thấy một mã đơn kỹ thuật không xuất hiện trong lịch sử của họ.
-            await conn.ExecuteAsync(
-                "DELETE FROM ThongBao WHERE MaDonHang = @MaDonHang",
-                new { MaDonHang = maDonHang });
-            await conn.ExecuteAsync(
-                @"INSERT INTO ThongBao (MaNguoiDung, MaDonHang, TieuDe, NoiDung)
-                  SELECT MaKhachHang, MaDonHang,
-                         CASE WHEN @DaHoanTat = 1 THEN N'Đơn hàng đã hoàn tất' ELSE N'Bản in lại đã sẵn sàng' END,
-                         CASE WHEN @DaHoanTat = 1
-                              THEN N'Quầy đã xử lý xong phần in lại miễn phí và hoàn tất đơn hàng.'
-                              ELSE N'Quầy đã in lại phần bị lỗi miễn phí. Vui lòng thanh toán COD khi nhận tài liệu.' END
-                  FROM DonHang WHERE MaDonHang = @MaDonHangGoc",
-                new { phatSinh.MaDonHangGoc, DaHoanTat = donGocTuHoanTat });
-
-            if (donGocTuHoanTat)
-                await XoaFileCuaDonDaKetThuc(conn, phatSinh.MaDonHangGoc.Value);
-        }
-
-        string cau = req.TrangThaiMoi == "DANG_IN"
-            ? "Đơn đang được in"
-            : donGocTuHoanTat ? "Đã hoàn tất bản in lại và đơn gốc"
-            : laInLaiMienPhi ? "Bản in lại đã xong; đơn gốc đang chờ thu COD và bàn giao"
-            : "Đơn đã in xong";
-        await BaoDonDoiTrangThai(conn, maDonHang, cau);
-        if (laInLaiMienPhi)
-            await BaoDonDoiTrangThai(conn, phatSinh.MaDonHangGoc.Value,
-                donGocTuHoanTat ? "Đã xử lý xong bản in lại và hoàn tất đơn gốc"
-                                : "Bản in lại đã xong; chờ thu COD và bàn giao cho khách");
-        return Ok(new KetQuaDto { Message = cau + "." });
+        await BaoDonDoiTrangThai(conn, maDonHang, "Đã gửi đơn COD vào hàng đợi máy in; chờ connector xử lý");
+        return Ok(new KetQuaDto { Message = "Đã gửi đơn tới máy in. Chỉ chuyển đã in xong sau khi connector báo kết quả; COD vẫn thu lúc bàn giao." });
     }
 
     // GET api/don-hang/5/file/12 — F-16: thợ in tải file (bản PDF đã chuẩn hóa) về để in.
@@ -996,7 +941,7 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
         }
         else if (!DuocLamViecVoiChiNhanh(don.MaChiNhanh))
             return StatusCode(403, new { message = "Đơn không thuộc phạm vi chi nhánh đang chọn." });
-        if (don.TrangThai == "DANG_IN" && don.PhuongThuc == "VIETQR" && don.TrangThaiThanhToan == "DA_THANH_TOAN")
+        if (don.TrangThai == "DANG_IN")
             return BadRequest(new { message = "Connector đang xử lý đơn; phải kiểm tra và dừng máy thực tế trước, không hủy lệnh đang in từ đây." });
         try
         {

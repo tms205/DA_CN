@@ -12,6 +12,32 @@ namespace PhotocopyApi.Tests;
 public class MayInThatTests
 {
     [Fact]
+    public async Task GuiPdfThatBai_KhongDuocChuyenSangChoXacNhanHayHoanTat()
+    {
+        using var handler = new ApiInThat();
+        using var http = new HttpClient(handler) { BaseAddress = new Uri("http://localhost/") };
+        using var worker = new MayInSimulator(http, Options.Create(new CauHinhSimulator {
+            ThuMucTrangThai = Path.Combine(Path.GetTempPath(), "photocopy-send-fail-" + Guid.NewGuid()),
+            MayIn = new() { new() { MaMayIn = 1, CheDo = "THAT", TenHangDoiWindows = "fixture" } }
+        }), NullLogger<MayInSimulator>.Instance, new WindowsGuiLoi());
+        await worker.StartAsync(default);
+        try
+        {
+            string state = await handler.SauKhiGui.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal("LOI", state);
+            Assert.Equal(0, handler.SoLanHoanTat);
+        }
+        finally { await worker.StopAsync(default); }
+    }
+
+    private sealed class WindowsGuiLoi : MayInWindows
+    {
+        public override void KiemTraCauHinh(string engine, string printer) { }
+        public override Task GuiPdf(string engine, string printer, string file, DongLenhInDto dong, CancellationToken token) =>
+            throw new InvalidOperationException("Driver không nhận PDF fixture.");
+        public override List<JobWindows> DocJob(string printer) => new();
+    }
+    [Fact]
     public async Task GuiPdfCham_VanNhanDuocLenhTamDungVaGuiHeartbeat()
     {
         using var handler = new ApiInThat();
@@ -111,6 +137,7 @@ public class MayInThatTests
         public volatile bool TamDung;
         public TaskCompletionSource<bool> ChoXacNhan = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource<bool> HoanTat = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource<string> SauKhiGui = new(TaskCreationOptions.RunContinuationsAsynchronously);
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage req, CancellationToken token)
         {
             string url = req.RequestUri.AbsolutePath;
@@ -124,6 +151,7 @@ public class MayInThatTests
             }
             if (url.Contains("/file/")) { SoLanTai++; return new(HttpStatusCode.OK) { Content = new ByteArrayContent(Encoding.ASCII.GetBytes("%PDF-test-fixture")) }; }
             var body = await req.Content.ReadFromJsonAsync<BaoCaoMayInRequest>(token);
+            if (body.TrangThai is "CHO_XAC_NHAN" or "LOI") SauKhiGui.TrySetResult(body.TrangThai);
             if (body.TrangThai == "CHO_XAC_NHAN") ChoXacNhan.TrySetResult(true);
             if (url.EndsWith("hoan-tat")) { SoLanHoanTat++; HoanTat.TrySetResult(true); }
             return new(HttpStatusCode.OK);

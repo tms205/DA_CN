@@ -106,7 +106,7 @@
     <HopThoaiQuanTri Mo="@_moForm" TieuDe="@(LaCEO() ? "Lập và duyệt phiếu nhập vật tư" : "Đề xuất nhập vật tư")" MoTa="Tồn kho chỉ tăng sau khi xác nhận nhận hàng thực tế." Loi="@_loi" DangLuu="@_dangLuu" Dong="DongForm">
         <NoiDung>
         <form id="kho-form-phieu" @onsubmit="TaoPhieuAsync" @onsubmit:preventDefault>
-            <div class="ca-loc-luoi">
+            <div class="ca-loc-luoi" style="align-items: start;">
                 <div class="truong">
                     <label class="nhan">Vật tư cần nhập</label>
                     <select class="ca-o-loc" @bind="_form.MaVatTu">
@@ -224,7 +224,7 @@
         else
         {
             <div class="bang-cuon">
-                <table role="table" class="bang">
+                <table role="table" class="bang bang-thao-tac-trai">
                     <thead>
                         <tr>
                             <th scope="col">Mã phiếu</th>

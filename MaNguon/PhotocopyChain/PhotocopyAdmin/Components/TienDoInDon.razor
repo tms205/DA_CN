@@ -1,0 +1,35 @@
+@using PhotocopyShared.Dtos.MayInAo
+
+<section class="tdi-khung" aria-label="Tiến độ máy in" aria-live="polite">
+    @if (TrangThai == null)
+    {
+        <strong>Chờ connector nhận lệnh</strong><p>Đơn đã xếp vào hàng đợi. Chưa có phản hồi xử lý đơn này; không được coi là đã in xong.</p>
+    }
+    else
+    {
+        <div class="tdi-dau"><strong>@TenTrangThai(TrangThai.TrangThai)</strong><span>@(TrangThai.CheDo == "AO" ? "Mô phỏng" : "Windows · máy thật")</span></div>
+        <p>@TrangThai.TenFileDangIn</p>
+        @if (TrangThai.CheDo == "AO" && TrangThai.TongTrang > 0 && TrangThai.TrangDaIn != null)
+        {
+            <progress max="@TrangThai.TongTrang" value="@TrangThai.TrangDaIn" aria-label="Tiến độ mô phỏng"></progress>
+            <p>@TrangThai.TrangDaIn / @TrangThai.TongTrang trang (mô phỏng) @(TrangThai.SoGiayConLai != null ? $"· còn khoảng {TrangThai.SoGiayConLai} giây" : "")</p>
+        }
+        else if (TrangThai.CheDo == "THAT")
+        {
+            <p>Tổng đơn: @TrangThai.TongTrang trang. @(TrangThai.TrangDaIn != null ? $"Driver ghi nhận {TrangThai.TrangDaIn} trang ở các job còn trong queue — không phải tổng giấy đã ra." : "Driver chưa cung cấp số trang đã in; không hiển thị phần trăm giả.")</p>
+        }
+        @if (!string.IsNullOrWhiteSpace(TrangThai.Loi)) { <p class="tdi-loi">@TrangThai.Loi</p> }
+        @if (!string.IsNullOrWhiteSpace(TrangThai.ThongDiep)) { <p>@TrangThai.ThongDiep</p> }
+        @if (TrangThai.TrangThai == "CHO_XAC_NHAN") { <p>Đã gửi tài liệu và không còn job đang xử lý. Mở Điều khiển máy in để đối chiếu toàn bộ bản giấy; spooler chưa chứng minh giấy đã ra đủ.</p> }
+    }
+    <a class="nut-nho" href="/may-in">Mở điều khiển máy in</a>
+    <small>Không chuyển máy hoặc gửi lại đơn khi mất kết nối; cần đối chiếu lệnh cũ để tránh in trùng.</small>
+</section>
+
+@code {
+    [Parameter] public TrangThaiKetNoiMayInDto TrangThai { get; set; }
+    private static string TenTrangThai(string s) => s switch {
+        "DANG_IN" => "Máy đang xử lý lệnh in", "TAM_DUNG" => "Lệnh in đang tạm dừng",
+        "CHO_XAC_NHAN" => "Chờ kiểm tra bản giấy", "HET_GIAY" => "Máy hết giấy", "KET_GIAY" => "Máy kẹt giấy",
+        "OFFLINE" or "MAT_KET_NOI" => "Mất kết nối — giữ nguyên lệnh", "LOI" => "Có lỗi — chưa in xong", _ => "Đang chờ phản hồi máy in" };
+}

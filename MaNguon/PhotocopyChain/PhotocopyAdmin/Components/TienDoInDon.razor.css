@@ -1,0 +1,7 @@
+.tdi-khung { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--vien); border-radius: 8px; background: var(--accent-nhat); overflow-wrap: anywhere; }
+.tdi-dau { display: flex; justify-content: space-between; align-items: start; gap: 10px; flex-wrap: wrap; }
+.tdi-dau span, .tdi-khung small { color: var(--chu-phu); font-size: 13px; }
+.tdi-khung p { margin: 0; line-height: 1.7; }
+.tdi-khung progress { width: 100%; height: 14px; accent-color: var(--accent); }
+.tdi-khung a { justify-self: start; min-height: 44px; display: inline-flex; align-items: center; }
+.tdi-khung .tdi-loi { color: var(--loi, #b42318); }

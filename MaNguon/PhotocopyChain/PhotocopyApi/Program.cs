@@ -98,6 +98,9 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddSignalR();
 
 // Máy in mô phỏng và máy in vật lý sau này dùng chung luồng tự động này.
+builder.Services.AddSingleton(new PhatHienMayInStore(
+    builder.Configuration["PrinterConnector:ThuMucLienKet"] ?? Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PhotocopyChain", "PrinterLinks")));
 builder.Services.AddSingleton(new TrangThaiMayInAoStore(TimeProvider.System,
     builder.Configuration["PrinterConnector:ThuMucDieuKhien"] ?? Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PhotocopyChain", "PrinterControls")));
@@ -106,6 +109,9 @@ builder.Services.AddSingleton(new QuyenNhanLenhInStore(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "PhotocopyChain", "PrinterClaims")));
 builder.Services.AddScoped<TuDongInService>();
+builder.Services.AddSingleton(new YeuCauInCodStore(
+    builder.Configuration["PrinterConnector:ThuMucYeuCauCod"] ?? Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PhotocopyChain", "PrinterRequests")));
 builder.Services.AddHostedService<XepLaiDonChoInJob>();
 
 // F-10 / F-31: mỗi phút hủy đơn VietQR quá hạn và xóa file của các đơn đã kết thúc

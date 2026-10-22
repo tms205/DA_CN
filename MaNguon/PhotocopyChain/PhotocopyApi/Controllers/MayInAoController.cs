@@ -20,10 +20,16 @@ namespace PhotocopyApi.Controllers;
 [Route("api/may-in-ao")]
 public sealed class MayInAoController : ControllerBase
 {
+    public const string DieuKienNhanLenhSql = @"((tt.PhuongThuc='VIETQR' AND tt.TrangThai='DA_THANH_TOAN')
+        OR (tt.PhuongThuc='COD' AND dh.HinhThucNhan='TAI_QUAY'
+            AND tt.TrangThai IN ('CHUA_THANH_TOAN','DA_THANH_TOAN')
+            AND dh.MaDonHang IN (SELECT CONVERT(int,[value]) FROM OPENJSON(@DonCodDaGui))))";
     private readonly string _chuoiKetNoi;
     private readonly string _khoaConnector;
     private readonly TrangThaiMayInAoStore _trangThai;
     private readonly QuyenNhanLenhInStore _quyenNhanLenh;
+    private readonly PhatHienMayInStore _phatHien;
+    private readonly YeuCauInCodStore _yeuCauCod;
     private readonly IHubContext<CapNhatHub> _hub;
     private readonly ILogger<MayInAoController> _logger;
 
@@ -32,7 +38,8 @@ public sealed class MayInAoController : ControllerBase
         TrangThaiMayInAoStore trangThai,
         IHubContext<CapNhatHub> hub,
         ILogger<MayInAoController> logger,
-        QuyenNhanLenhInStore quyenNhanLenh)
+        QuyenNhanLenhInStore quyenNhanLenh,
+        PhatHienMayInStore phatHien = null, YeuCauInCodStore yeuCauCod = null)
     {
         _chuoiKetNoi = config.GetConnectionString("PhotocopyChain")!;
         _khoaConnector = config["PrinterConnector:ApiKey"];
@@ -40,6 +47,8 @@ public sealed class MayInAoController : ControllerBase
         _hub = hub;
         _logger = logger;
         _quyenNhanLenh = quyenNhanLenh;
+        _phatHien = phatHien;
+        _yeuCauCod = yeuCauCod ?? new YeuCauInCodStore();
     }
 
     [HttpPost("{maMayIn:int}/heartbeat")]
@@ -49,6 +58,9 @@ public sealed class MayInAoController : ControllerBase
         IActionResult loiKhoa = KiemTraKhoa();
         if (loiKhoa != null) return loiKhoa;
 
+        var lienKet = _phatHien?.LayLienKet(maMayIn);
+        if (lienKet != null && lienKet.ConnectorId != ConnectorId())
+            return Conflict(new { message = "Máy đã liên kết với connector khác." });
         using var conn = new SqlConnection(_chuoiKetNoi);
         bool tonTai = await conn.ExecuteScalarAsync<bool>(
             "SELECT CAST(CASE WHEN EXISTS (SELECT 1 FROM MayIn WHERE MaMayIn=@MaMayIn) THEN 1 ELSE 0 END AS BIT)",
@@ -77,7 +89,11 @@ public sealed class MayInAoController : ControllerBase
         if (loi != null) return loi;
         var lenh = _quyenNhanLenh.LayLenhDangIn(maMayIn);
         if (lenh != null && lenh.ConnectorId != ConnectorId()) return Conflict();
-        return Ok(_trangThai.LayDieuKhien(maMayIn));
+        var lienKet = _phatHien?.LayLienKet(maMayIn);
+        if (lienKet != null && lienKet.ConnectorId != ConnectorId()) return Conflict();
+        var dieuKhien = _trangThai.LayDieuKhien(maMayIn);
+        dieuKhien.LienKet = lienKet;
+        return Ok(dieuKhien);
     }
 
     [HttpPost("{maMayIn:int}/dieu-khien")]
@@ -109,6 +125,10 @@ public sealed class MayInAoController : ControllerBase
         IActionResult loiKhoa = KiemTraKhoa();
         if (loiKhoa != null) return loiKhoa;
 
+        if (_phatHien != null && !_phatHien.DuocNhanLenh(maMayIn, ConnectorId(),
+            Request.Headers["X-Printer-Binding-Version"].ToString()))
+            return Conflict(new { message = "Liên kết máy đã đổi. Tải lại cấu hình trước khi nhận lệnh." });
+
         var lenhDangIn = _quyenNhanLenh.LayLenhDangIn(maMayIn);
         if (lenhDangIn != null && lenhDangIn.ConnectorId != ConnectorId())
             return Conflict(new { message = "Máy đang có lệnh thuộc connector khác." });
@@ -121,11 +141,12 @@ public sealed class MayInAoController : ControllerBase
               JOIN MayIn m ON m.MaMayIn = dh.MaMayIn
               JOIN ThanhToan tt ON tt.MaDonHang = dh.MaDonHang
               WHERE dh.MaMayIn = @MaMayIn AND dh.TrangThai = 'DANG_IN'
-                AND tt.PhuongThuc='VIETQR' AND tt.TrangThai='DA_THANH_TOAN'
+                AND " + DieuKienNhanLenhSql + @"
                 AND (@MaDonDangIn IS NULL OR dh.MaDonHang = @MaDonDangIn)
                 AND (m.TrangThai = 'HOAT_DONG' OR @MaDonDangIn IS NOT NULL)
               ORDER BY dh.InGap DESC, dh.NgayDat, dh.MaDonHang",
-            new { MaMayIn = maMayIn, MaDonDangIn = lenhDangIn?.MaDonHang });
+            new { MaMayIn = maMayIn, MaDonDangIn = lenhDangIn?.MaDonHang,
+                DonCodDaGui = System.Text.Json.JsonSerializer.Serialize(_yeuCauCod.DonChoMay(maMayIn)) });
 
         if (lenh == null)
         {
@@ -135,7 +156,15 @@ public sealed class MayInAoController : ControllerBase
             return NoContent();
         }
 
-        var quyen = _quyenNhanLenh.NhanLenh(maMayIn, lenh.MaDonHang, ConnectorId());
+        QuyenNhanLenhIn quyen;
+        lock (_phatHien?.Khoa ?? _quyenNhanLenh)
+        {
+            // Đối chiếu phiên cấu hình ngay tại điểm nhận lệnh; không in vào queue cũ sau khi đổi liên kết.
+            if (_phatHien != null && !_phatHien.DuocNhanLenh(maMayIn, ConnectorId(),
+                Request.Headers["X-Printer-Binding-Version"].ToString()))
+                return Conflict(new { message = "Liên kết máy đã đổi. Connector cần tải lại cấu hình trước khi nhận lệnh." });
+            quyen = _quyenNhanLenh.NhanLenh(maMayIn, lenh.MaDonHang, ConnectorId());
+        }
         if (quyen == null) return Conflict(new { message = "Lệnh đã được connector khác nhận." });
         lenh.MaLenh = quyen.MaLenh;
 
@@ -199,7 +228,7 @@ public sealed class MayInAoController : ControllerBase
         await conn.OpenAsync();
         await using var giaoDich = await conn.BeginTransactionAsync();
         DonDangIn don = await conn.QueryFirstOrDefaultAsync<DonDangIn>(
-            @"SELECT MaDonHang, MaChiNhanh, MaKhachHang, MaMayIn, TrangThai
+            @"SELECT MaDonHang, MaChiNhanh, MaKhachHang, MaMayIn, TrangThai, LoaiPhatSinh, MaDonHangGoc
               FROM DonHang WITH (UPDLOCK, HOLDLOCK) WHERE MaDonHang = @MaDonHang",
             new { MaDonHang = maDonHang }, giaoDich);
 
@@ -219,8 +248,12 @@ public sealed class MayInAoController : ControllerBase
             "SELECT ISNULL(SUM(SoTrang * SoBan), 0) FROM ChiTietDonHang WHERE MaDonHang=@MaDonHang",
             new { MaDonHang = maDonHang }, giaoDich);
 
+        DonDangIn donGoc = null;
         try
         {
+            var files = (await conn.QueryAsync<FileCanGiu>(
+                @"SELECT DISTINCT f.MaFile, f.DuongDan FROM ChiTietDonHang ct JOIN FileIn f ON f.MaFile=ct.MaFile
+                  WHERE ct.MaDonHang=@MaDonHang AND f.DuongDan IS NOT NULL", new { MaDonHang = maDonHang }, giaoDich)).ToList();
             await conn.ExecuteAsync(
                 "sp_CapNhatTrangThaiIn",
                 new { MaDonHang = maDonHang, TrangThaiMoi = "DA_IN" },
@@ -229,6 +262,29 @@ public sealed class MayInAoController : ControllerBase
             await conn.ExecuteAsync(
                 "UPDATE MayIn SET SoTrangDaIn = SoTrangDaIn + @SoTrang WHERE MaMayIn=@MaMayIn",
                 new { SoTrang = soTrang, req.MaMayIn }, giaoDich);
+            // Tương thích thủ tục cũ: giữ PDF cho tới khi đơn thực sự hoàn tất/bị hủy.
+            foreach (var file in files)
+                await conn.ExecuteAsync("UPDATE FileIn SET TrangThai='SAN_SANG', DuongDan=@DuongDan WHERE MaFile=@MaFile", file, giaoDich);
+            if (don.LoaiPhatSinh == "IN_LAI_LOI_QUAY" && don.MaDonHangGoc != null)
+            {
+                // Giữ nghiệp vụ in lại miễn phí khi chuyển việc hoàn tất sang connector.
+                await conn.ExecuteAsync("UPDATE DonHang SET TrangThai='HOAN_THANH', NgayHoanThanh=GETDATE() WHERE MaDonHang=@MaDonHang",
+                    new { MaDonHang = maDonHang }, giaoDich);
+                don.TrangThai = "HOAN_THANH";
+                await conn.ExecuteAsync(@"UPDATE dh SET TrangThai='HOAN_THANH', NgayHoanThanh=GETDATE()
+                    FROM DonHang dh JOIN ThanhToan tt ON tt.MaDonHang=dh.MaDonHang
+                    WHERE dh.MaDonHang=@MaDonHangGoc AND dh.TrangThai='DA_IN' AND tt.TrangThai='DA_THANH_TOAN'",
+                    new { don.MaDonHangGoc }, giaoDich);
+                donGoc = await conn.QuerySingleOrDefaultAsync<DonDangIn>(
+                    "SELECT MaDonHang,MaChiNhanh,MaKhachHang,TrangThai FROM DonHang WHERE MaDonHang=@ma", new { ma = don.MaDonHangGoc }, giaoDich);
+                await conn.ExecuteAsync("DELETE FROM ThongBao WHERE MaDonHang=@MaDonHang", new { MaDonHang = maDonHang }, giaoDich);
+                await conn.ExecuteAsync(@"INSERT INTO ThongBao(MaNguoiDung,MaDonHang,TieuDe,NoiDung)
+                    SELECT MaKhachHang,MaDonHang,N'Bản in lại đã sẵn sàng',
+                        CASE WHEN TrangThai='HOAN_THANH' THEN N'Quầy đã xử lý bản in lại miễn phí và hoàn tất đơn gốc.'
+                        ELSE N'Bản in lại miễn phí đã xong. Đơn gốc vẫn chờ thu COD và bàn giao.' END
+                    FROM DonHang WHERE MaDonHang=@MaDonHangGoc", new { don.MaDonHangGoc }, giaoDich);
+            }
+            else don.TrangThai = "DA_IN";
             await giaoDich.CommitAsync();
         }
         catch (SqlException ex)
@@ -241,6 +297,7 @@ public sealed class MayInAoController : ControllerBase
         _quyenNhanLenh.HoanTat(req.MaMayIn, maDonHang, ConnectorId(), req.MaLenh);
         _trangThai.CapNhat(req.MaMayIn, "SAN_SANG");
         await GuiCapNhat(don, "Máy in đã hoàn thành đơn hàng");
+        if (donGoc != null) await GuiCapNhat(donGoc, "Bản in lại đã sẵn sàng; tiền COD vẫn thu khi bàn giao đơn gốc");
         return Ok(new KetQuaDto { Message = "Đã ghi nhận máy in hoàn thành." });
     }
 
@@ -310,7 +367,7 @@ public sealed class MayInAoController : ControllerBase
             MaDonHang = don.MaDonHang,
             MaDonHangHienThi = "DH" + don.MaDonHang.ToString("D5"),
             MaChiNhanh = don.MaChiNhanh,
-            TrangThai = "DA_IN",
+            TrangThai = don.TrangThai,
             NoiDung = noiDung
         };
         await CapNhatHub.GuiChoChiNhanh(_hub, don.MaChiNhanh, HubEvents.OrderStatusChanged, tin);
@@ -324,8 +381,16 @@ public sealed class MayInAoController : ControllerBase
         public string TrangThai { get; set; } = "";
     }
 
+    private sealed class FileCanGiu
+    {
+        public int MaFile { get; set; }
+        public string DuongDan { get; set; }
+    }
+
     private sealed class DonDangIn
     {
+        public int? MaDonHangGoc { get; set; }
+        public string LoaiPhatSinh { get; set; }
         public int MaDonHang { get; set; }
         public int MaChiNhanh { get; set; }
         public int MaKhachHang { get; set; }

@@ -1,0 +1,21 @@
+.pd-panel { padding: 22px; min-width: 0; }
+.pd-dau, .pd-chan { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+.pd-dau h2 { margin: 0; font-size: 20px; }
+.pd-dau p, .pd-phu, .pd-trong p, .pd-chan p { color: var(--chu-phu); font-size: 14px; line-height: 1.7; }
+.pd-connector { margin-top: 16px; padding: 16px; border: 1px solid var(--vien); border-radius: 8px; overflow-wrap: anywhere; }
+.pd-connector summary { cursor: pointer; min-height: 32px; }
+.pd-connector summary span { margin-left: 12px; color: var(--chu-phu); font-size: 14px; }
+.pd-queues { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 12px; }
+.pd-queue { padding: 16px; background: var(--nen); border: 1px solid var(--vien); border-radius: 6px; min-width: 0; }
+.pd-queue dl { display: grid; gap: 10px; margin-bottom: 0; font-size: 14px; }
+.pd-queue dt { color: var(--chu-phu); margin-bottom: 4px; }
+.pd-queue dd { margin: 0; }
+.pd-chan { margin-top: 16px; border-top: 1px solid var(--vien); padding-top: 12px; }
+.pd-chan p { flex: 1 1 360px; margin: 0; }
+.pd-panel button { min-height: 44px; }
+.pd-form { display: grid; gap: 18px; min-width: 0; }
+.pd-form p { margin: 0; line-height: 1.7; }
+.pd-form select { width: 100%; min-height: 44px; }
+.pd-xac-nhan { display: flex; align-items: flex-start; gap: 10px; line-height: 1.7; }
+.pd-xac-nhan input { width: 20px; height: 20px; margin-top: 4px; flex-shrink: 0; }
+@media (max-width: 600px) { .pd-panel { padding: 16px; } .pd-dau button, .pd-chan button { width: 100%; } .pd-connector { padding: 12px; } .pd-connector summary span { display: block; margin: 8px 0 0; } }

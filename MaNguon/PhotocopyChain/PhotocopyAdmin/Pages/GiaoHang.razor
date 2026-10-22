@@ -26,8 +26,10 @@
         @if (_ds == null) { <div class="gh-trong" role="status">Đang tải giao hàng…</div> }
         else
         {
-            <table class="bang-du-lieu">
-                <thead><tr><th>Đơn &amp; khách hàng</th><th>Điểm lấy / giao</th><th>Thanh toán</th><th>Lượt giao &amp; trạng thái</th><th>Shipper / thao tác</th></tr></thead>
+            <div class="bang-cuon">
+            <table class="bang gh-bang">
+                <colgroup><col class="gh-cot-don" /><col class="gh-cot-dia-chi" /><col class="gh-cot-tien" /><col class="gh-cot-trang-thai" /><col class="gh-cot-shipper" /></colgroup>
+                <thead><tr><th scope="col">Đơn &amp; khách hàng</th><th scope="col">Điểm lấy / giao</th><th scope="col">Thanh toán</th><th scope="col">Lượt giao &amp; trạng thái</th><th scope="col">Shipper / thao tác</th></tr></thead>
                 <tbody>
                 @foreach (var don in Loc())
                 {
@@ -53,6 +55,7 @@
                 @if (!Loc().Any()) { <tr><td colspan="5" class="gh-trong">Không có đơn/lượt phù hợp.</td></tr> }
                 </tbody>
             </table>
+            </div>
         }
     </div>
 </div>

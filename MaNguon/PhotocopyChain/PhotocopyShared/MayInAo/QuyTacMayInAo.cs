@@ -5,6 +5,11 @@ namespace PhotocopyShared.MayInAo;
 /// <summary>Các phép tính thuần dùng chung giữa API, simulator và kiểm thử.</summary>
 public static class QuyTacMayInAo
 {
+    public static bool DuocNhanLenh(string phuongThuc, string thanhToan, string hinhThucNhan) =>
+        (phuongThuc == "VIETQR" && thanhToan == "DA_THANH_TOAN")
+        || (phuongThuc == "COD" && hinhThucNhan == "TAI_QUAY"
+            && thanhToan is "CHUA_THANH_TOAN" or "DA_THANH_TOAN");
+
     public static bool FilePhucHoiHopLe(int soTrangCu, int soTrangMoi, string trangThaiMoi, bool conFile)
     {
         return soTrangCu > 0 && soTrangCu == soTrangMoi && trangThaiMoi == "SAN_SANG" && conFile;

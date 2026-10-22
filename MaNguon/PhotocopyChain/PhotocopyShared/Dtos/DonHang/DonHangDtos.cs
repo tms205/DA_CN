@@ -162,6 +162,8 @@ public sealed class MocTienDoDto
 /// <summary>F-11: chi tiết 1 đơn — dùng chung cho App (màn Theo dõi tiến độ) và Web (panel bên phải).</summary>
 public sealed class DonHangChiTietDto
 {
+    public int? MaMayIn { get; set; }
+    public bool DaGuiLenhIn { get; set; }
     public int MaDonHang { get; set; }
     public string MaDonHangHienThi { get; set; } = "";
     public int? MaDonHangGoc { get; set; }

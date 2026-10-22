@@ -90,6 +90,7 @@ public sealed class DieuKhienMayInRequest
 // Chỉ trả cho connector qua khóa riêng, tuyệt đối không trả mã lệnh này ra web.
 public sealed class DieuKhienMayInDto
 {
+    public LienKetMayInDto? LienKet { get; set; }
     public bool TamDung { get; set; }
     public string? LoiMoPhong { get; set; }
     public string? MaLenhXacNhan { get; set; }
