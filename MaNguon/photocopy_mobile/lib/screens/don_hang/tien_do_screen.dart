@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../api.dart';
@@ -6,6 +7,8 @@ import '../../models.dart';
 import '../../realtime.dart';
 import '../../theme.dart';
 import '../../widgets/icons.dart';
+import '../../widgets/huy_don.dart';
+import '../../widgets/gio_in_xong.dart';
 import '../../widgets/widgets.dart';
 import 'don_hang_screen.dart';
 
@@ -25,33 +28,64 @@ class TienDoScreen extends StatefulWidget {
 class _TienDoScreenState extends State<TienDoScreen> {
   DonHangChiTiet? _don; // null = đang tải
   String? _loi;
+  Future<void>? _dangTaiDon;
+  bool _canTaiLai = false;
+  Timer? _nhipTienDo;
 
   @override
   void initState() {
     super.initState();
     _taiDon();
     Realtime.dangKyNghe(_khiCoTin);
+    // Chỉ màn đơn đang in, đang mở và app ở foreground mới làm mới 10 giây/lần.
+    // _taiDon đã gộp request đang chạy, nên không tạo nhiều truy vấn chồng nhau.
+    _nhipTienDo = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted &&
+          _don?.trangThaiDonHang == 'DANG_IN' &&
+          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed &&
+          ModalRoute.of(context)?.isCurrent == true) {
+        _taiDon();
+      }
+    });
   }
 
   @override
   void dispose() {
     Realtime.boNghe(_khiCoTin);
+    _nhipTienDo?.cancel();
+    _canTaiLai = false;
     super.dispose();
   }
 
   // GET /api/don-hang/{maDonHang}
-  Future<void> _taiDon() async {
-    KetQuaApi kq = await Api.get('/api/don-hang/${widget.maDonHang}');
-    if (!mounted) return;
-
-    if (!kq.thanhCong) {
-      setState(() => _loi = kq.loi);
-      return;
+  Future<void> _taiDon() {
+    if (!mounted) return Future.value();
+    if (_dangTaiDon != null) {
+      // Nhiều tin SignalR/refresh cùng lúc chỉ cần một lượt bù sau phản hồi hiện tại.
+      _canTaiLai = true;
+      return _dangTaiDon!;
     }
-    setState(() {
-      _loi = null;
-      _don = DonHangChiTiet.fromJson(kq.duLieu);
-    });
+    return _dangTaiDon = _docDon();
+  }
+
+  Future<void> _docDon() async {
+    try {
+      do {
+        _canTaiLai = false;
+        KetQuaApi kq = await Api.get('/api/don-hang/${widget.maDonHang}');
+        if (!mounted) return;
+        setState(() {
+          if (!kq.thanhCong) {
+            _loi = kq.loi;
+          } else {
+            _loi = null;
+            _don = DonHangChiTiet.fromJson(kq.duLieu);
+          }
+        });
+      } while (_canTaiLai && mounted);
+    } finally {
+      _dangTaiDon = null;
+    }
   }
 
   // Máy chủ báo đơn này vừa đổi trạng thái
@@ -86,24 +120,47 @@ class _TienDoScreenState extends State<TienDoScreen> {
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 26),
           children: [
             _theDon(),
+            if (_don!.choPhepHuy) ...[
+              const SizedBox(height: 12),
+              NutHuyDon(
+                maDonHang: widget.maDonHang,
+                daThanhToan: _don!.daTra,
+                daHuy: _taiDon,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Bạn có thể hủy trước khi bắt đầu in. Khi đơn chuyển sang Đang in, chức năng hủy sẽ không còn khả dụng.',
+                style: AppTheme.font(size: 11.5, color: AppColors.chuPhu),
+              ),
+            ],
+            if (_don!.choPhepBoSungHoanTien) ...[
+              const SizedBox(height: 12),
+              NutHuyDon(
+                maDonHang: widget.maDonHang,
+                capNhatHoanTien: true,
+                thongTinHoanTien: _don!.thongTinHoanTien,
+                daHuy: _taiDon,
+              ),
+            ],
+            if (_don!.trangThaiDonHang == 'DA_HUY' &&
+                (_don!.ghiChu?.trim().isNotEmpty ?? false)) ...[
+              const SizedBox(height: 12),
+              KhungNetDut(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    _don!.ghiChu!,
+                    style: AppTheme.font(size: 12, height: 1.5),
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 14),
             _khoiTienDo(),
             const SizedBox(height: 14),
             _khoiTaiLieu(),
             const SizedBox(height: 14),
             _khoiThanhToan(),
-            if (_don!.trangThaiDonHang == 'CHO_XAC_NHAN') ...[
-              const SizedBox(height: 14),
-              NutPhu(
-                nhan: 'Hủy đơn',
-                icon: const AppIcon(
-                  Ico.chamThan,
-                  size: 17,
-                  color: AppColors.loiChu,
-                ),
-                onPressed: _huyDon,
-              ),
-            ],
             if (_don!.trangThaiDonHang == 'HOAN_THANH' && !_don!.daDanhGia) ...[
               const SizedBox(height: 14),
               NutChinh(
@@ -211,6 +268,11 @@ class _TienDoScreenState extends State<TienDoScreen> {
               ),
             ],
           ),
+          GioInXong(
+            trangThai: d.trangThaiDonHang,
+            duKien: d.ngayHenTra,
+            giaoHang: d.laGiaoTanNoi,
+          ),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 10),
             child: Divider(height: 1, color: AppColors.vach),
@@ -219,12 +281,14 @@ class _TienDoScreenState extends State<TienDoScreen> {
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              Text(
-                d.daTra ? 'Đã thanh toán' : 'Phải trả khi nhận',
-                style: AppTheme.font(
-                  size: 11.5,
-                  weight: FontWeight.w600,
-                  color: d.daTra ? AppColors.thanhCong : AppColors.cbChu,
+              Flexible(
+                child: Text(
+                  d.nhanThanhToan,
+                  style: AppTheme.font(
+                    size: 11.5,
+                    weight: FontWeight.w600,
+                    color: d.daTra ? AppColors.thanhCong : AppColors.cbChu,
+                  ),
                 ),
               ),
               const Spacer(),
@@ -446,7 +510,7 @@ class _TienDoScreenState extends State<TienDoScreen> {
                 ),
               ),
           ],
-          if (d.ghiChu != null) ...[
+          if (d.ghiChu != null && d.trangThaiDonHang != 'DA_HUY') ...[
             const SizedBox(height: 10),
             KhungNetDut(
               child: Padding(
@@ -580,43 +644,6 @@ class _TienDoScreenState extends State<TienDoScreen> {
         ],
       ),
     );
-  }
-
-  Future<void> _huyDon() async {
-    TextEditingController lyDo = TextEditingController(
-      text: 'Tôi không còn nhu cầu in',
-    );
-    bool? dongY = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Hủy đơn hàng?'),
-        content: TextField(
-          controller: lyDo,
-          maxLength: 255,
-          decoration: const InputDecoration(labelText: 'Lý do hủy'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Không'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Hủy đơn'),
-          ),
-        ],
-      ),
-    );
-    if (dongY != true) return;
-    KetQuaApi kq = await Api.post('/api/don-hang/${widget.maDonHang}/huy', {
-      'lyDo': lyDo.text.trim(),
-    });
-    if (!mounted) return;
-    hienThongBaoNhanh(
-      context,
-      kq.thanhCong ? (kq.duLieu['message'] ?? 'Đã hủy đơn.') : kq.loi,
-    );
-    if (kq.thanhCong) _taiDon();
   }
 
   Future<void> _danhGia() async {

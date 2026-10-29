@@ -1,0 +1,13 @@
+<div class="bang-dang-tai" role="status" aria-live="polite" aria-busy="true">
+    <span class="tai-nhan">@NoiDung</span>
+    <div class="tai-khung" aria-hidden="true">
+        @for (int i = 0; i < 3; i++)
+        {
+            <div class="tai-hang"><span></span><span></span><span></span></div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string NoiDung { get; set; } = "Đang tải dữ liệu…";
+}

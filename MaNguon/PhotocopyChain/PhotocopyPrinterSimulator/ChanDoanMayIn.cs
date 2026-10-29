@@ -42,7 +42,7 @@ public static class ChanDoanMayIn
             }
             var ds = new PhatHienMayInWindows().Quet();
             Console.WriteLine("Queue đã cài cho tài khoản Windows hiện tại (không khẳng định máy đang online):");
-            foreach (var q in ds) Console.WriteLine($"- {q.Ten} | {q.Driver} | {q.Cong} | {(q.LaMayAo ? "ẢO / XUẤT FILE" : "CHƯA KIỂM CHỨNG VẬT LÝ")} | {q.SoJob} job");
+            foreach (var q in ds) Console.WriteLine($"- {q.Ten} | {q.Driver} | {q.Cong} | {(q.LaMayAo ? "ẢO / XUẤT FILE" : "CHƯA KIỂM CHỨNG VẬT LÝ")} | {q.SoJob} job | Khổ từ driver: {(q.KhoGiayHoTro == null ? "Chưa rõ" : string.Join(", ", q.KhoGiayHoTro))}");
             int index = Array.IndexOf(args, "--in-thu");
             if (index < 0) return 0;
             string ten = index + 1 < args.Length ? args[index + 1] : "";

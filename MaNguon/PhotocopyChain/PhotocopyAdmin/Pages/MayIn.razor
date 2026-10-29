@@ -25,7 +25,7 @@
                     var tt = TrangThai(m.MaMayIn);
                     <button type="button" class="mi-may @(_maMay == m.MaMayIn ? "chon" : "")" aria-pressed="@(_maMay == m.MaMayIn ? "true" : "false")" @onclick="() => ChonMay(m.MaMayIn)">
                         <span class="mi-icon">@((MarkupString)Svg.MayIn(24))</span>
-                        <span class="mi-may-chu"><strong>@m.TenMay</strong><small>@m.TenChiNhanh</small><span>@TenTrangThai(tt.TrangThai)</span></span>
+                        <span class="mi-may-chu"><strong>@TenThietBi(m)</strong><small>@(LaMayThat(m) ? "Máy thật · Windows" : "Máy ảo · Mô phỏng") · @m.TenChiNhanh</small><span>@TenTrangThai(tt.TrangThai)</span></span>
                         <span class="mi-led @(SanSang(tt) ? "online" : "")" aria-hidden="true"></span>
                     </button>
                 }
@@ -34,9 +34,9 @@
             {
                 var tt = TrangThai(may.MaMayIn);
                 bool ngoaiTuyen = tt.TrangThai == "MAT_KET_NOI";
-                bool that = tt.CheDo == "THAT";
+                bool that = LaMayThat(may);
                 <section class="mi-console the" aria-label="Điều khiển máy đã chọn">
-                    <div class="mi-console-dau"><div><span class="mi-nhan">THIẾT BỊ #@may.MaMayIn</span><h2>@may.TenMay</h2><p>@may.TenChiNhanh</p></div><span class="nhan-mau @(that ? "nhan-xanh" : "nhan-xam")">@(that ? "Máy thật · Windows" : "Máy ảo · Mô phỏng")</span></div>
+                    <div class="mi-console-dau"><div><span class="mi-nhan">THIẾT BỊ #@may.MaMayIn</span><h2>@TenThietBi(may)</h2><p>@may.TenChiNhanh</p>@if (that) { <small>Danh mục: @may.TenMay · giữ nguyên mã máy và lịch sử đơn</small> }</div><span class="nhan-mau @(that ? "nhan-xanh" : "nhan-xam")">@(that ? "Máy thật · Windows" : "Máy ảo · Mô phỏng")</span></div>
                     <div class="mi-lcd" aria-label="Màn hình trạng thái">
                         <div class="mi-lcd-dau"><span>TRẠNG THÁI</span><strong>@TenTrangThai(tt.TrangThai)</strong></div>
                         @if (tt.MaDonHangDangIn != null)
@@ -64,10 +64,10 @@
                         <button type="button" class="nut-chinh" disabled="@(_dangGui || ngoaiTuyen || !tt.TamDung)" @onclick='() => GuiAsync("TIEP_TUC")'>Tiếp tục</button>
                         <a class="nut-phu" href="/">Xem hàng đợi đơn</a>
                     </div>
-                    <dl class="mi-thong-so"><div><dt>Khổ giấy tối đa</dt><dd>@may.KhoGiay</dd></div><div><dt>Tốc độ danh mục</dt><dd>@may.TocDo trang/phút</dd></div><div><dt>Màu / hai mặt</dt><dd>@(may.InMau ? "Có màu" : "Đen trắng") · @(may.In2Mat ? "Hai mặt" : "Một mặt")</dd></div><div><dt>Counter đã hoàn tất</dt><dd>@may.SoTrangDaIn trang</dd></div></dl>
+                    <dl class="mi-thong-so"><div><dt>@(that ? "Khổ giấy từ driver" : "Khổ giấy tối đa")</dt><dd>@(that ? (may.KetNoi?.HangDoi?.KhoGiayHoTro is { Count: > 0 } kho ? string.Join(", ", kho) : "Chưa xác nhận từ driver") : may.KhoGiay)</dd></div><div><dt>Tốc độ danh mục</dt><dd>@may.TocDo trang/phút</dd></div><div><dt>Màu / hai mặt</dt><dd>@(that ? $"Màu: {NangLuc(may.KetNoi?.HangDoi?.InMau)} · Hai mặt: {NangLuc(may.KetNoi?.HangDoi?.InHaiMat)}" : $"{(may.InMau ? "Có màu" : "Đen trắng")} · {(may.In2Mat ? "Hai mặt" : "Một mặt")}")</dd></div><div><dt>Counter đã hoàn tất</dt><dd>@may.SoTrangDaIn trang</dd></div></dl>
                     @if (that)
                     {
-                        <div class="mi-ghi-chu"><strong>Queue Windows: @(tt.TenHangDoi ?? "Chưa cấu hình")</strong><p>USB và mạng dùng driver đã cài trên máy connector. Tạm dừng không thu hồi những trang đã vào máy; kiểm tra tại thiết bị nếu driver không nhận diện được job.</p></div>
+                        <div class="mi-ghi-chu"><strong>Queue Windows: @(may.KetNoi?.TenHangDoi ?? tt.TenHangDoi ?? "Chưa cấu hình")</strong><p>USB và mạng dùng driver đã cài trên máy connector. Tạm dừng không thu hồi những trang đã vào máy; kiểm tra tại thiết bị nếu driver không nhận diện được job.</p></div>
                         @if (tt.TrangThai == "CHO_XAC_NHAN")
                         {
                             <div class="mi-xac-nhan"><strong>Cần kiểm tra bản giấy</strong><p>Đối chiếu đủ tất cả file, trang, số bản và quy cách. Job biến mất khỏi Windows không chứng minh giấy đã in đủ.</p>
@@ -103,6 +103,10 @@
     private string _loi, _thongBao;
     private DateTime? _capNhat;
     private MayInQuanTriDto MayDaChon => _danhMuc.FirstOrDefault(x => x.MaMayIn == _maMay);
+    private bool LaMayThat(MayInQuanTriDto may) => (may.KetNoi?.CheDo ?? TrangThai(may.MaMayIn).CheDo) == "THAT";
+    private string TenThietBi(MayInQuanTriDto may) => LaMayThat(may)
+        ? may.KetNoi?.TenHangDoi ?? TrangThai(may.MaMayIn).TenHangDoi ?? may.TenMay : may.TenMay;
+    private static string NangLuc(bool? value) => value == null ? "Chưa rõ" : value.Value ? "Có" : "Không";
     private TrangThaiKetNoiMayInDto TrangThai(int ma) => _trangThai.FirstOrDefault(x => x.MaMayIn == ma) ?? new() { MaMayIn = ma, TrangThai = "MAT_KET_NOI" };
     private bool SanSang(TrangThaiKetNoiMayInDto t) => t.TrangThai is "SAN_SANG" or "DANG_IN" or "CHO_XAC_NHAN";
     private static string TenTrangThai(string s) => s switch {

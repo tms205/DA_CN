@@ -1,0 +1,24 @@
+.bt-page { max-width: 1320px; }
+.bt-card { background: #fff; border: 1px solid #dce5ee; border-radius: 12px; box-shadow: 0 3px 12px rgba(28, 58, 85, .04); }
+.bt-status { display: flex; gap: 16px; align-items: center; padding: 22px 24px; margin-bottom: 18px; }
+.bt-status-icon { width: 48px; height: 48px; flex: none; display: grid; place-items: center; border-radius: 13px; }
+.bt-status-icon.is-online { background: #e6f5ef; color: #20845c; }
+.bt-status-icon.is-maintenance { background: #fff2db; color: #a35b0b; }
+.bt-status-copy { flex: 1; min-width: 0; }
+.bt-eyebrow, .bt-preview-label { font-size: 11px; font-weight: 800; letter-spacing: .09em; color: #60768b; }
+.bt-status h2 { font-size: 19px; color: #173149; margin: 5px 0; }
+.bt-status p, .bt-section-head p { margin: 0; color: #566d81; line-height: 1.5; font-size: 13px; }
+.bt-pill { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; border-radius: 999px; padding: 7px 11px; font-size: 12px; font-weight: 700; }
+.bt-pill span { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.bt-pill.is-online { color: #1d7652; background: #e9f7f0; }.bt-pill.is-maintenance { color: #90510c; background: #fff2dc; }
+.bt-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(260px, 1fr); gap: 18px; align-items: start; }
+.bt-main, .bt-info { padding: 24px; min-width: 0; }.bt-main h2, .bt-info h2 { margin: 0 0 6px; font-size: 16px; color: #1b3247; }
+.bt-section-head { margin-bottom: 22px; }.bt-label { display: block; color: #263d53; font-size: 13px; font-weight: 700; margin-bottom: 8px; }.bt-label span { color: #aa4b32; }
+textarea { width: 100%; resize: vertical; min-height: 120px; border: 1px solid #bfcedb; border-radius: 8px; padding: 12px; font: inherit; color: #1c3349; line-height: 1.5; }
+textarea:focus { outline: 2px solid #9cc7e5; outline-offset: 1px; border-color: #15517f; }.bt-count { color: #5f7487; font-size: 12px; text-align: right; margin-top: 6px; }
+.bt-preview { margin-top: 20px; padding: 16px; border: 1px solid #f1d9ac; background: #fffbf3; border-radius: 9px; overflow-wrap: anywhere; }.bt-preview-label { display: block; margin-bottom: 9px; }.bt-preview strong { color: #70440e; }.bt-preview p { white-space: pre-wrap; margin: 7px 0 0; color: #765a38; font-size: 13px; line-height: 1.5; }
+.bt-actions, .bt-dialog-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }.bt-primary, .bt-secondary { border-radius: 8px; padding: 10px 16px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }.bt-primary { color: white; background: #15517f; border: 1px solid #15517f; }.bt-secondary { color: #23455f; background: white; border: 1px solid #b7c9d8; }.bt-primary:disabled,.bt-secondary:disabled { opacity: .55; cursor: not-allowed; }.bt-primary:focus-visible,.bt-secondary:focus-visible { outline: 3px solid #8dbde0; outline-offset: 2px; }
+.bt-info-icon { color: #15517f; margin-bottom: 10px; }.bt-info ol { margin: 16px 0 20px; padding-left: 22px; color: #455f73; line-height: 1.6; font-size: 13px; }.bt-info li + li { margin-top: 9px; }.bt-warning { padding: 13px; border-radius: 8px; background: #fff6e8; color: #70440e; font-size: 13px; line-height: 1.5; }.bt-warning p { margin: 5px 0 0; }
+.bt-error, .bt-success { margin-top: 16px; border-radius: 8px; padding: 11px 13px; font-size: 13px; }.bt-error { background: #fff0ef; color: #a42b27; }.bt-success { background: #eaf7ef; color: #256e4b; }.bt-loading { padding: 24px; color: #425b71; }
+.bt-overlay { position: fixed; inset: 0; z-index: 1200; display: grid; place-items: center; padding: 20px; background: rgba(13, 29, 44, .55); }.bt-dialog { width: min(100%, 460px); background: #fff; border-radius: 14px; padding: 26px; box-shadow: 0 18px 60px #10293f40; }.bt-dialog-icon { color: #a65d0e; }.bt-dialog h2 { color: #1c3349; font-size: 19px; margin: 12px 0 8px; }.bt-dialog p { color: #526a7e; line-height: 1.6; font-size: 13px; }.bt-dialog-actions { justify-content: flex-end; }
+@media (max-width: 850px) { .bt-grid { grid-template-columns: 1fr; } }.bt-status { flex-wrap: wrap; } @media (max-width: 480px) { .bt-status, .bt-main, .bt-info { padding: 18px; }.bt-pill { margin-left: 64px; }.bt-actions button { width: 100%; } }

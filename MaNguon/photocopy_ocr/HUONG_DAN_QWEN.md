@@ -20,15 +20,15 @@ Hai ảnh chứa **cùng một đoạn chữ 4 dòng**, một ảnh toàn trang 
 | Qwen 2B Q4_K_M | 20,25 giây | 8,04 giây | 5/28 từ |
 | Qwen 4B Q4_K_M | 31,27 giây | 13,39 giây | 3/28 từ |
 
-Thời gian trên là từng lượt nhận dạng, không gồm nạp model. 2B mất thêm 3,67 giây nạp, 4B thêm 6,67 giây trong lượt đo. Các kết quả không bị cắt token. Chép tay đối chiếu từ ảnh được ghi trong `reports/doi-chieu-qwen-20261022.json`, cần nhóm xác nhận lại dấu/câu. Cách đếm từ là tách theo khoảng trắng, giữ dấu/chữ hoa/dấu câu; không phải đánh giá chuyên gia tiếng Việt.
+Thời gian trên là từng lượt nhận dạng, không gồm nạp model. 2B mất thêm 3,67 giây nạp, 4B thêm 6,67 giây trong lượt đo. Các kết quả không bị cắt token. Chép tay đối chiếu từ ảnh được ghi trong file đối chiếu trong bản sao lưu OCR, cần nhóm xác nhận lại dấu/câu. Cách đếm từ là tách theo khoảng trắng, giữ dấu/chữ hoa/dấu câu; không phải đánh giá chuyên gia tiếng Việt.
 
 Trên ảnh cắt sát chữ, 4B vẫn nhầm ví dụ `mây → mấy`, `đi → cứ`, `trả → xả`. Không tự sửa những từ này trong file kết quả để làm đẹp số đo. CER tương ứng: 2B toàn trang 10,17%, 2B crop 5,93%, 4B toàn trang 6,78%, 4B crop 4,24% trên bản chép đối chiếu 118 ký tự sau chuẩn hóa khoảng trắng. Không diễn giải thành “độ chính xác 95,76%” hoặc suy rộng cho trang khác.
 
 Kết quả thô:
 
-- 2B: `reports/qwen-20261022-092943-409207/`.
-- 4B: `reports/qwen-20261022-093412-571375/`.
-- So sánh với VietOCR: bản cũ cho nhiều câu không liên quan ngay cả khi khoanh từng dòng; xem `reports/doi-chung-4-dong-20261022-092248/`. Hai bộ dùng phương thức xử lý khác nhau, không coi đây là so sánh kiểm soát hoàn toàn.
+- 2B: `photocopy_ocr_backup_20261028/reports/qwen-20261022-092943-409207/`.
+- 4B: `photocopy_ocr_backup_20261028/reports/qwen-20261022-093412-571375/`.
+- So sánh với VietOCR: bản cũ cho nhiều câu không liên quan ngay cả khi khoanh từng dòng; xem `photocopy_ocr_backup_20261028/reports/doi-chung-4-dong-20261022-092248/`. Hai bộ dùng phương thức xử lý khác nhau, không coi đây là so sánh kiểm soát hoàn toàn.
 
 Với dữ liệu này, 4B phù hợp hơn để tiếp tục thử có người kiểm tra; 2B dùng khi ưu tiên thời gian. Chưa kết luận model đọc tốt mọi ảnh vở, công thức, bảng hoặc mọi kiểu chữ.
 
@@ -63,7 +63,7 @@ File ảnh phải là JPG/PNG tĩnh, tối đa 10 MB và 20 megapixel. Hủy ch�
 
 ## Cài lại trên máy khác
 
-1. Tạo `.venv` Python 3.11 và cài dependency theo README gốc, gồm PyTorch CUDA 12.4. Runtime dùng DLL CUDA trong `torch/lib`, không yêu cầu cài CUDA Toolkit riêng.
+1. Tạo `.venv` Python 3.11 và cài dependency theo phần cài lại trong README.md, gồm PyTorch CUDA 12.4. Runtime dùng DLL CUDA trong `torch/lib`, không yêu cầu cài CUDA Toolkit riêng.
 2. Tải model/runtime bằng script:
 
 ```powershell
@@ -75,4 +75,4 @@ Script tải từ Qwen và ggml-org, kiểm SHA256, hỗ trợ tải tiếp file
 
 ## Những phần cần tiếp tục đánh giá
 
-Tập 20–30 ảnh thực tế từ nhiều người, mỗi ảnh có bản chép đối chiếu; ghi CER/WER, lỗi dấu/chữ và thiếu dòng; tách ảnh dùng điều chỉnh prompt khỏi ảnh kiểm tra cuối. Tính năng hiện là bộ thử local, chưa nối web/mobile. Nhóm phải ghi nhận đây là model có sẵn được tích hợp, không phải do nhóm tự huấn luyện.
+Tập 20–30 ảnh thực tế từ nhiều người, mỗi ảnh có bản chép đối chiếu; ghi CER/WER, lỗi dấu/chữ và thiếu dòng; tách ảnh dùng điều chỉnh prompt khỏi ảnh kiểm tra cuối. Tính năng đã có màn hình web và mobile; xem README.md để sử dụng. Nhóm phải ghi nhận đây là model có sẵn được tích hợp, không phải do nhóm tự huấn luyện.

@@ -409,6 +409,8 @@ class DonHangChiTiet {
       ''; // CHUA_THANH_TOAN / DA_THANH_TOAN / DA_HOAN_TIEN
 
   String? tenNhanVien;
+  bool choPhepBoSungHoanTien = false;
+  Map<String, dynamic>? thongTinHoanTien;
   String? tenMayIn;
   String? tenShipper;
   String? soDienThoaiShipper;
@@ -447,6 +449,10 @@ class DonHangChiTiet {
     trangThaiThanhToan = json['trangThaiThanhToan'] ?? '';
 
     tenNhanVien = json['tenNhanVien'];
+    choPhepBoSungHoanTien = json['choPhepBoSungHoanTien'] == true;
+    thongTinHoanTien = json['thongTinHoanTien'] is Map
+        ? Map<String, dynamic>.from(json['thongTinHoanTien'])
+        : null;
     tenMayIn = json['tenMayIn'];
     tenShipper = json['tenShipper'];
     soDienThoaiShipper = json['soDienThoaiShipper'];
@@ -473,6 +479,20 @@ class DonHangChiTiet {
   bool get laGiaoTanNoi => hinhThucNhan == 'GIAO_HANG';
 
   bool get daTra => trangThaiThanhToan == 'DA_THANH_TOAN';
+
+  bool get choPhepHuy =>
+      trangThaiDonHang == 'CHO_XAC_NHAN' || trangThaiDonHang == 'DA_XAC_NHAN';
+
+  String get nhanThanhToan {
+    if (trangThaiThanhToan == 'DA_HOAN_TIEN') return 'Đã hoàn tiền';
+    if (trangThaiDonHang == 'DA_HUY') {
+      return daTra ? 'Đã hủy · Chờ hoàn tiền' : 'Đã hủy · Không cần thanh toán';
+    }
+    if (daTra) return 'Đã thanh toán';
+    return phuongThucThanhToan == 'VIETQR'
+        ? 'Chờ thanh toán QR'
+        : 'Phải trả khi nhận';
+  }
 }
 
 // ============================================================ Thanh toán (ThanhToanDto)

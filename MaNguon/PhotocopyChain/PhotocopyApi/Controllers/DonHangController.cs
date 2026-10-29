@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.Data;
 using PhotocopyApi.GiaoHang;
 using System.Text.Json;
@@ -17,6 +17,7 @@ using PhotocopyShared.Dtos;
 using PhotocopyShared.Dtos.DanhMuc;
 using PhotocopyShared.Dtos.DatIn;
 using PhotocopyShared.Dtos.DonHang;
+using PhotocopyShared.Dtos.MayInAo;
 using PhotocopyShared.Dtos.Tuan3;
 using PhotocopyShared.MayInAo;
 using PhotocopyShared.KiemTraDuLieu;
@@ -35,15 +36,17 @@ public class DonHangController : ControllerBase
     private readonly IHubContext<CapNhatHub> _hub;
     private readonly TrangThaiMayInAoStore _trangThaiMay;
     private readonly YeuCauInCodStore _yeuCauCod;
+    private readonly PhatHienMayInStore _phatHienMay;
 
     public DonHangController(IConfiguration config, IMemoryCache boNhoTam, IHubContext<CapNhatHub> hub, GeoapifyService giaoHang = null,
-        TrangThaiMayInAoStore trangThaiMay = null, YeuCauInCodStore yeuCauCod = null)
+        TrangThaiMayInAoStore trangThaiMay = null, YeuCauInCodStore yeuCauCod = null, PhatHienMayInStore phatHienMay = null)
     {
         _giaoHang = giaoHang ?? new GeoapifyService(config, boNhoTam);
         _hub = hub;
         _chuoiKetNoi = config.GetConnectionString("PhotocopyChain");
         _trangThaiMay = trangThaiMay ?? new TrangThaiMayInAoStore();
         _yeuCauCod = yeuCauCod ?? new YeuCauInCodStore();
+        _phatHienMay = phatHienMay;
     }
 
     // =================================================================== PHÍA KHÁCH HÀNG (App)
@@ -60,6 +63,9 @@ public class DonHangController : ControllerBase
         var danhSach = await conn.QueryAsync<DonHangTomTatDto>(
             TruyVanSql.DonHang.CuaKhachHang,
             new { MaKhachHang = maKhachHang });
+        foreach (var don in danhSach)
+            don.ThoiGianDuKienHoanThanh = don.TrangThaiDonHang == "DANG_IN"
+                ? _trangThaiMay.LayDuKienInXong(don.MaDonHang, don.MaMayIn) : null;
         return Ok(danhSach);
     }
 
@@ -488,6 +494,8 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
         DateTime? gioNhanGiao = await conn.ExecuteScalarAsync<DateTime?>(
             "SELECT MAX(NgayNhan) FROM GiaoHang WHERE MaDonHang = @MaDonHang", new { MaDonHang = maDonHang });
 
+        don.NgayHenTra = don.TrangThaiDonHang == "DANG_IN"
+            ? _trangThaiMay.LayDuKienInXong(don.MaDonHang, don.MaMayIn) : null;
         don.TienDo = DungTienDo(don, gioNhanGiao);
         don.DaGuiLenhIn = don.MaMayIn != null && _yeuCauCod.DaDangKy(maDonHang, don.MaMayIn.Value);
         return Ok(don);
@@ -513,6 +521,9 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
         {
             MaChiNhanh = vaiTro == VaiTro.SuperAdmin ? null : maChiNhanh
         });
+        foreach (var don in danhSach)
+            don.NgayHenTra = don.TrangThaiDonHang == "DANG_IN"
+                ? _trangThaiMay.LayDuKienInXong(don.MaDonHang, don.MaMayIn) : null;
         return Ok(danhSach);
     }
 
@@ -534,6 +545,8 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
         YeuCauMayIn yeuCau = await conn.QueryFirstAsync<YeuCauMayIn>(
             TruyVanSql.DonHang.YeuCauMayIn,
             new { MaDonHang = maDonHang });
+        var quyCach = (await conn.QueryAsync<DongLenhInDto>(TruyVanSql.DonHang.QuyCachMayIn,
+            new { MaDonHang = maDonHang })).ToList();
 
         var dsMay = (await conn.QueryAsync<MayIn>(
             "SELECT * FROM MayIn WHERE MaChiNhanh = @MaChiNhanh ORDER BY MaMayIn",
@@ -551,6 +564,7 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
                 In2Mat = may.In2Mat,
                 TocDo = may.TocDo,
                 TrangThai = may.TrangThai,
+                KetNoi = _phatHienMay?.LayKetNoi(may.MaMayIn),
                 DapUngDuoc = true
             };
 
@@ -568,6 +582,9 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
                     dto.LyDoKhongDapUng = "Không " + thieu;
                 }
             }
+
+            string loiThietBi = _phatHienMay?.KiemTraQuyCach(may.MaMayIn, quyCach);
+            if (loiThietBi != null) { dto.DapUngDuoc = false; dto.LyDoKhongDapUng = loiThietBi; }
 
             ketQua.Add(dto);
         }
@@ -676,6 +693,7 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
         public string TrangThai { get; set; }
         public string PhuongThuc { get; set; }
         public string TrangThaiThanhToan { get; set; }
+        public string GhiChu { get; set; }
     }
 
     private sealed class FilePhucHoi
@@ -731,6 +749,10 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
         var ketNoi = _trangThaiMay.LayTatCa().FirstOrDefault(x => x.MaMayIn == req.MaMayIn);
         if (ketNoi == null || ketNoi.TrangThai is not ("SAN_SANG" or "DANG_IN"))
             return Conflict(new { message = "Máy chưa kết nối hoặc đang lỗi/tạm dừng. Kiểm tra connector trước khi gửi đơn." });
+        var quyCach = (await conn.QueryAsync<DongLenhInDto>(TruyVanSql.DonHang.QuyCachMayIn,
+            new { MaDonHang = maDonHang }, giaoDich)).ToList();
+        string loiThietBi = _phatHienMay?.KiemTraQuyCach(req.MaMayIn.Value, quyCach);
+        if (loiThietBi != null) return Conflict(new { message = loiThietBi });
         var dsFile = (await conn.QueryAsync<FilePhucHoi>(
             @"SELECT f.TrangThai, f.DuongDan FROM ChiTietDonHang ct JOIN FileIn f ON f.MaFile=ct.MaFile
               WHERE ct.MaDonHang=@MaDonHang", new { MaDonHang = maDonHang }, giaoDich)).ToList();
@@ -917,7 +939,7 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
         }
     }
 
-    // POST api/don-hang/5/huy — khách chỉ tự hủy khi quầy chưa tiếp nhận; quản lý hủy các bước còn lại.
+    // POST api/don-hang/5/huy — mọi vai trò chỉ được hủy trước khi đơn bắt đầu in.
     [HttpPost("{maDonHang}/huy")]
     [Authorize(Roles = "CUSTOMER,SUPER_ADMIN,BRANCH_ADMIN")]
     public async Task<IActionResult> HuyDon([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maDonHang, HuyDonRequest req)
@@ -941,15 +963,26 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
         }
         else if (!DuocLamViecVoiChiNhanh(don.MaChiNhanh))
             return StatusCode(403, new { message = "Đơn không thuộc phạm vi chi nhánh đang chọn." });
-        if (don.TrangThai == "DANG_IN")
-            return BadRequest(new { message = "Connector đang xử lý đơn; phải kiểm tra và dừng máy thực tế trước, không hủy lệnh đang in từ đây." });
+        if (!TrangThaiDonHang.ChoPhepHuy(don.TrangThai))
+            return BadRequest(new { message = "Chỉ được hủy đơn đang chờ tiếp nhận hoặc chờ in. Từ khi bắt đầu in, đơn không được hủy hoặc hoàn tiền qua luồng này." });
+        string ghiChu = req.LyDo.Trim().Replace('\r', ' ').Replace('\n', ' ');
+        bool coThongTinHoan = !string.IsNullOrWhiteSpace(req.NganHang) || !string.IsNullOrWhiteSpace(req.SoTaiKhoan);
+        if (coThongTinHoan || (User.IsInRole(VaiTro.Customer) && don.TrangThaiThanhToan == "DA_THANH_TOAN"))
+        {
+            var thongTin = new ThongTinHoanTienRequest {
+                LyDo = req.LyDo.Trim(), NganHang = req.NganHang?.Trim() ?? "", SoTaiKhoan = req.SoTaiKhoan?.Trim() ?? ""
+            };
+            string loi = thongTin.KiemTra();
+            if (loi != null) return BadRequest(new { message = loi });
+            ghiChu = thongTin.TaoGhiChu();
+        }
         try
         {
             await conn.ExecuteAsync("sp_HuyDonHang", new
             {
                 MaDonHang = maDonHang,
                 MaNguoiHuy = maNguoiHuy,
-                LyDo = req.LyDo.Trim()
+                LyDo = ghiChu
             }, transaction: giaoDich, commandType: CommandType.StoredProcedure);
             await giaoDich.CommitAsync();
         }
@@ -972,6 +1005,42 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
         });
     }
 
+    private const string SqlLuuThongTinHoanTien = @"
+        UPDATE dh SET GhiChu=@GhiChu
+        FROM dbo.DonHang dh JOIN dbo.ThanhToan tt ON tt.MaDonHang=dh.MaDonHang
+        WHERE dh.MaDonHang=@MaDonHang AND dh.MaKhachHang=@MaKhachHang
+          AND dh.TrangThai='DA_HUY' AND dh.MaMayIn IS NULL AND tt.TrangThai='DA_THANH_TOAN';";
+
+    // Khách bổ sung/sửa tài khoản cho đơn đã hủy trước in, đang chờ hoàn.
+    [HttpPost("{maDonHang}/thong-tin-hoan-tien")]
+    [Authorize(Roles = "CUSTOMER")]
+    public async Task<IActionResult> CapNhatThongTinHoanTien(
+        [Range(1, int.MaxValue)] int maDonHang, ThongTinHoanTienRequest req)
+    {
+        string loi = req.KiemTra();
+        if (loi != null) return BadRequest(new { message = loi });
+        int maKhachHang = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
+        using var conn = new SqlConnection(_chuoiKetNoi);
+        await conn.OpenAsync();
+        await using var giaoDich = await conn.BeginTransactionAsync();
+        var don = await conn.QueryFirstOrDefaultAsync<DonPhucHoiFile>(
+            @"SELECT dh.MaChiNhanh, dh.MaKhachHang, dh.MaMayIn, dh.TrangThai,
+                     tt.TrangThai AS TrangThaiThanhToan
+              FROM DonHang dh WITH (UPDLOCK, HOLDLOCK)
+              JOIN ThanhToan tt WITH (UPDLOCK, HOLDLOCK) ON tt.MaDonHang=dh.MaDonHang
+              WHERE dh.MaDonHang=@MaDonHang", new { MaDonHang = maDonHang }, giaoDich);
+        if (don == null || don.MaKhachHang != maKhachHang)
+            return NotFound(new { message = "Không tìm thấy đơn hàng." });
+        if (don.TrangThai != TrangThaiDonHang.DaHuy || don.MaMayIn != null || don.TrangThaiThanhToan != "DA_THANH_TOAN")
+            return BadRequest(new { message = "Chỉ cập nhật thông tin cho đơn hủy trước khi in, đã nhận tiền và chưa xác nhận hoàn." });
+        int soDong = await conn.ExecuteAsync(SqlLuuThongTinHoanTien,
+            new { MaDonHang = maDonHang, MaKhachHang = maKhachHang, GhiChu = req.TaoGhiChu() }, giaoDich);
+        if (soDong != 1) return Conflict(new { message = "Đơn đã thay đổi. Vui lòng tải lại trước khi lưu thông tin hoàn tiền." });
+        await giaoDich.CommitAsync();
+        await BaoDonDoiTrangThai(conn, maDonHang, "Khách đã cập nhật thông tin nhận hoàn tiền");
+        return Ok(new KetQuaDto { Message = "Đã lưu thông tin nhận hoàn tiền, chờ CEO xử lý." });
+    }
+
     // POST api/don-hang/5/hoan-tien — chỉ Super Admin xác nhận sau khi đã chuyển tiền lại cho khách.
     [HttpPost("{maDonHang}/hoan-tien")]
     [Authorize(Roles = "SUPER_ADMIN")]
@@ -979,16 +1048,25 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
     {
         int maNguoiDuyet = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
         using var conn = new SqlConnection(_chuoiKetNoi);
-        int? maChiNhanhDon = await conn.ExecuteScalarAsync<int?>(
-            "SELECT MaChiNhanh FROM DonHang WHERE MaDonHang=@MaDonHang", new { MaDonHang = maDonHang });
-        if (maChiNhanhDon == null) return NotFound(new { message = "Không tìm thấy đơn hàng." });
-        if (!DuocLamViecVoiChiNhanh(maChiNhanhDon.Value))
+        await conn.OpenAsync();
+        await using var giaoDich = await conn.BeginTransactionAsync();
+        var don = await conn.QueryFirstOrDefaultAsync<DonPhucHoiFile>(
+            "SELECT MaChiNhanh, MaMayIn, TrangThai, GhiChu FROM DonHang WITH (UPDLOCK, HOLDLOCK) WHERE MaDonHang=@MaDonHang",
+            new { MaDonHang = maDonHang }, giaoDich);
+        if (don == null) return NotFound(new { message = "Không tìm thấy đơn hàng." });
+        if (!DuocLamViecVoiChiNhanh(don.MaChiNhanh))
             return StatusCode(403, new { message = "Đơn không thuộc phạm vi chi nhánh đang chọn." });
+        if (don.TrangThai != TrangThaiDonHang.DaHuy || don.MaMayIn != null)
+            return BadRequest(new { message = "Chỉ xác nhận hoàn tiền cho đơn đã hủy trước khi bắt đầu in." });
+        if (ThongTinHoanTienRequest.DocGhiChu(don.GhiChu) == null)
+            return BadRequest(new { message = "Khách chưa cung cấp đủ lý do hoàn tiền, ngân hàng và số tài khoản. Chưa thể xác nhận hoàn tiền." });
         try
         {
             await conn.ExecuteAsync("sp_HoanTien",
                 new { MaDonHang = maDonHang, MaNguoiDuyet = maNguoiDuyet },
+                transaction: giaoDich,
                 commandType: CommandType.StoredProcedure);
+            await giaoDich.CommitAsync();
         }
         catch (SqlException ex)
         {

@@ -1,6 +1,7 @@
-using PhotocopyShared.KiemTraDuLieu;
+﻿using PhotocopyShared.KiemTraDuLieu;
 using System.ComponentModel.DataAnnotations;
 using PhotocopyShared.Dtos.DatIn;
+using PhotocopyShared.Dtos.Tuan3;
 
 namespace PhotocopyShared.Dtos.DonHang;
 
@@ -13,6 +14,7 @@ public sealed class PhucHoiFileInRequest
 /// <summary>Một thẻ trong danh sách "Đơn hàng của tôi" (F-12) trên App.</summary>
 public sealed class DonHangTomTatDto
 {
+    public int? MaMayIn { get; set; }
     public int MaDonHang { get; set; }
     public string? MaDonHangHienThi { get; set; }
     public int MaChiNhanh { get; set; }
@@ -198,6 +200,9 @@ public sealed class DonHangChiTietDto
 
     public string? TenNhanVien { get; set; }
     public string? TenMayIn { get; set; }
+    public bool ChoPhepBoSungHoanTien => TrangThaiDonHang == "DA_HUY"
+        && TrangThaiThanhToan == "DA_THANH_TOAN" && MaMayIn == null;
+    public ThongTinHoanTienRequest? ThongTinHoanTien => ThongTinHoanTienRequest.DocGhiChu(GhiChu);
     public string? TenShipper { get; set; }
     public string? SoDienThoaiShipper { get; set; }
 
@@ -217,6 +222,7 @@ public sealed class DonHangChiTietDto
 /// <summary>Một dòng trong bảng Hàng đợi đơn hàng của Web quản trị (Figma 04-Admin-HangDoiDon).</summary>
 public sealed class HangDoiDonDto
 {
+    public int? MaMayIn { get; set; }
     public int MaDonHang { get; set; }
     public string MaDonHangHienThi { get; set; } = "";
     public int? MaDonHangGoc { get; set; }
@@ -245,6 +251,8 @@ public sealed class HangDoiDonDto
 /// <summary>Một máy in của chi nhánh, kèm cờ có in được đơn đang chọn không (F-21).</summary>
 public sealed class MayInDto
 {
+    public PhotocopyShared.Dtos.MayInAo.KetNoiMayInDto? KetNoi { get; set; }
+    public string TenHienThi => KetNoi?.CheDo == "THAT" && !string.IsNullOrWhiteSpace(KetNoi.TenHangDoi) ? KetNoi.TenHangDoi : TenMay;
     public int MaMayIn { get; set; }
     public string TenMay { get; set; } = "";
     public string? KhoGiay { get; set; }

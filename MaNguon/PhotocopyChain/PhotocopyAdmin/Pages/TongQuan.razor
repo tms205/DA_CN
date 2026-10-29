@@ -1,4 +1,4 @@
-@page "/tong-quan"
+﻿@page "/tong-quan"
 @attribute [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN")]
 @inject HttpClient Http
 
@@ -25,30 +25,28 @@
                 </div>
                 <div class="truong"><label class="nhan" for="tq-tu">Từ ngày</label><input id="tq-tu" class="ca-o-loc" type="text" inputmode="numeric" placeholder="dd/MM/yyyy" maxlength="10" @bind="_tuNhap" @bind:after="ChonTuyChon" /></div>
                 <div class="truong"><label class="nhan" for="tq-den">Đến ngày</label><input id="tq-den" class="ca-o-loc" type="text" inputmode="numeric" placeholder="dd/MM/yyyy" maxlength="10" @bind="_denNhap" @bind:after="ChonTuyChon" /></div>
-                <div class="truong"><label class="nhan" for="tq-nhom">Nhóm báo cáo</label><select id="tq-nhom" class="ca-o-loc" @bind="_nhomTheo"><option value="ngay">Theo ngày</option><option value="tuan">Theo tuần</option><option value="thang">Theo tháng</option></select></div>
                 <button type="button" class="nut-chinh" @onclick="TaiAsync">@(_dangTai ? "Đang tải…" : "Xem tổng quan")</button>
             </fieldset>
             <p class="nv-phu">Preset ngày/tuần/tháng tự áp dụng · Ngày nhập dd/MM/yyyy · Tối đa 366 ngày.</p>
         </section>
-        <p class="tq-dinh-nghia">Doanh thu đơn hoàn tất, không tính in lại lỗi quầy; không phải tiền nhận hay lợi nhuận.</p>
         @if (_loi != null) { <div class="o-loi" role="alert">@_loi</div> }
         @if (_dangTai) { <div class="the bang-trong" role="status">Đang tải tổng quan…</div> }
         else if (_ds != null && _loi == null)
         {
-            decimal doanhThu = _ds.Sum(x => x.DoanhThu), doanhThuTruoc = _truoc.Sum(x => x.DoanhThu);
-            int soDon = _ds.Sum(x => x.SoDon), soDonTruoc = _truoc.Sum(x => x.SoDon);
-            decimal aov = soDon == 0 ? 0 : doanhThu / soDon, aovTruoc = soDonTruoc == 0 ? 0 : doanhThuTruoc / soDonTruoc;
+            decimal doanhThu = _ds.Sum(x => x.DoanhThu);
+            int soDon = _ds.Sum(x => x.SoDon);
+            decimal aov = soDon == 0 ? 0 : doanhThu / soDon;
             <div class="tq-ky-da-tai"><span>@_tuDaTai.ToString("dd'/'MM'/'yyyy") – @_denDaTai.ToString("dd'/'MM'/'yyyy")</span><span>Cập nhật lúc @_lucTai.ToString("HH:mm:ss")</span></div>
             <div class="tq-kpi" aria-label="Chỉ số doanh thu">
-                <section class="the tq-kpi-o tq-kpi-chinh"><h2>Doanh thu kỳ đã chọn</h2><div class="tq-kpi-tien mono">@Tien(doanhThu)</div><p>@ThayDoi(doanhThu, doanhThuTruoc) so với kỳ đối chiếu</p></section>
-                <section class="the tq-kpi-o"><h2>Số đơn hoàn tất</h2><div class="tq-kpi-tien mono">@soDon</div><p>@ThayDoi(soDon, soDonTruoc) so với kỳ đối chiếu</p></section>
-                <section class="the tq-kpi-o"><h2>Giá trị trung bình/đơn</h2><div class="tq-kpi-tien mono">@(soDon == 0 ? "Chưa có đơn" : Tien(aov))</div><p>@(soDon == 0 || soDonTruoc == 0 ? "Chưa đủ đơn để so sánh" : ThayDoi(aov, aovTruoc) + " so với kỳ đối chiếu")</p></section>
+                <section class="the tq-kpi-o tq-kpi-chinh"><h2>Doanh thu kỳ đã chọn</h2><div class="tq-kpi-tien mono">@Tien(doanhThu)</div></section>
+                <section class="the tq-kpi-o"><h2>Số đơn hoàn tất</h2><div class="tq-kpi-tien mono">@soDon</div></section>
+                <section class="the tq-kpi-o"><h2>Giá trị trung bình/đơn</h2><div class="tq-kpi-tien mono">@(soDon == 0 ? "Chưa có đơn" : Tien(aov))</div></section>
             </div>
             <section class="the the-bang" aria-label="Xu hướng doanh thu">
-                <div class="bang-tieu-de"><div><h2>Xu hướng doanh thu</h2><p class="bang-mo-ta">Đối chiếu cùng số ngày liền trước: @_tuTruoc.ToString("dd'/'MM'/'yyyy") – @_denTruoc.ToString("dd'/'MM'/'yyyy")</p></div><a class="nut-nho" href="bao-cao">Báo cáo chi nhánh →</a></div>
+                <div class="bang-tieu-de"><div><h2>Xu hướng doanh thu</h2></div><a class="nut-nho" href="bao-cao">Báo cáo chi nhánh →</a></div>
                 <div class="tq-noi-bieu-do">
                     @if (soDon == 0) { <p class="tq-trong">Chưa có đơn hoàn tất trong kỳ đã chọn.</p> }
-                    <BieuDoDoanhThu HienTai="_ky" KyTruoc="_kyTruoc" NhomTheo="_nhomDaTai" />
+                    <BieuDoDoanhThu HienTai="_ky" KyTruoc="_kyTruoc" NhomTheo="@_nhomDaTai" NhomTheoChanged="DoiNhomBieuDo" />
                 </div>
             </section>
             @if (_chiNhanh.Count > 1)
@@ -64,7 +62,6 @@
                 </section>
             }
             <TongQuanPhanTich @key="_lucTai" TuNgay="_tuDaTai" DenNgay="_denDaTai" />
-            <details class="tq-giai-thich"><summary>Cách tính và kỳ đối chiếu</summary><p>Tuần bắt đầu thứ Hai. Kỳ đối chiếu là @_soNgayDaTai ngày liền trước, không mặc định toàn tháng trước. Khi kỳ trước bằng 0, không tính tỷ lệ tăng trưởng. Chọn nhóm rồi bấm Xem tổng quan; báo cáo không tự chuyển trạng thái đơn.</p></details>
         }
     </div>
     }
@@ -166,10 +163,7 @@
             _lucTai = DateTime.Now;
             _soNgayDaTai = (den - tu).Days + 1;
             _nhomDaTai = _nhomTheo;
-            _ky = TongQuanBaoCao.NhomKy(_ds, tu, den, _nhomDaTai);
-            // Dịch kỳ trước sang cùng vị trí ngày của kỳ này trước khi nhóm tuần/tháng.
-            var canNgay = _truoc.Select(x => new BaoCaoDoanhThuDto { Ngay = x.Ngay.AddDays(_soNgayDaTai), SoDon = x.SoDon, DoanhThu = x.DoanhThu });
-            _kyTruoc = TongQuanBaoCao.NhomKy(canNgay, tu, den, _nhomDaTai);
+            NhomDoanhThu();
             _chiNhanh = _ds.GroupBy(x => x.MaChiNhanh).Select(g => new BaoCaoDoanhThuDto {
                 MaChiNhanh = g.Key, TenChiNhanh = g.First().TenChiNhanh, SoDon = g.Sum(x => x.SoDon), DoanhThu = g.Sum(x => x.DoanhThu)
             }).OrderByDescending(x => x.DoanhThu).ToList();
@@ -182,13 +176,21 @@
         finally { _dangTai = false; }
     }
 
-    private static string Tien(decimal tien) => tien.ToString("#,##0", KieuSo) + "₫";
-
-    private static string ThayDoi(decimal nay, decimal truoc)
+    private void DoiNhomBieuDo(string nhom)
     {
-        decimal? tyLe = TongQuanBaoCao.TyLeThayDoi(nay, truoc);
-        return tyLe == null ? "—" : (tyLe > 0 ? "+" : "") + tyLe.Value.ToString("0.#", KieuSo) + "%";
+        if (nhom is not ("ngay" or "tuan" or "thang") || _ds == null) return;
+        _nhomTheo = _nhomDaTai = nhom;
+        NhomDoanhThu();
     }
+
+    private void NhomDoanhThu()
+    {
+        _ky = TongQuanBaoCao.NhomKy(_ds, _tuDaTai, _denDaTai, _nhomDaTai);
+        var canNgay = _truoc.Select(x => new BaoCaoDoanhThuDto { Ngay = x.Ngay.AddDays(_soNgayDaTai), SoDon = x.SoDon, DoanhThu = x.DoanhThu });
+        _kyTruoc = TongQuanBaoCao.NhomKy(canNgay, _tuDaTai, _denDaTai, _nhomDaTai);
+    }
+
+    private static string Tien(decimal tien) => tien.ToString("#,##0", KieuSo) + "₫";
 
     private string DoRongCot(decimal tien)
     {

@@ -93,6 +93,12 @@ public sealed class TrangThaiMayInAoStore
         };
     }
 
+    public DateTime? LayDuKienInXong(int maDonHang, int? maMayIn)
+    {
+        if (maMayIn == null) return null;
+        return LayTatCa().FirstOrDefault(x => x.MaMayIn == maMayIn && x.MaDonHangDangIn == maDonHang)?.DuKienInXong;
+    }
+
     public List<TrangThaiKetNoiMayInDto> LayTatCa()
     {
         DateTime mocMatKetNoi = _gio.GetLocalNow().DateTime.AddSeconds(-30);

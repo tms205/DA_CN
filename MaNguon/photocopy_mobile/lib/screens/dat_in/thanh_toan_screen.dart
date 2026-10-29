@@ -11,6 +11,7 @@ import '../../models.dart';
 import '../../realtime.dart';
 import '../../theme.dart';
 import '../../widgets/icons.dart';
+import '../../widgets/huy_don.dart';
 import '../../widgets/widgets.dart';
 import '../don_hang/tien_do_screen.dart';
 import '../trang_chinh_screen.dart';
@@ -268,6 +269,28 @@ class _ThanhToanScreenState extends State<ThanhToanScreen>
           ],
         ),
       );
+    } else if (_tt!.trangThaiDonHang == 'DA_HUY' &&
+        (_tt!.daTra || _tt!.trangThai == 'DA_HOAN_TIEN')) {
+      final daHoan = _tt!.trangThai == 'DA_HOAN_TIEN';
+      noiDung = SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _theMaDon(),
+            const SizedBox(height: 16),
+            HopThongBao(daHoan ? 'Đã hoàn tiền' : 'Đơn đã hủy · Chờ hoàn tiền'),
+            const SizedBox(height: 12),
+            Text(
+              daHoan
+                  ? 'Cửa hàng đã xác nhận chuyển hoàn tiền. Đơn hàng vẫn được giữ ở trạng thái đã hủy.'
+                  : 'Cửa hàng đã ghi nhận tiền cho đơn đã hủy và sẽ xử lý hoàn đủ tiền. Đơn không được đưa trở lại in.',
+            ),
+            const SizedBox(height: 16),
+            NutChinh(nhan: 'Xem chi tiết đơn', onPressed: _xemTienDo),
+          ],
+        ),
+      );
       // Nhánh COD/TIEN_MAT để phòng khi mở màn này bằng đơn do quầy lập.
     } else if (_tt!.daTra || _laTraKhiNhan(_tt!.phuongThuc)) {
       noiDung = _manDaXong();
@@ -307,6 +330,16 @@ class _ThanhToanScreenState extends State<ThanhToanScreen>
         children: [
           _theMaDon(),
           const SizedBox(height: 12),
+
+          if (tt.trangThaiDonHang == 'CHO_XAC_NHAN' ||
+              tt.trangThaiDonHang == 'DA_XAC_NHAN') ...[
+            NutHuyDon(
+              maDonHang: widget.maDonHang,
+              daThanhToan: tt.daTra,
+              daHuy: () async => _xemTienDo(),
+            ),
+            const SizedBox(height: 12),
+          ],
 
           // Đồng hồ đếm ngược
           Container(

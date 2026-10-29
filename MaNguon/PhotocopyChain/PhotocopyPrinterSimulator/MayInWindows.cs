@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using PhotocopyShared.Dtos.MayInAo;
+using PhotocopyShared.MayInAo;
 
 namespace PhotocopyPrinterSimulator;
 
@@ -37,6 +38,9 @@ public class MayInWindows
     public virtual async Task GuiPdf(string engine, string tenMay, string tep, DongLenhInDto dong, CancellationToken dung)
     {
         KiemTraCauHinh(engine, tenMay);
+        var queue = new PhatHienMayInWindows().Quet().FirstOrDefault(x => string.Equals(x.Ten, tenMay, StringComparison.OrdinalIgnoreCase));
+        string? loiQuyCach = QuyTacMayInThat.KiemTra(queue, new[] { dong });
+        if (loiQuyCach != null) throw new InvalidOperationException(loiQuyCach);
         var start = new ProcessStartInfo(engine) { UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden };
         foreach (string arg in TaoThamSo(tenMay, tep, dong)) start.ArgumentList.Add(arg);
         using var process = Process.Start(start) ?? throw new InvalidOperationException("Không mở được bộ in PDF.");
@@ -45,8 +49,19 @@ public class MayInWindows
         try { await process.WaitForExitAsync(han.Token); }
         catch (OperationCanceledException)
         {
-            // Chỉ dừng bộ gửi do mình tạo, không xóa job đã vào spooler.
-            if (!process.HasExited) process.Kill();
+            // Chỉ dừng bộ gửi do mình tạo, không xóa job đã vào spooler. Phải chờ
+            // process thật sự thoát: Kill() trả về chưa có nghĩa nó đã ngừng gửi.
+            try
+            {
+                if (!process.HasExited) process.Kill();
+            }
+            catch (InvalidOperationException) when (process.HasExited) { }
+            finally
+            {
+                // Không hủy lần chờ này theo request dừng. Nếu Windows chưa dừng
+                // được bộ gửi, không được ACK để máy mới chạy song song.
+                await process.WaitForExitAsync(CancellationToken.None);
+            }
             throw;
         }
         if (process.ExitCode != 0)
@@ -94,6 +109,18 @@ public class MayInWindows
     public static bool ThuocTep(JobWindows job, string tep) =>
         string.Equals(job.TenTaiLieu, Path.GetFileName(tep), StringComparison.OrdinalIgnoreCase)
         || string.Equals(job.TenTaiLieu, tep, StringComparison.OrdinalIgnoreCase);
+
+    public virtual void HuyJob(string tenMay, JobWindows job)
+    {
+        if (!OpenPrinter(tenMay, out var handle, IntPtr.Zero)) throw LoiWindows();
+        try
+        {
+            if (!DocJob(tenMay).Any(x => x.Id == job.Id && x.TenTaiLieu == job.TenTaiLieu)) return;
+            // JOB_CONTROL_DELETE, không PURGE toàn queue. Job của khách/ứng dụng khác được giữ.
+            if (!SetJob(handle, job.Id, 0, IntPtr.Zero, 5u)) throw LoiWindows();
+        }
+        finally { ClosePrinter(handle); }
+    }
 
     private static Win32Exception LoiWindows() => new(Marshal.GetLastWin32Error(), "Không truy cập được hàng đợi in. Kiểm tra Spooler, driver, tên queue và quyền Windows.");
 

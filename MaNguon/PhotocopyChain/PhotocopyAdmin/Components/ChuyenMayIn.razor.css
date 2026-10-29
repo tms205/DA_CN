@@ -1,0 +1,22 @@
+.cm-da-dung { padding: 1rem; margin: .75rem 0; border: 1px solid #b7d9ca; border-radius: .5rem; background: #f0faf5; color: #194937; }
+.cm-da-dung p { margin: .4rem 0 0; }
+.cm-xac-nhan { display: flex; align-items: flex-start; gap: .65rem; padding: .75rem 0; line-height: 1.5; }
+.cm-xac-nhan input, .cm-ten-file input { flex: 0 0 auto; width: 1.2rem; height: 1.2rem; margin-top: .2rem; }
+.cm-lich-su { margin: .75rem 0; padding: .75rem; background: #f3f6fa; border-radius: .4rem; }
+.cm-lich-su summary { cursor: pointer; font-weight: 600; }
+.cm-muc-lich-su { border-top: 1px solid #dce4ed; padding-top: .65rem; margin-top: .65rem; }
+.cm-lich-su p { margin: .35rem 0; line-height: 1.5; overflow-wrap: anywhere; }
+.cm-dong { border: 1px solid #dce4ed; border-radius: .5rem; padding: 1rem; margin: .75rem 0; }
+.cm-ten-file { display: flex; gap: .6rem; align-items: flex-start; overflow-wrap: anywhere; }
+.cm-pham-vi { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; margin: .75rem 0; }
+.cm-pham-vi label { display: grid; gap: .35rem; }
+.cm-hao-hut { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: .75rem 0; overflow-wrap: anywhere; }
+.cm-hao-hut input { width: 8rem; flex-shrink: 0; }
+select, textarea { width: 100%; margin: .5rem 0 .75rem; }
+select, textarea, input[type=number] { border: 1px solid var(--vien, #cdd8e5); border-radius: .4rem; padding: .6rem .75rem; min-height: 2.75rem; background: var(--trang, #fff); color: inherit; font: inherit; box-sizing: border-box; }
+input[type=number]:disabled { background: var(--nen, #f3f6fa); color: var(--chu-nhan, #5e6d81); }
+input[type=number] { min-width: 0; width: 100%; }
+.cm-hao-hut input[type=number] { width: 8rem; }
+button { min-height: 2.75rem; }
+input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 2px solid #14568a; outline-offset: 2px; }
+@media(max-width: 600px) { .cm-pham-vi { grid-template-columns: 1fr; } .cm-hao-hut { flex-direction: column; align-items: stretch; } .cm-hao-hut input[type=number] { width: 100%; } }

@@ -70,7 +70,7 @@ public class ThanhToanController : ControllerBase
 
         // Webhook có thể bị lỡ khi Quick Tunnel tắt. Nút "Kiểm tra thanh toán" đối soát lại
         // trực tiếp với payOS; chỉ dữ liệu do API payOS trả về mới được dùng để khôi phục đơn.
-        if (tt.PhuongThuc == "VIETQR" && tt.TrangThai != "DA_THANH_TOAN"
+        if (tt.PhuongThuc == "VIETQR" && tt.TrangThai == "CHUA_THANH_TOAN"
             && await ThuDongBoTuPayOS(tt))
         {
             tt = await DocThanhToanDuocPhep(conn, maDonHang);
@@ -212,9 +212,9 @@ public class ThanhToanController : ControllerBase
             return Ok(new KetQuaDto { Message = "Đã nhận webhook payOS." });
         }
 
-        bool biHuyThuCong = don.TrangThaiDonHang == TrangThaiDonHang.DaHuy
-            && don.GhiChu != "Quá 15 phút chưa thanh toán";
-        if (don.PhuongThuc != "VIETQR" || biHuyThuCong)
+        // Đơn đã hủy vẫn có thể nhận tiền do webhook chậm hoặc khách dùng QR cũ.
+        // Ghi nhận tiền thật để hoàn/đối soát, tuyệt đối không khôi phục đơn để in.
+        if (don.PhuongThuc != "VIETQR")
         {
             _logger.LogWarning("Webhook payOS báo cho đơn {MaDonHang} không còn được phép thanh toán.", maDonHang);
             return Ok(new KetQuaDto { Message = "Đã nhận webhook payOS." });
@@ -365,27 +365,25 @@ public class ThanhToanController : ControllerBase
     private async Task<IActionResult> XacNhanDaTra(int maDonHang, string maGiaoDich)
     {
         using var conn = new SqlConnection(_chuoiKetNoi);
+        await conn.OpenAsync();
+        await using var giaoDich = await conn.BeginTransactionAsync();
 
+        // Cùng thứ tự khóa Đơn -> Thanh toán với hủy/xếp in; không để tiền tới
+        // đồng thời với hủy làm khôi phục đơn hoặc mất khoản tiền cần hoàn.
         var don = await conn.QueryFirstOrDefaultAsync<DonDeBao>(
             @"SELECT dh.MaDonHang, 'DH' + RIGHT('00000' + CAST(dh.MaDonHang AS VARCHAR(10)), 5) AS MaDonHangHienThi,
                      dh.MaChiNhanh, dh.MaKhachHang, dh.TrangThai, dh.GhiChu,
                      tt.TrangThai AS TrangThaiThanhToan
-              FROM DonHang dh JOIN ThanhToan tt ON tt.MaDonHang = dh.MaDonHang
-              WHERE dh.MaDonHang = @MaDonHang", new { MaDonHang = maDonHang });
+              FROM DonHang dh WITH (UPDLOCK, HOLDLOCK)
+              JOIN ThanhToan tt WITH (UPDLOCK, HOLDLOCK) ON tt.MaDonHang = dh.MaDonHang
+              WHERE dh.MaDonHang = @MaDonHang", new { MaDonHang = maDonHang }, giaoDich);
 
         if (don == null)
             return NotFound(new { message = "Không tìm thấy đơn hàng." });
-        if (don.TrangThai == TrangThaiDonHang.DaHuy)
+        if (don.TrangThaiThanhToan == "DA_HOAN_TIEN")
         {
-            int daKhoiPhuc = await conn.ExecuteAsync(
-                @"UPDATE DonHang
-                  SET TrangThai = 'CHO_XAC_NHAN', GhiChu = NULL
-                  WHERE MaDonHang = @MaDonHang AND TrangThai = 'DA_HUY'
-                    AND GhiChu = N'Quá 15 phút chưa thanh toán'",
-                new { MaDonHang = maDonHang });
-            if (daKhoiPhuc == 0)
-                return BadRequest(new { message = "Đơn đã bị hủy thủ công nên không thể tự khôi phục." });
-            don.TrangThai = TrangThaiDonHang.ChoXacNhan;
+            await giaoDich.CommitAsync();
+            return Ok(new KetQuaDto { Message = "Đơn đã hoàn tiền; không ghi nhận lại hoặc gửi in." });
         }
 
         if (don.TrangThaiThanhToan != "DA_THANH_TOAN")
@@ -395,6 +393,7 @@ public class ThanhToanController : ControllerBase
                 // Thủ tục chỉ cập nhật đúng đơn VietQR đang "CHUA_THANH_TOAN" và tự ghi thông báo cho khách
                 await conn.ExecuteAsync("sp_XacNhanChuyenKhoan",
                     new { MaDonHang = maDonHang, MaGiaoDich = maGiaoDich },
+                    transaction: giaoDich,
                     commandType: CommandType.StoredProcedure);
             }
             catch (SqlException ex)
@@ -402,9 +401,11 @@ public class ThanhToanController : ControllerBase
                 return BadRequest(new { message = ex.Message });
             }
         }
+        await giaoDich.CommitAsync();
 
-        // Webhook có thể được gửi lại. Hàm xếp in kiểm tra trạng thái hiện tại nên gọi lặp vẫn an toàn.
-        KetQuaXepIn ketQuaIn = await _tuDongIn.XepInSauThanhToan(maDonHang);
+        // Đơn đã hủy (kể cả quá hạn) giữ nguyên để hoàn tiền; không chạy lại quy trình in.
+        KetQuaXepIn ketQuaIn = don.TrangThai == TrangThaiDonHang.DaHuy
+            ? null : await _tuDongIn.XepInSauThanhToan(maDonHang);
 
         DonDeBao donSau = await conn.QueryFirstAsync<DonDeBao>(
             @"SELECT dh.MaDonHang, 'DH' + RIGHT('00000' + CAST(dh.MaDonHang AS VARCHAR(10)), 5) AS MaDonHangHienThi,
@@ -418,14 +419,19 @@ public class ThanhToanController : ControllerBase
             MaDonHangHienThi = donSau.MaDonHangHienThi,
             MaChiNhanh = donSau.MaChiNhanh,
             TrangThai = donSau.TrangThai,
-            NoiDung = "Đơn " + donSau.MaDonHangHienThi + " đã thanh toán"
+            NoiDung = donSau.TrangThai == TrangThaiDonHang.DaHuy
+                ? "Đơn " + donSau.MaDonHangHienThi + " đã hủy; khoản tiền đã nhận được giữ để xử lý hoàn"
+                : "Đơn " + donSau.MaDonHangHienThi + " đã thanh toán"
         };
-        await CapNhatHub.GuiChoNguoiDung(_hub, donSau.MaKhachHang, HubEvents.PaymentConfirmed, tin);
-        await CapNhatHub.GuiChoChiNhanh(_hub, donSau.MaChiNhanh, HubEvents.PaymentConfirmed, tin);
+        string suKien = donSau.TrangThai == TrangThaiDonHang.DaHuy ? HubEvents.OrderStatusChanged : HubEvents.PaymentConfirmed;
+        await CapNhatHub.GuiChoNguoiDung(_hub, donSau.MaKhachHang, suKien, tin);
+        await CapNhatHub.GuiChoChiNhanh(_hub, donSau.MaChiNhanh, suKien, tin);
 
-        string message = ketQuaIn.DaBatDauIn
-            ? "Đã ghi nhận thanh toán và bắt đầu in tự động."
-            : "Đã ghi nhận thanh toán. " + ketQuaIn.Message;
+        string message = donSau.TrangThai == TrangThaiDonHang.DaHuy
+            ? (donSau.TrangThaiThanhToan == "DA_HOAN_TIEN" ? "Đơn đã hủy và đã hoàn tiền."
+                : "Đã ghi nhận tiền cho đơn đã hủy, đang chờ CEO xử lý hoàn tiền. Đơn không được đưa trở lại in.")
+            : ketQuaIn?.DaBatDauIn == true ? "Đã ghi nhận thanh toán và bắt đầu in tự động."
+                : "Đã ghi nhận thanh toán. " + ketQuaIn?.Message;
         return Ok(new KetQuaDto { Message = message });
     }
 

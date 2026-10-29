@@ -5,6 +5,8 @@ using Microsoft.Data.SqlClient;
 using PhotocopyApi.Hubs;
 using PhotocopyShared.Constants;
 using PhotocopyShared.MayInAo;
+using PhotocopyShared.Dtos.MayInAo;
+using PhotocopyApi.DuLieu;
 
 namespace PhotocopyApi.MayInAo;
 
@@ -18,17 +20,19 @@ public sealed class TuDongInService
     private readonly IHubContext<CapNhatHub> _hub;
     private readonly ILogger<TuDongInService> _logger;
     private readonly TrangThaiMayInAoStore _trangThaiMay;
+    private readonly PhatHienMayInStore _phatHien;
 
     public TuDongInService(
         IConfiguration config,
         IHubContext<CapNhatHub> hub,
         ILogger<TuDongInService> logger,
-        TrangThaiMayInAoStore trangThaiMay)
+        TrangThaiMayInAoStore trangThaiMay, PhatHienMayInStore phatHien = null)
     {
         _chuoiKetNoi = config.GetConnectionString("PhotocopyChain")!;
         _hub = hub;
         _logger = logger;
         _trangThaiMay = trangThaiMay;
+        _phatHien = phatHien;
     }
 
     public async Task<KetQuaXepIn> XepInSauThanhToan(int maDonHang)
@@ -134,11 +138,11 @@ public sealed class TuDongInService
         return new KetQuaXepIn(true, "Đơn đã được chuyển sang đang in.");
     }
 
-    private static async Task<int?> ChonMayIn(SqlConnection conn, SqlTransaction giaoDich,
+    private async Task<int?> ChonMayIn(SqlConnection conn, SqlTransaction giaoDich,
         int maDonHang, int? maMayDaGan, int[] mayDangKetNoi)
     {
         const string sql = @"
-            SELECT TOP 1 m.MaMayIn
+            SELECT m.MaMayIn
             FROM MayIn m
             JOIN DonHang dh ON dh.MaChiNhanh = m.MaChiNhanh
             WHERE dh.MaDonHang = @MaDonHang
@@ -158,12 +162,17 @@ public sealed class TuDongInService
                       WHERE d.MaMayIn = m.MaMayIn AND d.TrangThai = 'DANG_IN'),
                      m.MaMayIn";
 
-        return await conn.ExecuteScalarAsync<int?>(sql, new
+        var dsMay = await conn.QueryAsync<int>(sql, new
         {
             MaDonHang = maDonHang,
             MaMayDaGan = maMayDaGan,
             MayDangKetNoi = mayDangKetNoi
         }, giaoDich);
+        var quyCach = (await conn.QueryAsync<DongLenhInDto>(TruyVanSql.DonHang.QuyCachMayIn,
+            new { MaDonHang = maDonHang }, giaoDich)).ToList();
+        foreach (int ma in dsMay)
+            if (_phatHien?.KiemTraQuyCach(ma, quyCach) == null) return ma;
+        return null;
     }
 
     private async Task GuiCapNhat(SqlConnection conn, int maDonHang, string noiDung)

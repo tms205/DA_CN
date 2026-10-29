@@ -1,4 +1,4 @@
-@inject HttpClient Http
+﻿@inject HttpClient Http
 
 @if (_dangTai) { <div class="the bang-trong" role="status">Đang tải phân tích doanh thu…</div> }
 else if (_loi != null) { <div class="o-loi" role="alert">@_loi <button type="button" class="nut-nho" @onclick="TaiAsync">Thử lại phân tích</button></div> }
@@ -8,18 +8,14 @@ else if (_ds != null)
         <section class="the the-bang" aria-label="Cơ cấu dịch vụ">
             <div class="bang-tieu-de"><div><h2>Cơ cấu dịch vụ</h2><p class="bang-mo-ta">Tiền dịch vụ trước giảm giá, không cộng gia công hai lần.</p></div></div>
             <div class="tq-danh-sach">
-                @foreach (var dv in _ds.DichVu)
-                {
-                    <div class="tq-dong-thong-tin"><span>@dv.Ten</span><b class="mono">@TongQuanBaoCao.Tien(dv.SoTien)</b></div>
-                }
-                @if (_ds.DichVu.Count == 0) { <p class="nv-phu">Chưa có dữ liệu dịch vụ trong kỳ.</p> }
+                <BieuDoCoCauDichVu DuLieu="_ds.DichVu" />
                 <details class="tq-giai-thich"><summary>Đối chiếu dịch vụ với doanh thu</summary><dl class="tq-doi-chieu-tien">
                     <div><dt>Tổng chi tiết dịch vụ</dt><dd>@TongQuanBaoCao.Tien(_ds.DichVu.Sum(x => x.SoTien))</dd></div>
                     <div><dt>Phụ phí / điều chỉnh</dt><dd>@TongQuanBaoCao.Tien(_ds.TienHang - _ds.DichVu.Sum(x => x.SoTien))</dd></div>
                     <div><dt>Phí vận chuyển</dt><dd>@TongQuanBaoCao.Tien(_ds.PhiShip)</dd></div>
                     <div><dt>Giảm giá (trừ)</dt><dd>@TongQuanBaoCao.Tien(_ds.GiamGia)</dd></div>
                     <div><dt>Doanh thu đơn hoàn tất</dt><dd>@TongQuanBaoCao.Tien(_ds.DoanhThu)</dd></div>
-                </dl><p>Đơn giá gia công lấy từ dữ liệu đã chốt. In màu/đen trắng phân loại theo danh mục dịch vụ hiện tại; ảnh thẻ theo quy cách lưu trong đơn. Không tự phân bổ giảm giá vào từng dịch vụ.</p>
+                </dl>
                 @if (_ds.DoanhThu != _ds.TienHang + _ds.PhiShip - _ds.GiamGia) { <p class="tq-chu-canh-bao">Tổng đơn và các thành phần tiền có chênh lệch; cần kiểm tra dữ liệu gốc.</p> }
                 </details>
             </div>

@@ -566,13 +566,13 @@ public partial class QuanTriController : ControllerBase
     {
         int? maChiNhanh = LayChiNhanhTuToken();
         using var conn = new SqlConnection(_chuoiKetNoi);
-        var ds = await conn.QueryAsync(
+        var ds = await conn.QueryAsync<HoanTienChoDuyetDto>(
             @"SELECT dh.MaDonHang, 'DH'+RIGHT('00000'+CAST(dh.MaDonHang AS VARCHAR(10)),5) AS MaDonHangHienThi,
                      kh.HoTen AS TenKhachHang, kh.SoDienThoai, cn.TenChiNhanh, tt.SoTien, dh.GhiChu, dh.NgayDat
               FROM DonHang dh JOIN ThanhToan tt ON tt.MaDonHang=dh.MaDonHang
               JOIN NguoiDung kh ON kh.MaNguoiDung=dh.MaKhachHang
               JOIN ChiNhanh cn ON cn.MaChiNhanh=dh.MaChiNhanh
-              WHERE dh.TrangThai='DA_HUY' AND tt.TrangThai='DA_THANH_TOAN'
+              WHERE dh.TrangThai='DA_HUY' AND dh.MaMayIn IS NULL AND tt.TrangThai='DA_THANH_TOAN'
                 AND (@MaChiNhanh IS NULL OR dh.MaChiNhanh=@MaChiNhanh)
               ORDER BY dh.NgayDat", new { MaChiNhanh = maChiNhanh });
         return Ok(ds);

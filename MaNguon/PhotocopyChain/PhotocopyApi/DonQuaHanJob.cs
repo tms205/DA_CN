@@ -1,4 +1,5 @@
 using Dapper;
+using PhotocopyApi.BaoTri;
 using Microsoft.Data.SqlClient;
 
 namespace PhotocopyApi;
@@ -13,11 +14,13 @@ public class DonQuaHanJob : BackgroundService
 {
     private readonly string _chuoiKetNoi;
     private readonly ILogger<DonQuaHanJob> _logger;
+    private readonly BaoTriStore _baoTri;
 
-    public DonQuaHanJob(IConfiguration config, ILogger<DonQuaHanJob> logger)
+    public DonQuaHanJob(IConfiguration config, ILogger<DonQuaHanJob> logger, BaoTriStore baoTri = null)
     {
         _chuoiKetNoi = config.GetConnectionString("PhotocopyChain");
         _logger = logger;
+        _baoTri = baoTri;
     }
 
     // Hàm này chạy suốt từ lúc API bật tới lúc tắt
@@ -27,6 +30,7 @@ public class DonQuaHanJob : BackgroundService
         {
             try
             {
+                if (_baoTri?.Read().DangBaoTri == true) { await Task.Delay(TimeSpan.FromMinutes(1), dungLai); continue; }
                 using var conn = new SqlConnection(_chuoiKetNoi);
                 await conn.ExecuteAsync("sp_HuyDonQuaHan", commandType: System.Data.CommandType.StoredProcedure);
                 await XoaFileCuaDonDaKetThuc(conn);

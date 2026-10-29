@@ -14,7 +14,7 @@ import time
 import urllib.error
 import urllib.request
 
-from thu_ocr import ROOT, choose_image, read_image, verify_hash
+from qwen_support import ROOT, choose_image, read_image, verify_hash
 
 MODEL_DIR = ROOT / 'models' / 'qwen3-vl-2b'
 RUNTIME_DIR = ROOT / 'third_party' / 'llama-b6907' / 'bin'

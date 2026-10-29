@@ -13,6 +13,17 @@ public sealed class HangDoiWindowsDto
     // null = driver không cung cấp; không được hiểu là không hỗ trợ.
     public bool? InMau { get; set; }
     public bool? InHaiMat { get; set; }
+    // null = chưa đọc được driver; rỗng = driver không công bố khổ A3/A4.
+    [MaxLength(20)] public List<string>? KhoGiayHoTro { get; set; }
+}
+
+// Thông tin thiết bị để nhân sự chọn đúng đích in; không chứa khóa/mã lệnh.
+public sealed class KetNoiMayInDto
+{
+    public string CheDo { get; set; } = "AO";
+    public string TenHangDoi { get; set; } = "";
+    public bool TrucTuyen { get; set; }
+    public HangDoiWindowsDto? HangDoi { get; set; }
 }
 
 public sealed class BaoCaoPhatHienRequest

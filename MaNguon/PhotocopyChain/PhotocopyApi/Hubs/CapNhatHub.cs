@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using PhotocopyShared.Constants;
+using PhotocopyApi.BaoTri;
 
 namespace PhotocopyApi.Hubs;
 
@@ -15,9 +16,24 @@ namespace PhotocopyApi.Hubs;
 [Authorize]
 public class CapNhatHub : Hub
 {
+    private readonly KetNoiBaoTri _connections;
+    private readonly BaoTriStore _baoTri;
+    public CapNhatHub(KetNoiBaoTri connections, BaoTriStore baoTri) => (_connections, _baoTri) = (connections, baoTri);
+
+    public override async Task OnDisconnectedAsync(Exception exception)
+    {
+        _connections.Remove(Context.ConnectionId);
+        await base.OnDisconnectedAsync(exception);
+    }
+
     // Blazor / App vừa nối vào: đọc token để biết là ai rồi xếp vào nhóm
     public override async Task OnConnectedAsync()
     {
+        if (!Context.User.IsInRole(VaiTro.SuperAdmin))
+        {
+            _connections.Add(Context);
+            if (_baoTri.Read().DangBaoTri) { Context.Abort(); return; }
+        }
         string maNguoiDung = Context.User.FindFirst(TenClaim.MaNguoiDung).Value;
         await Groups.AddToGroupAsync(Context.ConnectionId, NhomNguoiDung(int.Parse(maNguoiDung)));
 

@@ -1,0 +1,103 @@
+@page "/bao-tri"
+@attribute [Authorize(Roles = "SUPER_ADMIN")]
+@inject HttpClient Http
+<PageTitle>Bảo trì hệ thống · PhotocopyChain</PageTitle>
+<TieuDeTrang TieuDe="Bảo trì hệ thống" MoTa="Quản lý quyền truy cập trong thời gian nâng cấp." />
+<div class="than-trang bt-page">
+    @if (_state == null)
+    {
+        <section class="bt-card bt-loading" role="status">
+            @if (_error == null) { <p>Đang kiểm tra trạng thái hệ thống…</p> }
+            else { <p>@_error</p><button type="button" class="bt-secondary" @onclick="TaiTrangThai">Thử lại</button> }
+        </section>
+    }
+    else
+    {
+        <section class="bt-status bt-card" aria-labelledby="bt-status-title">
+            <div class="bt-status-icon @(_state.DangBaoTri ? "is-maintenance" : "is-online")" aria-hidden="true">@((MarkupString)(_state.DangBaoTri ? Svg.BaoTri(24) : Svg.DauTich(24)))</div>
+            <div class="bt-status-copy">
+                <div class="bt-eyebrow">TRẠNG THÁI HỆ THỐNG</div>
+                <h2 id="bt-status-title">@(_state.DangBaoTri ? "Đang bảo trì" : "Đang hoạt động")</h2>
+                <p>@(_state.DangBaoTri ? "Các tài khoản khác đã bị chặn. CEO chỉ có thể quản lý chế độ bảo trì." : "Người dùng có thể đăng nhập và sử dụng hệ thống bình thường.")</p>
+            </div>
+            <span class="bt-pill @(_state.DangBaoTri ? "is-maintenance" : "is-online")"><span aria-hidden="true"></span>@(_state.DangBaoTri ? "Đang bật" : "Đang tắt")</span>
+        </section>
+
+        <div class="bt-grid">
+            <section class="bt-card bt-main" aria-labelledby="bt-message-title">
+                <div class="bt-section-head"><div><h2 id="bt-message-title">Lời nhắn cho người dùng</h2><p>Thông báo này xuất hiện trên màn hình đăng nhập trong lúc bảo trì.</p></div></div>
+                <label class="bt-label" for="loi-nhan-bao-tri">Nội dung thông báo <span aria-label="bắt buộc">*</span></label>
+                <textarea id="loi-nhan-bao-tri" rows="5" maxlength="500" @bind="_message" @bind:event="oninput" disabled="@_busy" placeholder="Ví dụ: Hệ thống đang nâng cấp. Vui lòng quay lại sau."></textarea>
+                <div class="bt-count">@(_message?.Length ?? 0) / 500 ký tự</div>
+                <div class="bt-preview"><span class="bt-preview-label">XEM TRƯỚC TRÊN TRANG ĐĂNG NHẬP</span><strong>Hệ thống đang bảo trì</strong><p>@(string.IsNullOrWhiteSpace(_message) ? "Lời nhắn của bạn sẽ xuất hiện tại đây." : _message)</p></div>
+                @if (_error != null) { <div class="bt-error" role="alert">@_error</div> }
+                @if (_notice != null) { <div class="bt-success" role="status">@_notice</div> }
+                <div class="bt-actions">
+                    @if (_state.DangBaoTri)
+                    {
+                        <button type="button" class="bt-primary" disabled="@_busy" @onclick="() => Luu(true)">Lưu lời nhắn</button>
+                        <button type="button" class="bt-secondary" disabled="@_busy" @onclick="() => Luu(false)">Tắt bảo trì</button>
+                    }
+                    else
+                    {
+                        <button type="button" class="bt-primary" disabled="@_busy" @onclick="XacNhanBat">Bật bảo trì</button>
+                    }
+                </div>
+            </section>
+            <aside class="bt-card bt-info" aria-labelledby="bt-info-title">
+                <div class="bt-info-icon" aria-hidden="true">@((MarkupString)Svg.ThongTin(19))</div>
+                <h2 id="bt-info-title">Trước khi bật bảo trì</h2>
+                <ol>
+                    <li>Chờ các đơn đang in và thanh toán hoàn tất.</li>
+                    <li>Người dùng khác sẽ bị đăng xuất và không thể đăng nhập.</li>
+                    <li>CEO chỉ được cập nhật lời nhắn hoặc tắt bảo trì.</li>
+                </ol>
+                <div class="bt-warning"><strong>Lưu ý về giao dịch</strong><p>Connector và thông báo từ cổng thanh toán bị chặn trong lúc bảo trì. Kiểm tra, đối soát khi hệ thống hoạt động trở lại.</p></div>
+            </aside>
+        </div>
+    }
+</div>
+@if (_confirm)
+{
+    <div class="bt-overlay">
+        <section class="bt-dialog" role="alertdialog" aria-modal="true" aria-labelledby="bt-confirm-title" aria-describedby="bt-confirm-desc" @onkeydown="PhimXacNhan">
+            <div class="bt-dialog-icon" aria-hidden="true">@((MarkupString)Svg.CanhBao(24))</div>
+            <h2 id="bt-confirm-title">Bật chế độ bảo trì?</h2>
+            <p id="bt-confirm-desc">Tài khoản khác sẽ bị đăng xuất; kết nối máy in và thông báo thanh toán sẽ bị chặn. Hãy chắc chắn không còn đơn đang in hoặc thanh toán.</p>
+            <div class="bt-dialog-actions"><button type="button" class="bt-secondary" autofocus disabled="@_busy" @onclick="() => _confirm = false">Quay lại</button><button type="button" class="bt-primary" disabled="@_busy" @onclick="() => Luu(true)">@(_busy ? "Đang cập nhật…" : "Xác nhận bật")</button></div>
+        </section>
+    </div>
+}
+@code {
+    private TrangThai _state;
+    private string _message = "", _error, _notice;
+    private bool _busy, _confirm;
+    protected override Task OnInitializedAsync() => TaiTrangThai();
+    private async Task TaiTrangThai()
+    {
+        _error = null;
+        try { _state = await Http.GetFromJsonAsync<TrangThai>("api/bao-tri/trang-thai") ?? throw new InvalidOperationException(); _message = _state.LoiNhan ?? ""; }
+        catch { _state = null; _error = "Không lấy được trạng thái bảo trì. Vui lòng thử lại."; }
+    }
+    private void XacNhanBat()
+    {
+        _error = null; _notice = null;
+        if (string.IsNullOrWhiteSpace(_message)) { _error = "Vui lòng nhập lời nhắn cho người dùng."; return; }
+        _confirm = true;
+    }
+    private void PhimXacNhan(KeyboardEventArgs e) { if (e.Key == "Escape" && !_busy) _confirm = false; }
+    private async Task Luu(bool enabled)
+    {
+        _busy = true; _error = null; _notice = null;
+        try {
+            using var response = await Http.PutAsJsonAsync("api/bao-tri", new { dangBaoTri = enabled, loiNhan = _message });
+            if (!response.IsSuccessStatusCode) { var err = await response.Content.ReadFromJsonAsync<ApiError>(); _error = err?.Message ?? "Không cập nhật được."; _confirm = false; return; }
+            _state = await response.Content.ReadFromJsonAsync<TrangThai>();
+            if (_state == null) throw new InvalidOperationException();
+            _confirm = false;
+            _notice = enabled ? "Đã cập nhật chế độ bảo trì và lời nhắn." : "Đã tắt chế độ bảo trì.";
+        } catch { _confirm = false; _error = "Không xác nhận được kết quả. Hãy tải lại trạng thái trước khi thao tác tiếp."; _state = null; }
+        finally { _busy = false; }
+    }
+    private sealed class TrangThai { public bool DangBaoTri { get; set; } public string LoiNhan { get; set; } }
+}

@@ -1,4 +1,4 @@
-@page "/nhan-vien"
+﻿@page "/nhan-vien"
 @attribute [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN")]
 @inject HttpClient Http
 @inject PhienDangNhap Phien
@@ -15,7 +15,6 @@
         <div class="o-loi">@((MarkupString)Svg.ChamThan())<span>@_loi</span></div>
     }
 
-    <button type="button" class="nut-chinh" disabled="@_dangCap" @onclick="MoTao">Thêm nhân viên</button>
     <HopThoaiQuanTri Mo="@_moTao" TieuDe="Tạo tài khoản nhân viên mới" Loi="@_loi" DangLuu="@_dangCap" Dong="DongTao" Rong="true">
     <NoiDung>
     <form id="nv-form-tao" @onsubmit="TaoNhanVienAsync" @onsubmit:preventDefault>
@@ -54,23 +53,30 @@
     </HopThoaiQuanTri>
     <XacNhanThaoTac @ref="_xacNhan" />
 
-    <div class="the the-bang">
+    <div class="the the-bang nv-danh-sach">
         <div class="bang-tieu-de">
             <div>
                 <h2>Danh sách nhân viên</h2>
                 <p class="bang-mo-ta">Tài khoản, vai trò và chi nhánh công tác của nhân viên.</p>
             </div>
-            <span class="bang-dem">@(_ds == null ? 0 : LocDanhSach().Count) nhân viên</span>
+            <div class="nv-thanh-dau"><span class="bang-dem">@(_ds == null ? 0 : LocDanhSach().Count) nhân viên</span>
+                <button type="button" class="nut-chinh nv-them" disabled="@_dangCap" @onclick="MoTao"><span aria-hidden="true">＋</span> Thêm nhân viên</button></div>
         </div>
-        <div class="bang-cong-cu">
+        <div class="bang-cong-cu nv-bo-loc">
             <div class="o-nhap nho o-tim">
                 <span class="o-icon">@((MarkupString)Svg.KinhLup())</span>
-                <input placeholder="Tìm tên, email, số điện thoại" @bind="_tuKhoa" @bind:event="oninput" />
+                <input aria-label="Tìm nhân viên" placeholder="Tìm tên, email, số điện thoại" @bind="_tuKhoa" @bind:event="oninput" />
+            </div>
+            <div class="truong"><label class="nhan" for="nv-loc-vai-tro">Vai trò</label>
+                <select id="nv-loc-vai-tro" class="ca-o-loc" @bind="_locVaiTro"><option value="">Tất cả vai trò</option><option value="BRANCH_ADMIN">Quản lý chi nhánh</option><option value="STAFF">Nhân viên in ấn</option><option value="SHIPPER">Nhân viên giao nhận</option><option value="SUPER_ADMIN">Chủ chuỗi</option></select>
+            </div>
+            <div class="truong"><label class="nhan" for="nv-loc-trang-thai">Trạng thái</label>
+                <select id="nv-loc-trang-thai" class="ca-o-loc" @bind="_locTrangThai"><option value="">Tất cả trạng thái</option><option value="HOAT_DONG">Đang làm</option><option value="KHOA">Bị khóa</option></select>
             </div>
         </div>
         @if (_ds == null)
         {
-            <div class="bang-trong">Đang tải danh sách nhân viên…</div>
+            <TrangThaiTaiBang NoiDung="Đang tải danh sách nhân viên…" />
         }
         else if (LocDanhSach().Count == 0)
         {
@@ -99,11 +105,12 @@
                                         <div class="avatar-nho">@VietTat(nv.HoTen)</div>
                                         <div>
                                             <div class="nv-ten">@nv.HoTen @(LaChinhMinh(nv) ? "(bạn)" : "")</div>
-                                            <div class="nv-phu">@nv.Email@(nv.SoDienThoai == null ? "" : " · " + nv.SoDienThoai)</div>
+                                            <div class="nv-phu nv-email">@nv.Email</div>
+                                            @if (!string.IsNullOrEmpty(nv.SoDienThoai)) { <div class="nv-phu">@nv.SoDienThoai</div> }
                                         </div>
                                     </div>
                                 </td>
-                                <td data-nhan="Vai trò"><span class="nhan-mau nhan-accent mono">@nv.TenVaiTro</span></td>
+                                <td data-nhan="Vai trò"><span class="nhan-mau nhan-accent" title="@nv.TenVaiTro">@TenVaiTro(nv.TenVaiTro)</span></td>
                                 <td data-nhan="Chi nhánh">@(nv.TenChiNhanh ?? "Toàn chuỗi")</td>
                                 <td data-nhan="Trạng thái">
                                     @if (nv.TrangThai == "KHOA")
@@ -154,6 +161,8 @@
 
 @code {
     private List<NhanVienDto> _ds;              // danh sách lấy từ API (null = đang tải)
+    private string _locVaiTro = "";
+    private string _locTrangThai = "";
     private string _tuKhoa = "";                // ô tìm kiếm
     private string _loi;
     private bool _moTao;
@@ -250,12 +259,23 @@
         string tuKhoa = _tuKhoa.Trim().ToLower();
         foreach (var nv in _ds)
         {
+            if (_locVaiTro != "" && nv.TenVaiTro != _locVaiTro) continue;
+            if (_locTrangThai != "" && nv.TrangThai != _locTrangThai) continue;
             string sdt = nv.SoDienThoai ?? "";
             if (tuKhoa == "" || nv.HoTen.ToLower().Contains(tuKhoa) || nv.Email.ToLower().Contains(tuKhoa) || sdt.Contains(tuKhoa))
                 ketQua.Add(nv);
         }
         return ketQua;
     }
+
+    private static string TenVaiTro(string vaiTro) => vaiTro switch
+    {
+        "SUPER_ADMIN" => "Chủ chuỗi",
+        "BRANCH_ADMIN" => "Quản lý chi nhánh",
+        "STAFF" => "Nhân viên in ấn",
+        "SHIPPER" => "Nhân viên giao nhận",
+        _ => vaiTro
+    };
 
     private string MoTa()
     {

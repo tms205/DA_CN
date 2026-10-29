@@ -16,7 +16,7 @@ class HoTroScreen extends StatefulWidget {
 }
 
 class _HoTroScreenState extends State<HoTroScreen> {
-  List<ChiNhanh>? _dsChiNhanh;   // null = đang tải
+  List<ChiNhanh>? _dsChiNhanh; // null = đang tải
   String? _loi;
 
   @override
@@ -48,32 +48,49 @@ class _HoTroScreenState extends State<HoTroScreen> {
     if (_dsChiNhanh == null) {
       phanChiNhanh = const Padding(
         padding: EdgeInsets.all(24),
-        child: Center(child: CircularProgressIndicator(color: AppColors.accent)),
+        child: Center(
+          child: CircularProgressIndicator(color: AppColors.accent),
+        ),
       );
     } else if (_loi != null) {
       phanChiNhanh = HopThongBao(_loi!);
     } else {
       phanChiNhanh = Column(
         children: [
-          for (ChiNhanh cn in _dsChiNhanh!) ...[_theChiNhanh(cn), const SizedBox(height: 10)],
+          for (ChiNhanh cn in _dsChiNhanh!) ...[
+            _theChiNhanh(cn),
+            const SizedBox(height: 10),
+          ],
         ],
       );
     }
 
     return Scaffold(
       backgroundColor: AppColors.nen,
-      appBar: const ThanhTieuDe(tieuDe: 'Trợ giúp & liên hệ', phuDe: 'Hotline chi nhánh, câu hỏi thường gặp'),
+      appBar: const ThanhTieuDe(
+        tieuDe: 'Trợ giúp & liên hệ',
+        phuDe: 'Hotline chi nhánh, câu hỏi thường gặp',
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
         children: [
-          const Padding(padding: EdgeInsets.fromLTRB(4, 0, 4, 7), child: NhanTruong('Chi nhánh')),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(4, 0, 4, 7),
+            child: NhanTruong('Chi nhánh'),
+          ),
           phanChiNhanh,
           const SizedBox(height: 8),
-          const Padding(padding: EdgeInsets.fromLTRB(4, 0, 4, 7), child: NhanTruong('Câu hỏi thường gặp')),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(4, 0, 4, 7),
+            child: NhanTruong('Câu hỏi thường gặp'),
+          ),
           Material(
             color: AppColors.trang,
             clipBehavior: Clip.antiAlias,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: AppColors.vach)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: const BorderSide(color: AppColors.vach),
+            ),
             child: Column(
               children: [
                 _cauHoi(
@@ -84,8 +101,8 @@ class _HoTroScreenState extends State<HoTroScreen> {
                 ),
                 _cauHoi(
                   'Bao lâu thì in xong?',
-                  'Ngay ở bước cấu hình in, app hiện giờ in xong dự kiến tính theo tốc độ máy in và hàng đợi của '
-                      'chi nhánh. Bật In hỏa tốc để đơn được đưa lên đầu hàng đợi.',
+                  'Sau khi đặt đơn và máy bắt đầu xử lý, bạn xem giờ in xong trong Theo dõi tiến độ. '
+                      'Thời gian dự kiến dựa trên thời gian máy in cần xử lý, cộng 15 giây dự trù; chưa bao gồm giao hàng. ',
                   false,
                 ),
                 _cauHoi(
@@ -126,34 +143,76 @@ class _HoTroScreenState extends State<HoTroScreen> {
         children: [
           Row(
             children: [
-              const AppIcon(Ico.cuaHang, size: 17, color: AppColors.accent, net: 1.8),
+              const AppIcon(
+                Ico.cuaHang,
+                size: 17,
+                color: AppColors.accent,
+                net: 1.8,
+              ),
               const SizedBox(width: 8),
-              Expanded(child: Text(cn.tenChiNhanh, style: AppTheme.font(size: 13.5, weight: FontWeight.w700))),
+              Expanded(
+                child: Text(
+                  cn.tenChiNhanh,
+                  style: AppTheme.font(size: 13.5, weight: FontWeight.w700),
+                ),
+              ),
               if (cn.soLuotDanhGia > 0) ...[
-                const AppIcon(Ico.sao, size: 13, color: AppColors.hoaToc, net: 2),
+                const AppIcon(
+                  Ico.sao,
+                  size: 13,
+                  color: AppColors.hoaToc,
+                  net: 2,
+                ),
                 const SizedBox(width: 3),
-                Text('${cn.diemDanhGiaTB.toStringAsFixed(1)} (${cn.soLuotDanhGia})',
-                    style: AppTheme.font(size: 11.5, weight: FontWeight.w600, color: AppColors.chuNhan)),
+                Text(
+                  '${cn.diemDanhGiaTB.toStringAsFixed(1)} (${cn.soLuotDanhGia})',
+                  style: AppTheme.font(
+                    size: 11.5,
+                    weight: FontWeight.w600,
+                    color: AppColors.chuNhan,
+                  ),
+                ),
               ],
             ],
           ),
           const SizedBox(height: 7),
           _dongThongTin(Ico.ghim, cn.diaChi),
-          if (cn.gioMoCua != null && cn.gioDongCua != null) _dongThongTin(Ico.dongHo, 'Mở cửa ${cn.gioMoCua} – ${cn.gioDongCua} hằng ngày'),
+          if (cn.gioMoCua != null && cn.gioDongCua != null)
+            _dongThongTin(
+              Ico.dongHo,
+              'Mở cửa ${cn.gioMoCua} – ${cn.gioDongCua} hằng ngày',
+            ),
           const SizedBox(height: 6),
           Row(
             children: [
               Flexible(
-                child: NhanNho('Giao trong ${cn.banKinhGiao.toStringAsFixed(0)} km · shipper nội bộ',
-                    mau: AppColors.thanhCong, nen: AppColors.xanhNhat),
+                child: NhanNho(
+                  'Giao trong ${cn.banKinhGiao.toStringAsFixed(0)} km · shipper nội bộ',
+                  mau: AppColors.thanhCong,
+                  nen: AppColors.xanhNhat,
+                ),
               ),
               const Spacer(),
               if (cn.soDienThoai != null)
                 TextButton.icon(
-                  style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                  ),
                   onPressed: () => _chepSoDienThoai(cn),
-                  icon: const AppIcon(Ico.dienThoai, size: 14, color: AppColors.accent, net: 1.9),
-                  label: Text(cn.soDienThoai!, style: AppTheme.mono(size: 12.5, weight: FontWeight.w600, color: AppColors.accent)),
+                  icon: const AppIcon(
+                    Ico.dienThoai,
+                    size: 14,
+                    color: AppColors.accent,
+                    net: 1.9,
+                  ),
+                  label: Text(
+                    cn.soDienThoai!,
+                    style: AppTheme.mono(
+                      size: 12.5,
+                      weight: FontWeight.w600,
+                      color: AppColors.accent,
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -166,7 +225,10 @@ class _HoTroScreenState extends State<HoTroScreen> {
   Future<void> _chepSoDienThoai(ChiNhanh cn) async {
     await Clipboard.setData(ClipboardData(text: cn.soDienThoai!));
     if (!mounted) return;
-    hienThongBaoNhanh(context, 'Đã chép số ${cn.soDienThoai} của ${cn.tenChiNhanh}.');
+    hienThongBaoNhanh(
+      context,
+      'Đã chép số ${cn.soDienThoai} của ${cn.tenChiNhanh}.',
+    );
   }
 
   Widget _dongThongTin(String icon, String chu) {
@@ -175,9 +237,21 @@ class _HoTroScreenState extends State<HoTroScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(padding: const EdgeInsets.only(top: 1), child: AppIcon(icon, size: 13, color: AppColors.iconMo, net: 1.9)),
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: AppIcon(icon, size: 13, color: AppColors.iconMo, net: 1.9),
+          ),
           const SizedBox(width: 7),
-          Expanded(child: Text(chu, style: AppTheme.font(size: 12, color: AppColors.chuNhan, height: 1.4))),
+          Expanded(
+            child: Text(
+              chu,
+              style: AppTheme.font(
+                size: 12,
+                color: AppColors.chuNhan,
+                height: 1.4,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -186,7 +260,11 @@ class _HoTroScreenState extends State<HoTroScreen> {
   // Một câu hỏi bấm vào thì mở ra câu trả lời
   Widget _cauHoi(String hoi, String dap, bool cuoiCung) {
     return Container(
-      decoration: cuoiCung ? null : const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.vach))),
+      decoration: cuoiCung
+          ? null
+          : const BoxDecoration(
+              border: Border(bottom: BorderSide(color: AppColors.vach)),
+            ),
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
@@ -194,11 +272,21 @@ class _HoTroScreenState extends State<HoTroScreen> {
           childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
           iconColor: AppColors.accent,
           collapsedIconColor: AppColors.iconMo,
-          title: Text(hoi, style: AppTheme.font(size: 13, weight: FontWeight.w600)),
+          title: Text(
+            hoi,
+            style: AppTheme.font(size: 13, weight: FontWeight.w600),
+          ),
           children: [
             Align(
               alignment: Alignment.centerLeft,
-              child: Text(dap, style: AppTheme.font(size: 12.5, color: AppColors.chuNhan, height: 1.55)),
+              child: Text(
+                dap,
+                style: AppTheme.font(
+                  size: 12.5,
+                  color: AppColors.chuNhan,
+                  height: 1.55,
+                ),
+              ),
             ),
           ],
         ),

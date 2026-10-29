@@ -18,7 +18,7 @@
     }
     @foreach (var c in _ds)
     {
-        <details class="pd-connector">
+        <details class="pd-connector" open="@c.LienKet.Any()">
             <summary><strong>@c.TenMayTinh</strong><span>@(c.TrucTuyen ? "Connector đang phản hồi" : "Connector mất kết nối") · @c.HangDoi.Count queue</span></summary>
             <p class="pd-phu">Lần quét: @c.LanCuoiPhatHien.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss") · @(c.BoInPdfSanSang ? "Có bộ gửi PDF" : "Chưa cấu hình SumatraPDF")</p>
             @if (!string.IsNullOrEmpty(c.Loi)) { <div class="o-loi">@c.Loi Máy ảo không bị ảnh hưởng.</div> }
@@ -26,9 +26,11 @@
             <div class="pd-queues">
                 @foreach (var q in c.HangDoi)
                 {
-                    <article class="pd-queue"><div class="pd-dau"><strong>@q.Ten</strong><span class="nhan-mau nhan-xam">@(q.LaMayAo ? "Ảo / xuất file" : "Chưa kiểm chứng vật lý")</span></div>
+                    bool daLienKet = c.LienKet.Any(x => x.CheDo == "THAT" && string.Equals(x.TenHangDoi, q.Ten, StringComparison.OrdinalIgnoreCase));
+                    <article class="pd-queue"><div class="pd-dau"><strong>@q.Ten</strong><span class="nhan-mau @(daLienKet ? "nhan-xanh" : "nhan-xam")">@(q.LaMayAo ? "Ảo / xuất file" : daLienKet ? "Máy thật · đã liên kết" : "Chưa kiểm chứng vật lý")</span></div>
                         <dl><div><dt>Driver / cổng</dt><dd>@q.Driver · @q.Cong</dd></div>
                             <div><dt>Năng lực driver</dt><dd>Màu: @NangLuc(q.InMau) · Hai mặt: @NangLuc(q.InHaiMat)</dd></div>
+                            <div><dt>Khổ giấy từ driver</dt><dd>@(q.KhoGiayHoTro is { Count: > 0 } kho ? string.Join(", ", kho) : "Chưa xác nhận — không đoán theo tên máy")</dd></div>
                             <div><dt>Trạng thái Windows</dt><dd>@(q.TrangThaiDriver == 0 ? "Không báo lỗi (chưa khẳng định online)" : $"Mã trạng thái: {q.TrangThaiDriver}") · @q.SoJob job</dd></div></dl>
                     </article>
                 }

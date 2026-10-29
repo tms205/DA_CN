@@ -5,7 +5,9 @@
 
 <PageTitle>Phê duyệt · PhotocopyChain</PageTitle>
 
-<TieuDeTrang TieuDe="Phê duyệt" MoTa="Kiểm tra và phê duyệt phiếu nhập vật tư và xác nhận hoàn tiền các đơn đã hủy" />
+<TieuDeTrang TieuDe="Phê duyệt" MoTa="Kiểm tra phiếu nhập vật tư và xác nhận hoàn tiền các đơn đã hủy trước khi in">
+    <button class="nut-phu" disabled="@(_dangGui || _dangTai)" aria-busy="@(_dangTai ? "true" : "false")" @onclick="TaiAsync">@(_dangTai ? "Đang tải…" : "Làm mới danh sách")</button>
+</TieuDeTrang>
 
 <div class="than-trang khoi-doc">
     @if (_dangGui) { <p role="status">Đang xử lý xác nhận, vui lòng chờ…</p> }
@@ -34,7 +36,8 @@
         </div>
         @if (_phieu == null)
         {
-            <div class="bang-trong">Đang tải danh sách phiếu nhập…</div>
+            @if (_loi == null) { <TrangThaiTaiBang NoiDung="Đang tải danh sách phiếu nhập…" /> }
+            else { <div class="bang-trong">Chưa tải được phiếu nhập. Bấm Làm mới danh sách để thử lại.</div> }
         }
         else if (!_phieu.Any(x => x.TrangThai == "CHO_DUYET"))
         {
@@ -72,8 +75,8 @@
                                 </td>
                                 <td class="cot-hanh-dong" data-nhan="Thao tác">
                                     <div style="display: flex; gap: 8px;">
-                                        <button class="nut-nho chinh" disabled="@_dangGui" title="Duyệt phiếu nhập" @onclick="() => DuyetAsync(p, true)">Duyệt</button>
-                                        <button class="nut-nho nguy-hiem" disabled="@_dangGui" title="Từ chối phiếu nhập" @onclick="() => DuyetAsync(p, false)">Từ chối</button>
+                                        <button class="nut-nho chinh" disabled="@(_dangGui || _dangTai)" title="Duyệt phiếu nhập" @onclick="() => DuyetAsync(p, true)">Duyệt</button>
+                                        <button class="nut-nho nguy-hiem" disabled="@(_dangGui || _dangTai)" title="Từ chối phiếu nhập" @onclick="() => DuyetAsync(p, false)">Từ chối</button>
                                     </div>
                                 </td>
                             </tr>
@@ -88,13 +91,14 @@
         <div class="bang-tieu-de">
             <div>
                 <h2>Đơn hàng chờ xác nhận hoàn tiền</h2>
-                <p class="bang-mo-ta">Kiểm tra giao dịch và xác nhận hoàn tiền theo từng đơn.</p>
+                <p class="bang-mo-ta">Khách cung cấp lý do, ngân hàng và số tài khoản. Kiểm tra đúng thông tin, chuyển hoàn bên ngoài rồi xác nhận tại đây.</p>
             </div>
             <span class="bang-dem">@(_hoanTien?.Count ?? 0) đơn</span>
         </div>
         @if (_hoanTien == null)
         {
-            <div class="bang-trong">Đang tải danh sách đơn hoàn tiền…</div>
+            @if (_loi == null) { <TrangThaiTaiBang NoiDung="Đang tải danh sách đơn hoàn tiền…" /> }
+            else { <div class="bang-trong">Chưa tải được đơn hoàn tiền. Bấm Làm mới danh sách để thử lại.</div> }
         }
         else if (_hoanTien.Count == 0)
         {
@@ -110,7 +114,7 @@
                             <th scope="col">Khách hàng & SĐT</th>
                             <th scope="col">Chi nhánh</th>
                             <th scope="col">Số tiền hoàn</th>
-                            <th scope="col">Lý do hủy đơn</th>
+                            <th scope="col">Lý do & thông tin nhận hoàn</th>
                             <th scope="col" class="cot-hanh-dong">Thao tác</th>
                         </tr>
                     </thead>
@@ -125,11 +129,15 @@
                                 </td>
                                 <td data-nhan="Chi nhánh">@d.TenChiNhanh</td>
                                 <td class="mono hd-tong" data-nhan="Số tiền hoàn">@Tien(d.SoTien)</td>
-                                <td data-nhan="Lý do hủy đơn">
-                                    <span class="chu-mo">@(string.IsNullOrEmpty(d.GhiChu) ? "Hủy đơn" : d.GhiChu)</span>
+                                <td data-nhan="Lý do & thông tin nhận hoàn">
+                                    <div class="hoan-tien-ghi-chu">@(string.IsNullOrEmpty(d.GhiChu) ? "Chưa có lý do hủy" : d.GhiChu)</div>
+                                    @if (d.ThongTinHoanTien == null)
+                                    {
+                                        <div class="chu-mo">Chờ khách bổ sung thông tin nhận hoàn trên app.</div>
+                                    }
                                 </td>
                                 <td class="cot-hanh-dong" data-nhan="Thao tác">
-                                    <button class="nut-nho chinh" disabled="@_dangGui" title="Xác nhận đã chuyển khoản hoàn tiền" @onclick="() => HoanTienAsync(d)">Đã chuyển hoàn</button>
+                                    <button class="nut-nho chinh" disabled="@(_dangGui || _dangTai || d.ThongTinHoanTien == null)" title="Chỉ xác nhận sau khi kiểm tra tài khoản và đã chuyển hoàn" @onclick="() => HoanTienAsync(d)">Đã chuyển hoàn</button>
                                 </td>
                             </tr>
                         }
@@ -144,12 +152,32 @@
 @code{
     private XacNhanThaoTac _xacNhan;
     private bool _dangGui;
+    private bool _dangTai;
     private List<PhieuNhapDto> _phieu; private List<HoanTienChoDuyetDto> _hoanTien; private string _loi; private string _thongBao;
     protected override async Task OnInitializedAsync()=>await TaiAsync();
-    private async Task TaiAsync(){try{_phieu=await Http.GetFromJsonAsync<List<PhieuNhapDto>>("api/quan-tri/phieu-nhap")??new();_hoanTien=await Http.GetFromJsonAsync<List<HoanTienChoDuyetDto>>("api/quan-tri/hoan-tien")??new();ThongBao.CapNhat(_phieu.Count(x=>x.TrangThai=="CHO_DUYET")+_hoanTien.Count);}catch{_loi="Không tải được danh sách phê duyệt.";_phieu=new();_hoanTien=new();ThongBao.CapNhat(null);}}
+    private async Task TaiAsync()
+    {
+        if (_dangTai) return;
+        _dangTai = true;
+        _loi = null;
+        try
+        {
+            var phieu = await Http.GetFromJsonAsync<List<PhieuNhapDto>>("api/quan-tri/phieu-nhap") ?? new();
+            var hoanTien = await Http.GetFromJsonAsync<List<HoanTienChoDuyetDto>>("api/quan-tri/hoan-tien") ?? new();
+            _phieu = phieu;
+            _hoanTien = hoanTien;
+            ThongBao.CapNhat(_phieu.Count(x => x.TrangThai == "CHO_DUYET") + _hoanTien.Count);
+        }
+        catch
+        {
+            _loi = "Không tải được danh sách phê duyệt. Vui lòng thử lại.";
+            ThongBao.CapNhat(null);
+        }
+        finally { _dangTai = false; }
+    }
     private async Task DuyetAsync(PhieuNhapDto p, bool dongY)
     {
-        if (_dangGui || !await _xacNhan.HoiAsync($"{(dongY ? "Duyệt" : "Từ chối")} phiếu PN{p.MaPhieuNhap:0000} · {p.TenChiNhanh}\n{p.SoLuong} {p.TenVatTu} · {Tien(p.SoLuong * p.DonGia)}\nDuyệt phiếu chưa làm tăng tồn kho; cần bước nhận hàng.", "Phê duyệt phiếu nhập", dongY ? "Duyệt phiếu" : "Từ chối", !dongY)) return;
+        if (_dangGui || _dangTai || !await _xacNhan.HoiAsync($"{(dongY ? "Duyệt" : "Từ chối")} phiếu PN{p.MaPhieuNhap:0000} · {p.TenChiNhanh}\n{p.SoLuong} {p.TenVatTu} · {Tien(p.SoLuong * p.DonGia)}\nDuyệt phiếu chưa làm tăng tồn kho; cần bước nhận hàng.", "Phê duyệt phiếu nhập", dongY ? "Duyệt phiếu" : "Từ chối", !dongY)) return;
         _dangGui = true; _loi = _thongBao = null;
         try
         {
@@ -162,7 +190,7 @@
     }
     private async Task HoanTienAsync(HoanTienChoDuyetDto d)
     {
-        if (_dangGui || !await _xacNhan.HoiAsync($"Xác nhận đã chuyển hoàn {Tien(d.SoTien)} cho đơn {d.MaDonHangHienThi} của {d.TenKhachHang}? Chỉ xác nhận sau khi thực sự chuyển tiền; thao tác này không tự chuyển khoản.", "Xác nhận hoàn tiền", "Đã chuyển hoàn", true)) return;
+        if (_dangGui || _dangTai || d.ThongTinHoanTien == null || !await _xacNhan.HoiAsync($"Xác nhận đã chuyển hoàn {Tien(d.SoTien)} cho đơn {d.MaDonHangHienThi} của {d.TenKhachHang}?\n{d.GhiChu}\nChỉ xác nhận sau khi thực sự chuyển tiền; thao tác này không tự chuyển khoản.", "Xác nhận hoàn tiền", "Đã chuyển hoàn", true)) return;
         _dangGui = true; _loi = _thongBao = null;
         try
         {

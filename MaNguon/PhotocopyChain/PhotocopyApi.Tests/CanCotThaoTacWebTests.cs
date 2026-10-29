@@ -31,7 +31,7 @@ public class CanCotThaoTacWebTests
     public async Task NhanVien_CoTieuDeThaoTac_ChiGiuKhoaKhongCapLaiMatKhau()
     {
         string html = await Render<NhanVien>();
-        Assert.Contains("class=\"cot-hanh-dong\">Thao tác</th>", html);
+        Assert.Matches("<th[^>]*class=\"cot-hanh-dong\"[^>]*>Thao tác</th>", html);
         Assert.Contains(">Khóa</button>", html);
         Assert.DoesNotContain("Cấp lại mật khẩu", html);
         Assert.DoesNotContain("Ai cấp lại mật khẩu", html);

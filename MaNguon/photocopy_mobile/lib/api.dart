@@ -109,6 +109,37 @@ class Api {
     }
   }
 
+  // Nhận dạng chạy trên máy chủ, có thể mất vài phút khi nạp model.
+  static Future<KetQuaApi> nhanDangChu(String path, String name, String model, {List<double>? vungCat}) async {
+    try {
+      final request = http.MultipartRequest('POST', Uri.parse('$diaChiApi/api/ocr/nhan-dang'));
+      if (Phien.token != null) request.headers['Authorization'] = 'Bearer ${Phien.token}';
+      request.fields['model'] = model;
+      if (vungCat != null) request.fields['vungCat'] = jsonEncode(vungCat);
+      request.files.add(await http.MultipartFile.fromPath('file', path, filename: name));
+      final streamed = await request.send().timeout(const Duration(minutes: 15));
+      final response = await http.Response.fromStream(streamed).timeout(const Duration(minutes: 15));
+      return _docKetQua(response);
+    } catch (_) {
+      return KetQuaApi()..loi = 'Không nhận dạng được. Kiểm tra kết nối và OCR trên máy chủ.';
+    }
+  }
+
+  static Future<KetQuaApi> xuatWordOcr(String text) async {
+    try {
+      final response = await http.post(Uri.parse('$diaChiApi/api/ocr/xuat-word'), headers: _taoHeader(), body: jsonEncode({'text': text})).timeout(const Duration(seconds: 60));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        if (response.headers['content-type']?.contains('json') == true) return _docKetQua(response);
+        return KetQuaApi()..loi = 'Không xuất được file Word.';
+      }
+      final bytes = response.bodyBytes;
+      if (bytes.length < 4 || bytes.length > 4 * 1024 * 1024 || bytes[0] != 80 || bytes[1] != 75 || response.headers['content-type']?.split(';').first != 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        return KetQuaApi()..loi = 'File Word trả về không hợp lệ.';
+      }
+      return KetQuaApi()..thanhCong = true..duLieu = bytes;
+    } catch (_) { return KetQuaApi()..loi = 'Không tải được file Word. Kiểm tra kết nối và thử lại.'; }
+  }
+
   // Header gửi kèm: dữ liệu dạng JSON + token nếu đã đăng nhập
   static Map<String, String> _taoHeader() {
     Map<String, String> header = {'Content-Type': 'application/json'};

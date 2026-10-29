@@ -1,64 +1,92 @@
-@using System.Globalization
-
-<div class="tq-bieu-do">
-    <svg viewBox="0 0 760 280" role="img" aria-label="Xu hướng doanh thu kỳ đã chọn so với cùng số ngày liền trước">
-        <title>Doanh thu theo kỳ, đơn vị đồng</title>
-        <desc>Cột hoặc đường đậm là kỳ đã chọn; viền hoặc đường đứt là kỳ đối chiếu. Đơn vị tính là đồng; tổng doanh thu và số đơn nằm ở các thẻ chỉ số phía trên.</desc>
-        @for (int muc = 0; muc <= 4; muc++)
+﻿@using System.Globalization
+@* Adapted interaction pattern: Lucian UX/UI #095 (MIT); see docs/THIRD_PARTY_LUCIAN_UXUI.md. *@
+<div class="tq-bieu-do cd-xu-huong">
+    <div class="cd-dau">
+        <div class="cd-so-lieu" aria-live="polite">
+            <span>@(ChiSo >= 0 ? TenKy(HienTai[ChiSo].Ngay) : "Tổng doanh thu trong kỳ")</span>
+            <strong>@TongQuanBaoCao.Tien(ChiSo >= 0 ? HienTai[ChiSo].DoanhThu : HienTai.Sum(x => x.DoanhThu))</strong>
+        </div>
+        @if (NhomTheoChanged.HasDelegate)
         {
-            double y = 225 - muc * 50;
-            <g><line x1="168" x2="736" y1="@So(y)" y2="@So(y)" class="tq-vach-bieu-do" />
-            <text x="156" y="@So(y + 4)" text-anchor="end" class="tq-nhan-truc">@TongQuanBaoCao.Tien(_buoc * muc)</text></g>
-        }
-        @if (NhomTheo != "ngay")
-        {
-            @if (_coDoiChieu) { <polyline points="@Duong(KyTruoc)" class="tq-duong-truoc" /> }
-            <polyline points="@Duong(HienTai)" class="tq-duong-nay" />
-        }
-        @for (int i = 0; i < HienTai.Count; i++)
-        {
-            var diem = HienTai[i];
-            <g>
-                @if (NhomTheo == "ngay")
+            <div class="cd-nhom" role="group" aria-label="Nhóm báo cáo">
+                @foreach (string nhom in new[] { "ngay", "tuan", "thang" })
                 {
-                    @if (_coDoiChieu && i < KyTruoc.Count)
+                    <button type="button" aria-pressed="@(NhomTheo == nhom ? "true" : "false")" @onclick="() => NhomTheoChanged.InvokeAsync(nhom)">@(nhom == "ngay" ? "Ngày" : nhom == "tuan" ? "Tuần" : "Tháng")</button>
+                }
+            </div>
+        }
+    </div>
+    @if (HienTai.Count > 0)
+    {
+        <div class="cd-bieu-do" style="@($"--khoang-cot:{(HienTai.Count > 60 ? 0 : HienTai.Count > 31 ? 2 : 4)}px")">
+            <div class="cd-truc" aria-hidden="true">
+                @for (int i = 4; i >= 0; i--) { <span>@TongQuanBaoCao.Tien(_buoc * i)</span> }
+            </div>
+            <div class="cd-plot">
+                <div class="cd-luoi" aria-hidden="true">@for (int i = 0; i < 5; i++) { <span></span> }</div>
+                <div class="cd-trung-binh" style="@($"bottom:{So(ChieuCao(_trungBinh))}%")" aria-hidden="true"><span>TB @TongQuanBaoCao.Tien(_trungBinh)</span></div>
+                <div class="cd-cac-cot @(ChiSo >= 0 ? "co-chon" : "")" role="group" aria-label="Doanh thu theo từng kỳ">
+                    @for (int i = 0; i < HienTai.Count; i++)
                     {
-                        <rect x="@So(X(i) - _rongCot)" y="@So(Y(KyTruoc[i].DoanhThu))" width="@So(Math.Max(0.3, _rongCot - 1))" height="@So(225 - Y(KyTruoc[i].DoanhThu))" class="tq-cot-truoc"><title>Đối chiếu: @TongQuanBaoCao.Tien(KyTruoc[i].DoanhThu)</title></rect>
+                        int index = i;
+                        var diem = HienTai[index];
+                        <button @key="index" @ref="_cacCot[index]" type="button" class="cd-cot @(ChiSo == index ? "dang-chon" : "") @(_ghim == index ? "ghim" : "") @(index == HienTai.Count - 1 ? "cot-cuoi" : "")"
+                            style="@($"--cao:{So(ChieuCao(diem.DoanhThu))}%")" data-gia-tri="@diem.DoanhThu.ToString(CultureInfo.InvariantCulture)"
+                            tabindex="@(index == _focus ? 0 : -1)" aria-pressed="@(_ghim == index ? "true" : "false")"
+                            aria-label="@(TenKy(diem.Ngay) + ": " + TongQuanBaoCao.Tien(diem.DoanhThu))"
+                            @onmouseenter="() => _di = index" @onmouseleave="() => _di = -1" @onfocus="() => _di = index" @onblur="() => _di = -1"
+                            @onclick="() => Ghim(index)" @onkeydown="e => PhimCot(e, index)"><i aria-hidden="true"></i></button>
                     }
-                    <rect x="@So(X(i))" y="@So(Y(diem.DoanhThu))" width="@So(Math.Max(0.3, _rongCot - 1))" height="@So(225 - Y(diem.DoanhThu))" class="tq-cot-nay"><title>@diem.Ngay.ToString("dd'/'MM'/'yyyy"): @TongQuanBaoCao.Tien(diem.DoanhThu)</title></rect>
-                }
-                else if (HienTai.Count <= 31)
+                </div>
+                @if (ChiSo >= 0)
                 {
-                    @if (_coDoiChieu && i < KyTruoc.Count) { <circle cx="@So(X(i))" cy="@So(Y(KyTruoc[i].DoanhThu))" r="4" class="tq-diem-truoc"><title>Đối chiếu: @TongQuanBaoCao.Tien(KyTruoc[i].DoanhThu)</title></circle> }
-                    <circle cx="@So(X(i))" cy="@So(Y(diem.DoanhThu))" r="4" class="tq-diem"><title>@diem.Ngay.ToString("dd'/'MM'/'yyyy"): @TongQuanBaoCao.Tien(diem.DoanhThu)</title></circle>
+                    var diem = HienTai[ChiSo];
+                    <div class="cd-tooltip" role="status"><b>@TenKy(diem.Ngay)</b><span>@TongQuanBaoCao.Tien(diem.DoanhThu) · @diem.SoDon đơn</span>
+                    @if (ChiSo < KyTruoc.Count && KyTruoc[ChiSo].DoanhThu != 0) { <small>Kỳ trước: @TongQuanBaoCao.Tien(KyTruoc[ChiSo].DoanhThu)</small> }
+                    @if (_ghim >= 0) { <small>Đã ghim · bấm lại hoặc nhấn Esc để bỏ ghim</small> }</div>
                 }
-                @if (i == 0 || i == HienTai.Count - 1 || i % Math.Max(1, (HienTai.Count + 3) / 4) == 0)
+            </div>
+            <div class="cd-truc-ngang" aria-hidden="true">
+                @for (int i = 0; i < HienTai.Count; i++)
                 {
-                    <g><text x="@So(X(i))" y="253" text-anchor="@(HienTai.Count == 1 ? "middle" : i == 0 ? "start" : i == HienTai.Count - 1 ? "end" : "middle")" class="tq-nhan-truc">@diem.Ngay.ToString(NhomTheo == "thang" ? "MM'/'yy" : "dd'/'MM")</text></g>
+                    if (i == 0 || i == HienTai.Count - 1 || i % Math.Max(1, (HienTai.Count + 3) / 4) == 0)
+                    { <span style="@($"left:{So((i + .5) / HienTai.Count * 100)}%;transform:translateX({(i == 0 ? "0" : i == HienTai.Count - 1 ? "-100%" : "-50%")})")">@HienTai[i].Ngay.ToString(NhomTheo == "thang" ? "MM/yyyy" : "dd/MM")</span> }
                 }
-            </g>
-        }
-    </svg>
-    <div class="tq-chu-giai"><span><i class="tq-mau-nay"></i>Kỳ đã chọn</span>@if (_coDoiChieu) { <span><i class="tq-mau-truoc"></i>Kỳ đối chiếu</span> } else { <span>Kỳ đối chiếu chưa có doanh thu</span> }</div>
+            </div>
+        </div>
+        <p class="cd-huong-dan">Rê chuột hoặc chọn một cột để xem chi tiết · dùng phím ← / → để chuyển cột.</p>
+    }
+    else { <p class="cd-rong">Chưa có dữ liệu doanh thu trong kỳ.</p> }
 </div>
 
 @code {
     [Parameter] public List<BaoCaoDoanhThuDto> HienTai { get; set; } = new();
     [Parameter] public List<BaoCaoDoanhThuDto> KyTruoc { get; set; } = new();
     [Parameter] public string NhomTheo { get; set; } = "ngay";
-    private decimal _buoc;
-    private bool _coDoiChieu;
-    private double _rongCot;
+    [Parameter] public EventCallback<string> NhomTheoChanged { get; set; }
+    private decimal _buoc, _trungBinh;
+    private int _di = -1, _ghim = -1, _focus;
+    private ElementReference[] _cacCot = Array.Empty<ElementReference>();
+    private List<BaoCaoDoanhThuDto> _cu;
+    private int ChiSo => _di >= 0 && _di < HienTai.Count ? _di : _ghim >= 0 && _ghim < HienTai.Count ? _ghim : -1;
 
     protected override void OnParametersSet()
     {
-        _buoc = TongQuanBaoCao.BuocTruc(HienTai.Concat(KyTruoc).Select(x => x.DoanhThu).DefaultIfEmpty(0).Max());
-        _coDoiChieu = KyTruoc.Any(x => x.DoanhThu != 0);
-        _rongCot = Math.Min(24, 550.0 / Math.Max(1, HienTai.Count) / 2.5);
+        if (!ReferenceEquals(_cu, HienTai)) { _di = _ghim = -1; _focus = 0; _cu = HienTai; }
+        if (_cacCot.Length != HienTai.Count) _cacCot = new ElementReference[HienTai.Count];
+        _buoc = TongQuanBaoCao.BuocTruc(HienTai.Select(x => x.DoanhThu).DefaultIfEmpty(0).Max());
+        _trungBinh = HienTai.Count == 0 ? 0 : HienTai.Average(x => x.DoanhThu);
     }
-
-    private double X(int i) => HienTai.Count <= 1 ? 452 : 196 + 512.0 * i / (HienTai.Count - 1);
-    private double Y(decimal tien) => 225 - (double)(tien / (_buoc * 4)) * 200;
-    private static string So(double n) => n.ToString("0.##", CultureInfo.InvariantCulture);
-    private string Duong(List<BaoCaoDoanhThuDto> ds) => string.Join(" ", ds.Select((x, i) => $"{So(X(i))},{So(Y(x.DoanhThu))}"));
+    private void Ghim(int index) { _ghim = _ghim == index ? -1 : index; _focus = index; }
+    private async Task PhimCot(KeyboardEventArgs e, int index)
+    {
+        if (e.Key == "Escape") { _di = _ghim = -1; return; }
+        if (e.Key is not ("ArrowLeft" or "ArrowRight") || HienTai.Count == 0) return;
+        _focus = (index + (e.Key == "ArrowRight" ? 1 : HienTai.Count - 1)) % HienTai.Count;
+        _di = _focus;
+        await _cacCot[_focus].FocusAsync();
+    }
+    private double ChieuCao(decimal giaTri) => Math.Clamp((double)(giaTri / (_buoc * 4)) * 100, 0, 100);
+    private static string So(double n) => n.ToString("0.###", CultureInfo.InvariantCulture);
+    private string TenKy(DateTime ngay) => NhomTheo == "thang" ? ngay.ToString("MM/yyyy") : NhomTheo == "tuan" ? "Tuần từ " + ngay.ToString("dd/MM/yyyy") : ngay.ToString("dd/MM/yyyy");
 }

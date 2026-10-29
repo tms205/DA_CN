@@ -15,7 +15,7 @@ import 'thanh_toan_screen.dart';
 
 // F-09 / F-34 — Bước 3/4: chọn chi nhánh, hình thức nhận, mã giảm giá rồi đặt đơn.
 // Giá được tính lại theo đúng chi nhánh khách chọn (bước 2 tạm tính theo chi nhánh đang xem giấy),
-// vì giao tận nơi còn cộng phí ship và giờ in xong dự kiến tùy hàng đợi từng chi nhánh.
+// vì giao tận nơi còn cộng phí ship theo tuyến đường của từng chi nhánh.
 class ChonChiNhanhScreen extends StatefulWidget {
   const ChonChiNhanhScreen({
     super.key,
@@ -682,14 +682,6 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
     BaoGia? b = _baoGia;
     ChiNhanh? cn = _chiNhanhDaChon();
 
-    String? dongHenTra;
-    if (b != null && b.ngayHenTra != null) {
-      int soPhut = b.ngayHenTra!.difference(DateTime.now()).inMinutes;
-      if (soPhut < 1) soPhut = 1;
-      dongHenTra =
-          'Dự kiến in xong sau $soPhut phút — lúc ${gioPhut(b.ngayHenTra!)}';
-    }
-
     // Chỉ cho bấm Đặt đơn khi đã báo giá xong và chọn được chi nhánh in được
     bool datDuoc =
         b != null && cn != null && cn.dapUngDuoc && !_dangTinh && !_dangDatDon;
@@ -826,31 +818,6 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
                 ),
               ],
             ),
-            if (dongHenTra != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 5),
-                child: Row(
-                  children: [
-                    const AppIcon(
-                      Ico.dongHo,
-                      size: 13,
-                      color: AppColors.thanhCong,
-                      net: 1.9,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        dongHenTra,
-                        style: AppTheme.font(
-                          size: 11.5,
-                          weight: FontWeight.w600,
-                          color: AppColors.thanhCong,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             if (_loiDatDon != null) ...[
               const SizedBox(height: 8),
               HopThongBao(_loiDatDon!),

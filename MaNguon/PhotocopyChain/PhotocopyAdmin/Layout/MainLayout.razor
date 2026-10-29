@@ -57,6 +57,7 @@
                         <NavLink class="tb-muc" href="lap-don-tai-quay" title="Lập đơn tại quầy" @onclick="DongMenu">@((MarkupString)Svg.HoaDon(18)) <span>Lập đơn tại quầy</span></NavLink>
                         <NavLink class="tb-muc" href="ban-giao" title="Bàn giao tại quầy" @onclick="DongMenu">@((MarkupString)Svg.CapTap(18)) <span>Bàn giao tại quầy</span></NavLink>
                     }
+                    <NavLink class="tb-muc" href="nhan-dang-chu" title="Nhận dạng chữ từ ảnh" @onclick="DongMenu">@((MarkupString)Svg.NhanDang(18)) <span>Nhận dạng chữ</span></NavLink>
                     <NavLink class="tb-muc" href="kho-file" title="Kho file in" @onclick="DongMenu">@((MarkupString)Svg.TaiLieu(18)) <span>Kho file in</span></NavLink>
                     <NavLink class="tb-muc" href="may-in" title="Bảng điều khiển máy in" @onclick="DongMenu">@((MarkupString)Svg.MayIn(18)) <span>Điều khiển máy in</span></NavLink>
                     <NavLink class="tb-muc" href="giao-hang" title="Giao hàng nội bộ" @onclick="DongMenu">@((MarkupString)Svg.XeGiao(18)) <span>Giao hàng nội bộ</span></NavLink>
@@ -111,6 +112,7 @@
                 <button type="button" id="nhom-cau-hinh" class="tb-nhom-tieu-de" aria-expanded="@(_cacNhomDangMo.Contains("cau-hinh") ? "true" : "false")" aria-controls="menu-cau-hinh" @onclick='() => DoiNhom("cau-hinh")'>@((MarkupString)Svg.CaiDat(20)) <span>Cấu hình</span><span class="tb-nhom-mui-ten" aria-hidden="true"></span></button>
                 <div id="menu-cau-hinh" class="tb-nhom-noi-dung @(_cacNhomDangMo.Contains("cau-hinh") ? "" : "dong")">
                     <NavLink class="tb-muc" href="bang-gia" title="Bảng giá in ấn" @onclick="DongMenu">@((MarkupString)Svg.NhanGia()) <span>Bảng giá in ấn</span></NavLink>
+                    @if (VaiTroLa("SUPER_ADMIN")) { <NavLink class="tb-muc" href="bao-tri" title="Bảo trì hệ thống" @onclick="DongMenu">@((MarkupString)Svg.BaoTri(18)) <span>Bảo trì hệ thống</span></NavLink> }
                     @if (VaiTroLa("SUPER_ADMIN")) { <NavLink class="tb-muc" href="khuyen-mai" title="Quản lý khuyến mãi" @onclick="DongMenu">@((MarkupString)Svg.VeKhuyenMai()) <span>Khuyến mãi</span></NavLink> }
                     @if (LaQuanLy()) { <NavLink class="tb-muc" href="quan-tri" title="Chi nhánh & máy in" @onclick="DongMenu">@((MarkupString)Svg.CuaHang(18)) <span>Chi nhánh &amp; máy in</span></NavLink> }
                 </div>
@@ -171,6 +173,10 @@
 
         <main class="noi-dung">
             <div class="noi-dung-trang">
+                @if (_dangBaoTriCeo)
+                {
+                    <div class="layout-bao-tri" role="status"><div><strong>Đang bảo trì</strong><span>Các chức năng nghiệp vụ đã tạm khóa. CEO chỉ có thể quản lý chế độ bảo trì.</span></div><NavLink href="bao-tri">Quản lý bảo trì →</NavLink></div>
+                }
                 @if (_daKhoiTao) { @Body }
                 else { <div class="the" role="status">Đang chuẩn bị phiên làm việc…</div> }
             </div>
@@ -218,6 +224,8 @@
     // Người đang đăng nhập
     private NguoiDungDto ND => Phien.NguoiDung;
     private bool _daKhoiTao;
+    private bool _dangBaoTriCeo;
+    private readonly CancellationTokenSource _baoTriDung = new();
     private List<ChiNhanhDto> _dsChiNhanh = new();
     private ElementReference _hopLienHe;
     private string _ketQuaSaoChep;
@@ -254,6 +262,7 @@
                 "bang-gia" => ("Cấu hình", "Bảng giá in ấn"),
                 "khuyen-mai" => ("Cấu hình", "Khuyến mãi"),
                 "quan-tri" => ("Cấu hình", "Chi nhánh & máy in"),
+                "bao-tri" => ("Cấu hình", "Bảo trì hệ thống"),
                 "thong-tin-ca-nhan" => ("Tài khoản", "Thông tin cá nhân"),
                 _ => ("PhotocopyChain", "Không gian quản trị")
             };
@@ -278,6 +287,7 @@
         MoNhomCuaTrang();
         await PhamVi.KhoiTaoAsync();
         await TrangThaiDangNhap;
+        _ = TheoDoiBaoTriAsync(_baoTriDung.Token);
         Nav.LocationChanged += DoiTrang;
         if (!VaiTroLa(VaiTro.SuperAdmin)) { _daKhoiTao = true; return; }
 
@@ -297,6 +307,33 @@
         // Đọc xong phiên và phạm vi mới hiển thị trang; chọn chi nhánh không tự mở ca CEO.
         _daKhoiTao = true;
     }
+
+    private async Task TheoDoiBaoTriAsync(CancellationToken token)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+        try {
+            do {
+                try {
+                    if (ND != null) {
+                        var state = await Http.GetFromJsonAsync<TrangThaiBaoTriWeb>("api/bao-tri/trang-thai", token);
+                        if (VaiTroLa(VaiTro.SuperAdmin)) {
+                            bool active = state?.DangBaoTri == true;
+                            if (_dangBaoTriCeo != active) await InvokeAsync(() => { _dangBaoTriCeo = active; StateHasChanged(); });
+                            if (active) await InvokeAsync(GiuTrongTrangBaoTri);
+                        } else {
+                            var invalid = state?.DangBaoTri == true;
+                            if (!invalid) { using var session = await Http.GetAsync("api/bao-tri/phien", token); invalid = session.StatusCode == System.Net.HttpStatusCode.Unauthorized; }
+                            if (invalid) {
+                                await InvokeAsync(async () => { await Phien.DangXuat(); Nav.NavigateTo("dang-nhap", replace: true); }); return;
+                            }
+                        }
+                    }
+                } catch (OperationCanceledException) when (token.IsCancellationRequested) { return; }
+                  catch { /* Mất mạng tạm thời: thử lại ở nhịp kế tiếp. */ }
+            } while (await timer.WaitForNextTickAsync(token));
+        } catch (OperationCanceledException) { }
+    }
+    private sealed class TrangThaiBaoTriWeb { public bool DangBaoTri { get; set; } }
 
     private bool VaiTroLa(string vaiTro)
     {
@@ -395,14 +432,21 @@
     }
 
     private void VeBadge() => _ = InvokeAsync(StateHasChanged);
+    private void GiuTrongTrangBaoTri()
+    {
+        if (_dangBaoTriCeo && VaiTroLa(VaiTro.SuperAdmin) && Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].Trim('/') != "bao-tri")
+            Nav.NavigateTo("bao-tri", replace: true);
+    }
     private void DoiTrang(object sender, LocationChangedEventArgs e)
     {
+        GiuTrongTrangBaoTri();
         MoNhomCuaTrang();
         _ = InvokeAsync(StateHasChanged);
         if (VaiTroLa(VaiTro.SuperAdmin)) _ = ThongBao.TaiAsync();
     }
     public void Dispose()
     {
+        _baoTriDung.Cancel();
         ThongBao.ThayDoi -= VeBadge;
         Nav.LocationChanged -= DoiTrang;
     }

@@ -13,6 +13,9 @@ public static class TrangThaiDonHang
     public const string HoanThanh = "HOAN_THANH";
     public const string DaHuy = "DA_HUY";
 
+    /// <summary>Áp dụng cho mọi vai trò; DANG_IN là mốc đã bắt đầu quy trình in.</summary>
+    public static bool ChoPhepHuy(string trangThai) => trangThai is ChoXacNhan or DaXacNhan;
+
     public static string TenHienThi(string trangThai) => trangThai switch
     {
         ChoXacNhan => "Chờ tiếp nhận",

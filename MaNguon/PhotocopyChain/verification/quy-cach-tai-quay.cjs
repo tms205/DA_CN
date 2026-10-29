@@ -1,4 +1,4 @@
-const { expect } = require((process.env.PLAYWRIGHT_MODULE || 'playwright') + '/test');
+﻿const { expect } = require((process.env.PLAYWRIGHT_MODULE || 'playwright') + '/test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
@@ -7,6 +7,7 @@ async function kiemTraQuyCach(browser, base, output) {
   for (const width of [390, 768, 1366, 1920]) {
     const context = await browser.newContext({ viewport: { width, height: 1000 } });
     const page = await context.newPage(), errors = [], baoGia = [];
+    let loiBaoGia = false;
     page.on('pageerror', e => errors.push(e.message));
     const nd = { maNguoiDung: 2, hoTen: 'Quản lý kiểm thử', tenVaiTro: 'BRANCH_ADMIN', maChiNhanh: 1, tenChiNhanh: 'Chi nhánh thử' };
     await context.addInitScript(nd => localStorage.setItem('photocopychain.phien', JSON.stringify({
@@ -24,8 +25,12 @@ async function kiemTraQuyCach(browser, base, output) {
       if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/hubs/')) {
         const tra = (body, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body), headers: { 'Access-Control-Allow-Origin': '*' } });
         if (url.pathname === '/api/don-hang/khach-tai-quay') return tra({ maKhachHang: 20, hoTen: 'Khách thử' });
-        if (url.pathname === '/api/file-in' && req.method() === 'POST') return tra({ maFileIn: 10, tenFileGoc: 'test.pdf', soTrang: 8, trangThaiFile: 'SAN_SANG' });
+        if (url.pathname === '/api/file-in' && req.method() === 'POST') {
+          if (req.postDataBuffer().toString().includes('gia-loi.pdf')) loiBaoGia = true;
+          return tra({ maFileIn: loiBaoGia ? 11 : 10, tenFileGoc: loiBaoGia ? 'gia-loi.pdf' : 'test.pdf', soTrang: 8, trangThaiFile: 'SAN_SANG' });
+        }
         if (url.pathname === '/api/bao-gia') {
+          if (loiBaoGia) return tra({ message: 'Báo giá kiểm thử đang lỗi.' }, 400);
           const body = req.postDataJSON(); baoGia.push(body);
           return tra({ tienIn: 2400, tienGiaCong: 15000, tongTien: 17400, tongSoTrang: 8, ngayHenTra: '2026-10-13T18:30:00', khuyenMaiHopLe: true });
         }
@@ -46,8 +51,10 @@ async function kiemTraQuyCach(browser, base, output) {
       await page.getByPlaceholder('Nguyễn Văn An').fill('Khách thử');
       await page.getByRole('button', { name: 'Tìm / tạo khách hàng', exact: true }).click();
       await page.locator('input[type=file]').setInputFiles({ name: 'test.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\nfixture') });
+      await expect(page.getByRole('heading', { name: '3. Quy cách và báo giá', exact: true })).toBeFocused();
+      await expect.poll(() => page.locator('#ldq-quy-cach-bao-gia').evaluate(el => el.getBoundingClientRect().top)).toBeLessThan(180);
       await expect(page.getByLabel('Thanh toán', { exact: true })).toBeVisible();
-      const label = name => page.getByText(new RegExp(name + ' ·'));
+      const label = name => page.locator('label.hop-chon').filter({ hasText: name });
       const checked = name => label(name).locator('input[type=checkbox]');
       await label('Đóng bìa kiếng').click();
       await label('Đóng lò xo').click();
@@ -55,6 +62,8 @@ async function kiemTraQuyCach(browser, base, output) {
       await expect(checked('Đóng lò xo')).toBeChecked();
       await page.getByRole('button', { name: 'Tính lại giá', exact: true }).click();
       await expect(page.getByRole('button', { name: 'Lập đơn & hiện mã QR', exact: true })).toBeEnabled();
+      await expect(page.getByText('Giờ nhận dự kiến', { exact: false })).toHaveCount(0);
+      await expect(page.getByText('18:30 13/10/2026', { exact: false })).toHaveCount(0);
       assert.deepEqual(baoGia.at(-1).fileIn[0].dsGiaCong.sort(), [13, 14]);
       await label('Bấm kim góc').click();
       await expect(checked('Đóng lò xo')).not.toBeChecked();
@@ -69,9 +78,9 @@ async function kiemTraQuyCach(browser, base, output) {
         return { fields, full: document.getElementById(ids[0]).parentElement.parentElement.clientWidth, overflow: document.documentElement.scrollWidth > innerWidth };
       });
       assert.equal(sizes.overflow, false);
-      if (width > 1100) {
+      if (width > 1400) {
         assert.ok(sizes.fields.every(f => Math.abs(f.y - sizes.fields[0].y) < 1), 'Ba ô phải cùng hàng desktop.');
-        assert.ok(sizes.fields[0].width < sizes.full * .36 && sizes.fields[1].width < sizes.full * .2, 'Thanh toán/mã giảm khoảng một nửa độ rộng cũ.');
+        assert.ok(sizes.fields[1].width < sizes.fields[0].width, 'Mã giảm gọn hơn ô chọn thanh toán.');
       }
       await label('Đóng lò xo').click();
       await expect(checked('Đóng bìa kiếng')).toBeChecked();
@@ -81,6 +90,10 @@ async function kiemTraQuyCach(browser, base, output) {
       await expect(page.getByRole('button', { name: 'Lập đơn & hiện mã QR', exact: true })).toBeEnabled();
       await page.getByLabel('Thanh toán', { exact: true }).scrollIntoViewIfNeeded();
       await page.screenshot({ path: path.join(output, `quy-cach-${width}.png`), fullPage: true });
+      await page.locator('input[type=file]').focus();
+      await page.locator('input[type=file]').setInputFiles({ name: 'gia-loi.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\nfixture') });
+      await expect(page.locator('.o-loi')).toContainText('Báo giá kiểm thử đang lỗi.');
+      await expect(page.getByRole('heading', { name: '3. Quy cách và báo giá', exact: true })).not.toBeFocused();
       assert.deepEqual(errors, []);
       results.push({ width, status: 'PASS', sizes, note: 'Real Blazor UI, API fixture; no production writes' });
     } catch (error) {

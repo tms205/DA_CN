@@ -327,7 +327,10 @@ BEGIN
 
     IF @@ROWCOUNT > 0
         INSERT INTO ThongBao (MaNguoiDung, MaDonHang, TieuDe, NoiDung)
-        SELECT MaKhachHang, MaDonHang, N'Thanh toán thành công', N'Đơn hàng của bạn đã được thanh toán.'
+        SELECT MaKhachHang, MaDonHang,
+               CASE WHEN TrangThai = 'DA_HUY' THEN N'Đã nhận tiền cho đơn đã hủy' ELSE N'Thanh toán thành công' END,
+               CASE WHEN TrangThai = 'DA_HUY' THEN N'Đơn đã hủy vẫn được giữ nguyên; khoản tiền đã nhận đang chờ xử lý hoàn tiền.'
+                    ELSE N'Đơn hàng của bạn đã được thanh toán.' END
         FROM DonHang WHERE MaDonHang = @MaDonHang;
 END;
 GO
@@ -647,17 +650,21 @@ BEGIN
     SELECT @TrangThai = TrangThai, @MaChiNhanh = MaChiNhanh, @MaKhachHang = MaKhachHang
     FROM DonHang WHERE MaDonHang = @MaDonHang;
 
-    IF @TrangThai IS NULL OR @TrangThai IN ('HOAN_THANH','DA_HUY')
-        THROW 50040, N'Không thể hủy đơn này.', 1;
-    -- khach chi tu huy khi don chua duoc tiep nhan, con lai do quan ly huy
-    IF NOT ((@MaNguoiHuy = @MaKhachHang AND @TrangThai = 'CHO_XAC_NHAN') OR dbo.fn_LaQuanLy(@MaNguoiHuy, @MaChiNhanh) = 1)
+    IF @TrangThai IS NULL OR @TrangThai NOT IN ('CHO_XAC_NHAN','DA_XAC_NHAN')
+        THROW 50040, N'Chỉ được hủy đơn trước khi bắt đầu in.', 1;
+    IF NULLIF(LTRIM(RTRIM(@LyDo)), N'') IS NULL
+        THROW 50045, N'Vui lòng nhập lý do hủy đơn.', 1;
+    -- Khách đúng chủ hoặc quản lý đúng phạm vi; tất cả đều phải ở trước mốc in.
+    IF NOT (@MaNguoiHuy = @MaKhachHang OR dbo.fn_LaQuanLy(@MaNguoiHuy, @MaChiNhanh) = 1)
         THROW 50041, N'Bạn không có quyền hủy đơn này.', 1;
 
-    -- don chua in thi bo may in (don da in roi thi giu lai de doi soat so trang may in)
+    -- Chỉ hai trạng thái trước in mới tới được đây. Kho chưa trừ; bỏ máy đã phân công.
     UPDATE DonHang
     SET TrangThai = 'DA_HUY', GhiChu = @LyDo,
-        MaMayIn = CASE WHEN @TrangThai IN ('CHO_XAC_NHAN','DA_XAC_NHAN') THEN NULL ELSE MaMayIn END
-    WHERE MaDonHang = @MaDonHang;
+        MaMayIn = NULL
+    WHERE MaDonHang = @MaDonHang AND TrangThai IN ('CHO_XAC_NHAN','DA_XAC_NHAN');
+    IF @@ROWCOUNT = 0
+        THROW 50040, N'Đơn đã bắt đầu in hoặc không còn được phép hủy.', 1;
 
     INSERT INTO ThongBao (MaNguoiDung, MaDonHang, TieuDe, NoiDung)
     VALUES (@MaKhachHang, @MaDonHang, N'Đơn hàng đã bị hủy', @LyDo);
@@ -674,10 +681,11 @@ BEGIN
 
     UPDATE tt SET TrangThai = 'DA_HOAN_TIEN'
     FROM ThanhToan tt JOIN DonHang dh ON dh.MaDonHang = tt.MaDonHang
-    WHERE tt.MaDonHang = @MaDonHang AND dh.TrangThai = 'DA_HUY' AND tt.TrangThai = 'DA_THANH_TOAN';
+    WHERE tt.MaDonHang = @MaDonHang AND dh.TrangThai = 'DA_HUY' AND dh.MaMayIn IS NULL
+      AND tt.TrangThai = 'DA_THANH_TOAN';
 
     IF @@ROWCOUNT = 0
-        THROW 50043, N'Đơn không cần hoàn tiền.', 1;
+        THROW 50043, N'Chỉ hoàn tiền đơn đã hủy trước khi in, đã thanh toán và chưa hoàn tiền.', 1;
 END;
 GO
 

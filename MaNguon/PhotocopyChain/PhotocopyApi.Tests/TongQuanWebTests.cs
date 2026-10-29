@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Reflection;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
@@ -50,8 +50,8 @@ public class TongQuanWebTests
             Assert.DoesNotContain("Số dòng báo cáo", html);
             Assert.Contains("Xu hướng doanh thu", html);
             Assert.Contains("href=\"bao-cao\"", html);
-            Assert.Contains("<svg", html);
-            Assert.Contains("role=\"img\"", html);
+            Assert.Contains("cd-xu-huong", html);
+            Assert.Contains("aria-label=\"Doanh thu theo từng kỳ\"", html);
             Assert.DoesNotContain("NaN", html);
             Assert.DoesNotContain("Infinity", html);
             Assert.Contains(tinhHuong == "du-lieu" ? "150.000₫" : "Chưa có đơn hoàn tất", html);
@@ -115,8 +115,8 @@ public class TongQuanWebTests
             }
             finally { System.Globalization.CultureInfo.CurrentCulture = cu; }
         });
-        Assert.Contains("class=\"tq-diem-truoc\"", html);
-        Assert.Contains("points=\"452,175\"", html);
-        Assert.Contains("class=\"tq-diem\"", html);
+        Assert.Contains("data-gia-tri=\"3\"", html);
+        Assert.Contains("--cao:75%", html);
+        Assert.DoesNotContain("--cao:75,%", html);
     }
 }

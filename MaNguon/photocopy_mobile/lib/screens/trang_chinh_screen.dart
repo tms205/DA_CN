@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../phien.dart';
+import '../realtime.dart';
+import 'xac_thuc/dang_nhap_screen.dart';
 import '../theme.dart';
 import '../widgets/icons.dart';
 import 'dat_in/chon_file_screen.dart';
@@ -32,12 +35,36 @@ class _TrangChinhScreenState extends State<TrangChinhScreen> {
 
   // Số thông báo chưa đọc — hiện chấm đỏ trên tab Thông báo
   int _soChuaDoc = 0;
+  Timer? _kiemTraBaoTriTimer;
+  bool _dangKiemTraBaoTri = false;
 
   @override
   void initState() {
     super.initState();
     _tab = widget.tabBanDau ?? (Phien.laShipper ? 'DON_GIAO' : 'DAT_IN');
     _demThongBaoChuaDoc();
+    _kiemTraBaoTri();
+    _kiemTraBaoTriTimer = Timer.periodic(const Duration(seconds: 5), (_) => _kiemTraBaoTri());
+  }
+
+  @override
+  void dispose() { _kiemTraBaoTriTimer?.cancel(); super.dispose(); }
+
+  Future<void> _kiemTraBaoTri() async {
+    if (_dangKiemTraBaoTri || Phien.token == null) return;
+    _dangKiemTraBaoTri = true;
+    try {
+      final status = await Api.get('/api/bao-tri/trang-thai');
+      var invalid = status.thanhCong && status.duLieu['dangBaoTri'] == true;
+      if (!invalid) { final session = await Api.get('/api/bao-tri/phien'); invalid = session.maHttp == 401; }
+      if (!mounted) return;
+      if (invalid) {
+        _kiemTraBaoTriTimer?.cancel();
+        await Realtime.dung();
+        await Phien.dangXuat();
+        if (mounted) Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const DangNhapScreen()), (_) => false);
+      }
+    } finally { _dangKiemTraBaoTri = false; }
   }
 
   Future<void> _demThongBaoChuaDoc() async {

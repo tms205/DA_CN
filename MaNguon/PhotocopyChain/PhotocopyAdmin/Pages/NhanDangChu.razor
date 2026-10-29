@@ -1,0 +1,126 @@
+@page "/nhan-dang-chu"
+@attribute [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
+@inject HttpClient Http
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+<PageTitle>Nhận dạng chữ · PhotocopyChain</PageTitle>
+<TieuDeTrang TieuDe="Nhận dạng chữ từ ảnh" MoTa="Chọn ảnh chữ viết tay và kiểm tra văn bản sau khi nhận dạng." />
+<div class="than-trang ocr-page">
+    <div class="ocr-intro"><span class="ocr-intro-icon" aria-hidden="true">✦</span><div><strong>Biến chữ viết tay thành văn bản</strong><p>Ảnh được xử lý trên máy chủ. Chụp rõ, đủ sáng và cắt sát phần chữ để có kết quả tốt hơn.</p></div></div>
+    <div class="ocr-grid">
+        <section class="ocr-panel" aria-labelledby="ocr-input-title">
+            <div class="ocr-heading"><span class="ocr-step">01</span><div><h2 id="ocr-input-title">Chọn ảnh và model</h2><p>JPG hoặc PNG · tối đa 10 MB</p></div></div>
+            <div class="ocr-models" role="group" aria-label="Chọn model nhận dạng">
+                <label class="ocr-model @(_model == "2b" ? "selected" : "")"><input type="radio" name="ocr-model" checked='@(_model == "2b")' @onchange='() => _model = "2b"' disabled="@_dangXuLy" /><span><strong>Qwen 2B</strong><small>Nhanh hơn · nhẹ hơn</small></span></label>
+                <label class="ocr-model @(_model == "4b" ? "selected" : "")"><input type="radio" name="ocr-model" checked='@(_model == "4b")' @onchange='() => _model = "4b"' disabled="@_dangXuLy" /><span><strong>Qwen 4B</strong><small>Ưu tiên chất lượng</small></span></label>
+            </div>
+            <div class="ocr-preview">
+                @if (_anh != null) { <img src="@_anh" alt="Xem trước ảnh đã chọn" /> }
+                else { <div class="ocr-empty"><span aria-hidden="true">▧</span><strong>Chưa có ảnh</strong><small>Chọn ảnh chứa chữ cần nhận dạng</small></div> }
+            </div>
+            <div class="ocr-choose"><label for="ocr-file">@(_file == null ? "Chọn ảnh" : "Chọn ảnh khác")</label><InputFile id="ocr-file" OnChange="ChonAnh" accept="image/jpeg,image/png" disabled="@_dangXuLy" /></div>
+            @if (_file != null) {
+                <p class="ocr-filename">@_file.Name · @((_file.Size / 1024.0 / 1024).ToString("0.##")) MB@(_vungCat != null ? " · Đã chọn vùng chữ" : "")</p>
+                <div class="ocr-crop-actions"><button type="button" class="ocr-secondary" disabled="@_dangXuLy" @onclick="MoCatAsync">Cắt vùng chữ</button>@if (_vungCat != null) { <button type="button" class="ocr-secondary" disabled="@_dangXuLy" @onclick="DungAnhGoc">Dùng ảnh gốc</button> }</div>
+            }
+            <button class="ocr-primary" @onclick="NhanDang" disabled="@(_dangXuLy || _file == null)">@(_dangXuLy ? "Đang nhận dạng…" : "Nhận dạng chữ →")</button>
+            @if (_dangXuLy) { <p role="status" class="ocr-wait">Đang tải model và xử lý ảnh, có thể mất vài phút. Vui lòng giữ trang mở.</p> }
+            @if (_loi != null) { <div class="o-loi" role="alert">@_loi</div> }
+        </section>
+        <section class="ocr-panel" aria-labelledby="ocr-output-title">
+            <div class="ocr-heading"><span class="ocr-step">02</span><div><h2 id="ocr-output-title">Kết quả nhận dạng</h2><p>Kiểm tra và chỉnh sửa trước khi sử dụng</p></div></div>
+            <div class="ocr-notice">AI có thể đọc sai dấu, thiếu dòng hoặc đoán chữ. Vui lòng đối chiếu với ảnh gốc.@(_biCat ? " Kết quả có thể bị cắt do quá dài." : "")</div>
+            @if (_anhDaDoi) { <p class="ocr-wait" role="status">Ảnh đã được thay đổi. Văn bản dưới đây thuộc lần nhận dạng trước.</p> }
+            <label class="ocr-text-label" for="ocr-text">Văn bản</label>
+            <textarea id="ocr-text" class="ocr-text" @bind="_ketQua" @bind:event="oninput" @bind:after="KetQuaThayDoi" placeholder="Văn bản sau khi nhận dạng sẽ xuất hiện tại đây…" disabled="@(_ketQua == null || _dangXuLy)"></textarea>
+            <div class="ocr-actions"><button class="ocr-secondary" @onclick="SaoChep" disabled="@(string.IsNullOrWhiteSpace(_ketQua) || _dangXuLy)">Sao chép văn bản</button><button type="button" class="ocr-secondary" @onclick="XuatWordAsync" disabled="@(string.IsNullOrWhiteSpace(_ketQua) || _dangXuLy || _dangXuat)">@(_dangXuat ? "Đang xuất…" : "Xuất file Word")</button>@if (_daSaoChep) { <span role="status">Đã sao chép</span> }</div>
+        </section>
+    </div>
+</div>
+<HopThoaiQuanTri Mo="@_moCat" Rong="true" TieuDe="Cắt vùng văn bản" MoTa="Kéo chuột hoặc ngón tay khoanh phần chữ cần đọc. Có thể kéo lại để đổi vùng." Loi="@_loiCat" Dong="DongCatAsync">
+    <NoiDung><div class="ocr-crop-stage"><canvas @ref="_canvas" class="ocr-crop-canvas" aria-label="Ảnh để khoanh vùng chữ"></canvas></div><p class="ocr-wait">Giữ đủ dấu tiếng Việt và toàn bộ dòng chữ; bỏ phần bàn, tay và khoảng trống.</p></NoiDung>
+    <Chan><button type="button" class="nut-phu" @onclick="DungToanAnhAsync">Dùng toàn bộ ảnh</button><button type="button" class="nut-chinh" @onclick="ApDungCatAsync">Dùng vùng đã chọn</button></Chan>
+</HopThoaiQuanTri>
+
+@code {
+    private IBrowserFile _file;
+    private string _model = "2b", _loi, _ketQua, _anh;
+    private bool _dangXuLy, _biCat, _daSaoChep, _dangXuat, _moCat, _khoiTaoCat, _anhDaDoi;
+    private string _anhGoc, _loiCat;
+    private double[] _vungCat;
+    private ElementReference _canvas;
+    private IJSObjectReference _congCu;
+    private async Task ChonAnh(InputFileChangeEventArgs e)
+    {
+        _file = e.File; _loi = null; _ketQua = null; _anh = null; _anhGoc = null; _vungCat = null; _biCat = false; _daSaoChep = false; _anhDaDoi = false;
+        if (_file.Size > 10 * 1024 * 1024) { _loi = "Ảnh vượt quá 10 MB."; _file = null; return; }
+        if (!_file.Name.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) && !_file.Name.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) && !_file.Name.EndsWith(".png", StringComparison.OrdinalIgnoreCase)) { _loi = "Chỉ hỗ trợ ảnh JPG hoặc PNG."; _file = null; return; }
+        try { using var memory = new MemoryStream(); await _file.OpenReadStream(10 * 1024 * 1024).CopyToAsync(memory); var type = _file.Name.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ? "image/png" : "image/jpeg"; _anhGoc = _anh = $"data:{type};base64,{Convert.ToBase64String(memory.ToArray())}"; await MoCatAsync(); }
+        catch { _loi = "Không đọc được ảnh. Vui lòng chọn lại."; _file = null; }
+    }
+    private async Task NhanDang()
+    {
+        if (_file == null || _dangXuLy) return;
+        if (_file.Size > 10 * 1024 * 1024) { _loi = "Ảnh vượt quá 10 MB."; return; }
+        _dangXuLy = true; _loi = null; _ketQua = null; _daSaoChep = false; _anhDaDoi = false;
+        try
+        {
+            using var http = new HttpClient { BaseAddress = Http.BaseAddress, Timeout = TimeSpan.FromMinutes(15) };
+            http.DefaultRequestHeaders.Authorization = Http.DefaultRequestHeaders.Authorization;
+            using var form = new MultipartFormDataContent();
+            form.Add(new StringContent(_model), "model");
+            if (_vungCat != null) form.Add(new StringContent(System.Text.Json.JsonSerializer.Serialize(_vungCat)), "vungCat");
+            form.Add(new StreamContent(_file.OpenReadStream(10 * 1024 * 1024)), "file", _file.Name);
+            using var response = await http.PostAsync("api/ocr/nhan-dang", form);
+            using var json = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            if (!response.IsSuccessStatusCode) { _loi = json.RootElement.TryGetProperty("message", out var message) ? message.GetString() : "Không nhận dạng được ảnh."; return; }
+            _ketQua = json.RootElement.GetProperty("text").GetString();
+            _biCat = json.RootElement.GetProperty("truncated").GetBoolean();
+        }
+        catch (Exception) { _loi = "Không thể nhận dạng. Kiểm tra kết nối và thử lại."; }
+        finally { _dangXuLy = false; }
+    }
+    private async Task SaoChep()
+    {
+        try { await JS.InvokeVoidAsync("navigator.clipboard.writeText", _ketQua); _daSaoChep = true; }
+        catch (Exception) { _loi = "Không sao chép được tự động; hãy chọn và sao chép nội dung trong ô kết quả."; }
+    }
+    private async Task<IJSObjectReference> CongCuAsync() => _congCu ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/ocr-tools.js");
+    private Task MoCatAsync() { _loiCat = null; _moCat = true; _khoiTaoCat = true; return Task.CompletedTask; }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_moCat || !_khoiTaoCat) return;
+        _khoiTaoCat = false;
+        try { await (await CongCuAsync()).InvokeVoidAsync("initCrop", _canvas, _anhGoc, _vungCat); }
+        catch { _loiCat = "Không mở được ảnh. Ảnh cần là JPG/PNG hợp lệ, tối đa 20 megapixel."; await InvokeAsync(StateHasChanged); }
+    }
+    private async Task ApDungCatAsync()
+    {
+        try {
+            var tools = await CongCuAsync();
+            var preview = await tools.InvokeAsync<string>("cropPreview", _canvas);
+            _vungCat = await tools.InvokeAsync<double[]>("cropSelection", _canvas);
+            _anh = preview; _anhDaDoi = _ketQua != null;
+            await DongCatAsync();
+        } catch { _loiCat = "Vùng cắt quá nhỏ hoặc chưa sẵn sàng. Hãy kéo chọn lại vùng chữ."; }
+    }
+    private void DungAnhGoc() { _anh = _anhGoc; _vungCat = null; _anhDaDoi = _ketQua != null; }
+    private async Task DungToanAnhAsync() { DungAnhGoc(); await DongCatAsync(); }
+    private async Task DongCatAsync() { if (_congCu != null) await _congCu.InvokeVoidAsync("disposeCrop", _canvas); _moCat = false; }
+    private void KetQuaThayDoi() => _daSaoChep = false;
+    private async Task XuatWordAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_ketQua) || _dangXuat) return;
+        _dangXuat = true; _loi = null;
+        try {
+            using var response = await Http.PostAsJsonAsync("api/ocr/xuat-word", new { text = _ketQua });
+            if (!response.IsSuccessStatusCode) { var error = await response.Content.ReadFromJsonAsync<ApiError>(); _loi = error?.Message ?? "Không xuất được file Word."; return; }
+            using var stream = new MemoryStream(await response.Content.ReadAsByteArrayAsync());
+            using var reference = new DotNetStreamReference(stream);
+            await (await CongCuAsync()).InvokeVoidAsync("downloadWord", reference);
+        } catch { _loi = "Không tải được file Word. Hãy thử lại hoặc sao chép văn bản."; }
+        finally { _dangXuat = false; }
+    }
+    public async ValueTask DisposeAsync() { if (_congCu != null) { try { await _congCu.InvokeVoidAsync("disposeCrop", _canvas); await _congCu.DisposeAsync(); } catch (JSException) { } } }
+
+}

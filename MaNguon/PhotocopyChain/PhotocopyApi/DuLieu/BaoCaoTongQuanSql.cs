@@ -89,6 +89,6 @@ internal static class BaoCaoTongQuanSql
         SELECT COUNT(*) FROM PhieuNhap WHERE TrangThai='CHO_DUYET'
           AND (@MaChiNhanh IS NULL OR MaChiNhanh=@MaChiNhanh);
         SELECT COUNT(*) FROM DonHang dh JOIN ThanhToan tt ON tt.MaDonHang=dh.MaDonHang
-        WHERE dh.TrangThai='DA_HUY' AND tt.TrangThai='DA_THANH_TOAN'
+        WHERE dh.TrangThai='DA_HUY' AND dh.MaMayIn IS NULL AND tt.TrangThai='DA_THANH_TOAN'
           AND (@MaChiNhanh IS NULL OR dh.MaChiNhanh=@MaChiNhanh);";
 }

@@ -9,7 +9,7 @@ import '../../widgets/icons.dart';
 import '../../widgets/widgets.dart';
 import 'doi_mat_khau_screen.dart';
 
-// Cài đặt — chỉ đặt những mục thật sự có tác dụng; mục chưa làm ghi rõ tuần dự kiến.
+// Cài đặt — chỉ hiển thị những mục đang được ứng dụng hỗ trợ.
 class CaiDatScreen extends StatefulWidget {
   const CaiDatScreen({super.key});
 
@@ -72,24 +72,13 @@ class _CaiDatScreenState extends State<CaiDatScreen> {
               DongMenu(
                 icon: Ico.taiLai,
                 nhan: 'Cập nhật đơn theo thời gian thực',
-                phu: 'SignalR — đang mở ứng dụng',
+                phu: 'Tự cập nhật khi ứng dụng đang mở',
                 cuoi: NhanNho(
                   Realtime.dangNoi ? 'Đang bật' : 'Mất kết nối',
                   mau: Realtime.dangNoi
                       ? AppColors.thanhCong
                       : AppColors.loiChu,
                   nen: Realtime.dangNoi ? AppColors.xanhNhat : AppColors.loiNen,
-                ),
-              ),
-              // Tắt app thì phải có Firebase mới đẩy được thông báo — chờ tạo project Firebase
-              const DongMenu(
-                icon: Ico.tiaSet,
-                nhan: 'Thông báo đẩy khi tắt ứng dụng',
-                phu: 'Firebase Cloud Messaging — chờ tạo project Firebase',
-                cuoi: NhanNho(
-                  'Chờ Firebase',
-                  mau: AppColors.cbChu,
-                  nen: AppColors.cbNen,
                 ),
               ),
             ],

@@ -11,6 +11,7 @@ import '../../widgets/icons.dart';
 import '../../widgets/widgets.dart';
 import 'cau_hinh_in_screen.dart';
 import 'xem_mau_don_screen.dart';
+import 'nhan_dang_chu_screen.dart';
 
 // Các đuôi file máy chủ nhận (trùng danh sách trong FileInController của API) — mọi loại đều được đổi sang PDF
 const List<String> dinhDangDuocChon = [
@@ -163,6 +164,12 @@ class _ChonFileScreenState extends State<ChonFileScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            OutlinedButton.icon(
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NhanDangChuScreen())),
+              icon: const Icon(Icons.document_scanner_outlined),
+              label: const Text('Nhận dạng chữ viết tay từ ảnh'),
+            ),
+            const SizedBox(height: 12),
             Text(
               'Xin chào, ${Phien.nguoiDung?.hoTen ?? ''}',
               style: AppTheme.font(

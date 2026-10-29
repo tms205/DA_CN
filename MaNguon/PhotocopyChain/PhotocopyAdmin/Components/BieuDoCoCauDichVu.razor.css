@@ -1,0 +1,21 @@
+.cc-dich-vu { display: grid; grid-template-columns: minmax(170px, .9fr) minmax(0, 1fr); align-items: center; gap: 12px; container-type: inline-size; }
+.cc-vong { min-width: 0; text-align: center; }
+.cc-vong svg { width: 100%; max-width: 310px; overflow: visible; }
+.cc-hit { fill: transparent; stroke: none; cursor: pointer; }
+.cc-cung { pointer-events: none; fill: var(--mau-cung); stroke: var(--trang); stroke-width: 2; transform-box: view-box; transform-origin: 140px 140px; cursor: pointer; transition: transform 220ms cubic-bezier(.2,.8,.2,1), filter 220ms; }
+.cc-cung.noi-bat, .cc-mien:focus-visible .cc-cung { transform: scale(1.075); filter: drop-shadow(0 5px 4px color-mix(in srgb,var(--mau-cung) 30%,transparent)); outline: none; stroke-width: 3; }
+.cc-phan-tram { font-size: 29px; font-weight: 750; fill: var(--accent); pointer-events: none; font-variant-numeric: tabular-nums; }
+.cc-nhan { font-size: 11px; fill: var(--chu-phu); pointer-events: none; }
+.cc-thong-tin { display: grid; gap: 5px; margin-top: -4px; min-height: 58px; overflow-wrap: anywhere; }
+.cc-thong-tin span { color: var(--chu-phu); font-size: 12px; }
+.cc-thong-tin strong { font-size: 17px; color: var(--chu); font-variant-numeric: tabular-nums; }
+.cc-chu-giai { min-width: 0; display: grid; gap: 5px; }
+.cc-muc { display: grid; grid-template-columns: 10px minmax(0,1fr) auto; align-items: center; gap: 10px; width: 100%; padding: 10px; border: 1px solid transparent; border-radius: 7px; background: transparent; text-align: left; font: 500 13px var(--font); color: var(--chu); cursor: pointer; transition: background-color 160ms, border-color 160ms; }
+.cc-muc i { width: 10px; height: 10px; border-radius: 50%; background: var(--mau-cung); }
+.cc-muc span { overflow-wrap: anywhere; }
+.cc-muc small { display: block; margin-top: 5px; font-size: 11px; color: var(--chu-phu); font-variant-numeric: tabular-nums; }
+.cc-muc b { color: var(--accent); font-variant-numeric: tabular-nums; }
+.cc-muc.dang-chon { background: var(--accent-nhat); border-color: var(--vien); }
+.cc-muc:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+@media (max-width: 1300px) { .cc-dich-vu { grid-template-columns: minmax(0,1fr); } .cc-vong svg { max-width: 260px; } }
+@media (prefers-reduced-motion: reduce) { .cc-cung, .cc-muc { transition: none !important; } }

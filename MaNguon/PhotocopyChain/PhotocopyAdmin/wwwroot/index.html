@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="vi">
 
 <head>
@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="css/app.css" />
     <link rel="stylesheet" href="PhotocopyAdmin.styles.css" />
     <link rel="stylesheet" href="css/app-ui-v2.css?v=20261014-preview-align" />
+    <link rel="stylesheet" href="css/motion.css?v=20261028" />
     <link rel="icon" type="image/png" href="icon-192.png" />
 </head>
 
@@ -31,7 +32,16 @@
     </div>
 
     <script src="_framework/blazor.webassembly.js"></script>
-    <script>window.moLienHeFooter = hop => hop.showModal();
+    <script>
+        window.cuonToiQuyCach = element => {
+            requestAnimationFrame(() => {
+                if (!element?.isConnected) return;
+                const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+                element.scrollIntoView({ behavior: reduce ? 'instant' : 'smooth', block: 'start' });
+                element.querySelector('h2')?.focus({ preventScroll: true });
+            });
+        };
+        window.moLienHeFooter = hop => hop.showModal();
         window.dashboardDangHienThi = () => document.visibilityState === 'visible';
         window.moMauDon = hop => hop.showModal();
         window.moFormMauDon = window.moHopThoaiQuanTri = hop => {

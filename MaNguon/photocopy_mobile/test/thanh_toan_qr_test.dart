@@ -17,6 +17,7 @@ class MayChuThanhToan {
   int soLanXem = 0;
   int soLanTaoLink = 0;
   bool daTra = false;
+  bool daHoan = false;
   bool loiMang = false;
   bool hetHan = false;
   bool daHuy = false;
@@ -36,7 +37,11 @@ class MayChuThanhToan {
         'maDonHang': 15,
         'maDonHangHienThi': 'DH00015',
         'phuongThuc': phuongThuc,
-        'trangThai': daTra ? 'DA_THANH_TOAN' : 'CHUA_THANH_TOAN',
+        'trangThai': daHoan
+            ? 'DA_HOAN_TIEN'
+            : daTra
+            ? 'DA_THANH_TOAN'
+            : 'CHUA_THANH_TOAN',
         'soTien': 7400,
         'trangThaiDonHang': daHuy ? 'DA_HUY' : 'CHO_XAC_NHAN',
         'hanThanhToan': DateTime.now()
@@ -178,6 +183,21 @@ void main() {
     );
   }
 
+  testWidgets('Đơn chờ tiếp nhận có nút hủy trước vùng QR', (tester) async {
+    final api = MayChuThanhToan();
+    await thu(tester, api, () async {
+      expect(find.text('Hủy đơn'), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.text('Hủy đơn')).dy,
+        lessThan(tester.getTopLeft(find.byKey(const ValueKey('payos-qr'))).dy),
+      );
+      api.daHuy = true;
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pump();
+      expect(find.text('Hủy đơn'), findsNothing);
+    });
+  });
+
   testWidgets('API xác nhận tiền thì tự hiện kết quả, không tạo link lặp', (
     tester,
   ) async {
@@ -194,6 +214,27 @@ void main() {
       expect(api.soLanXem, soLan);
     });
   });
+
+  for (final refunded in [false, true]) {
+    testWidgets(
+      'QR đơn đã hủy có tiền không báo đặt đơn thành công: $refunded',
+      (tester) async {
+        final api = MayChuThanhToan()
+          ..daHuy = true
+          ..daTra = true
+          ..daHoan = refunded;
+        await thu(tester, api, () async {
+          expect(
+            find.text(refunded ? 'Đã hoàn tiền' : 'Đơn đã hủy · Chờ hoàn tiền'),
+            findsOneWidget,
+          );
+          expect(find.text('Thanh toán thành công'), findsNothing);
+          expect(find.byKey(const ValueKey('payos-qr')), findsNothing);
+          expect(api.soLanTaoLink, 0);
+        });
+      },
+    );
+  }
 
   testWidgets('Quay lại từ ngân hàng kiểm tra ngay, không polling trong nền', (
     tester,

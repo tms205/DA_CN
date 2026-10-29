@@ -120,6 +120,10 @@
                                         {
                                             <span class="nhan-mau nhan-xanh">Đã thanh toán</span>
                                         }
+                                        else if (don.TrangThaiThanhToan == "DA_HOAN_TIEN")
+                                        {
+                                            <span class="nhan-mau nhan-xam">Đã hoàn tiền</span>
+                                        }
                                         else
                                         {
                                             <span class="nhan-mau nhan-xam">Chưa thanh toán</span>
@@ -267,6 +271,10 @@
                         {
                             <span class="nhan-mau nhan-xanh">Đã thanh toán</span>
                         }
+                        else if (don.TrangThaiThanhToan == "DA_HOAN_TIEN")
+                        {
+                            <span class="nhan-mau nhan-xam">Đã hoàn tiền</span>
+                        }
                         else
                         {
                             <span class="nhan-mau nhan-xam">Chưa thanh toán</span>
@@ -279,7 +287,7 @@
                     <div class="o-loi">@((MarkupString)Svg.ChamThan())<span>@_loiThaoTac</span></div>
                 }
 
-                @if (don.PhuongThucThanhToan == "VIETQR" && don.TrangThaiThanhToan != "DA_THANH_TOAN")
+                @if (don.PhuongThucThanhToan == "VIETQR" && don.TrangThaiThanhToan == "CHUA_THANH_TOAN")
                 {
                     <button class="nut-nho" disabled="@_dangGui"
                             @onclick="() => KiemTraThanhToanAsync(don.MaDonHang)">
@@ -346,7 +354,8 @@
                 }
                 else if (don.TrangThaiDonHang == "DANG_IN")
                 {
-                    <TienDoInDon TrangThai="@_dsTrangThaiMayIn.FirstOrDefault(x => x.MaDonHangDangIn == don.MaDonHang)" />
+                    <TienDoInDon TrangThai="@_dsTrangThaiMayIn.FirstOrDefault(x => x.MaDonHangDangIn == don.MaDonHang && x.MaMayIn == don.MaMayIn)" />
+                    <button type="button" class="nut-phu" disabled="@_dangGui" @onclick="() => _moChuyenMay = true">Chuyển máy khi gặp sự cố</button>
                     @if (don.PhuongThucThanhToan == "COD" && !don.DaGuiLenhIn && don.MaMayIn != null)
                     {
                         <div class="o-canh-bao">Đơn COD cũ chưa có yêu cầu gửi qua connector. Kiểm tra bản giấy trước khi gửi để tránh in lại.</div>
@@ -377,10 +386,10 @@
                     <p class="goi-y">Đơn này không còn thao tác nào ở quầy.</p>
                 }
 
-                @if (LaQuanLy() && don.TrangThaiDonHang != "HOAN_THANH" && don.TrangThaiDonHang != "DA_HUY"
-                    && don.TrangThaiDonHang != "DANG_IN")
+                @if (LaQuanLy() && TrangThaiDonHang.ChoPhepHuy(don.TrangThaiDonHang))
                 {
                     <h3 class="hd-muc">Hủy đơn</h3>
+                    <p class="goi-y">Chỉ được hủy trước khi bắt đầu in. Đơn đã thanh toán sẽ chờ CEO xác nhận hoàn tiền.</p>
                     <button class="nut-nho nguy-hiem" disabled="@_dangGui" @onclick="MoHuyDon">Hủy đơn hàng</button>
                 }
             </div>
@@ -389,6 +398,10 @@
 </div>
 
 <XacNhanThaoTac @ref="_xacNhan" />
+@if (_donDangChon != null)
+{
+    <ChuyenMayIn @key="_donDangChon.MaDonHang" Mo="@_moChuyenMay" MaDonHang="@_donDangChon.MaDonHang" Dong="() => _moChuyenMay = false" DaChuyen="TaiLaiSauChuyenMay" />
+}
 <HopThoaiQuanTri Mo="@(_moChonMay && _donDangChon?.TrangThaiDonHang == "DA_XAC_NHAN" && !LaInTuDong(_donDangChon))" TieuDe="Chọn máy & bắt đầu in" Loi="@_loiThaoTac" DangLuu="@_dangGui" Dong="DongChonMay">
     <NoiDung>
         <p>Phân máy cho đơn <b>@_donDangChon?.MaDonHangHienThi</b>.</p>
@@ -400,7 +413,9 @@
             {
                 <label class="hd-may @(ChonDuocMay(may) ? "" : "mo")">
                     <input type="radio" name="mayin" disabled="@(!ChonDuocMay(may))" checked="@(_mayDaChon == may.MaMayIn)" @onchange="() => _mayDaChon = may.MaMayIn" />
-                    <div><b>@may.TenMay</b><div class="nv-phu">@(may.DapUngDuoc ? $"{may.KhoGiay} · {(may.InMau ? "In màu" : "Đen trắng")} · {(may.In2Mat ? "2 mặt" : "1 mặt")} · {may.TocDo} trang/phút" : may.LyDoKhongDapUng)</div><div class="nv-phu">@(MayDangKetNoi(may.MaMayIn) ? "Connector đang kết nối" : "Chưa kết nối hoặc máy đang lỗi/tạm dừng")</div></div>
+                    <div><b>@TenThietBi(may)</b><div class="nv-phu">@(LaMayThat(may) ? "Máy thật · Windows" : "Máy ảo · Mô phỏng") · #@may.MaMayIn</div>
+                        @if (LaMayThat(may)) { <div class="nv-phu">Danh mục: @may.TenMay</div> }
+                        <div class="nv-phu">@(may.DapUngDuoc ? MoTaNangLuc(may) : may.LyDoKhongDapUng)</div><div class="nv-phu">@(MayDangKetNoi(may.MaMayIn) ? "Connector đang kết nối" : "Chưa kết nối hoặc máy đang lỗi/tạm dừng")</div></div>
                 </label>
             }
             </div>
@@ -409,7 +424,7 @@
     <Chan><button type="button" class="nut-phu" disabled="@_dangGui" @onclick="DongChonMay">Hủy</button><button type="button" class="nut-chinh" disabled="@(_dangGui || _mayDaChon == null || !MayDangKetNoi(_mayDaChon.Value))" @onclick="BatDauInAsync">Gửi lệnh tới máy in</button></Chan>
 </HopThoaiQuanTri>
 <HopThoaiQuanTri Mo="@_moHuy" TieuDe="Hủy đơn hàng" Loi="@_loiThaoTac" DangLuu="@_dangGui" Dong="DongHuyDon">
-    <NoiDung><form id="hd-form-huy" @onsubmit="HuyDonAsync" @onsubmit:preventDefault><p>Hủy đơn <b>@_donDangChon?.MaDonHangHienThi</b>? Lịch sử vẫn được giữ để đối soát.</p><label class="nhan" for="hd-ly-do-huy">Lý do hủy</label><textarea id="hd-ly-do-huy" class="ca-o-loc" required maxlength="255" @bind="_lyDoHuy" placeholder="Nêu rõ lý do hủy"></textarea></form></NoiDung>
+    <NoiDung><form id="hd-form-huy" @onsubmit="HuyDonAsync" @onsubmit:preventDefault><p>Hủy đơn <b>@_donDangChon?.MaDonHangHienThi</b>? Chỉ hủy được khi chưa bắt đầu in. Nếu đã nhận tiền, đơn sẽ chờ hoàn tiền; lịch sử vẫn được giữ để đối soát.</p><label class="nhan" for="hd-ly-do-huy">Lý do hủy</label><textarea id="hd-ly-do-huy" class="ca-o-loc" required maxlength="255" @bind="_lyDoHuy" placeholder="Nêu rõ lý do hủy"></textarea></form></NoiDung>
     <Chan><button type="button" class="nut-phu" disabled="@_dangGui" @onclick="DongHuyDon">Không hủy</button><button type="submit" form="hd-form-huy" class="nut-phu nguy-hiem" disabled="@_dangGui">Xác nhận hủy đơn</button></Chan>
 </HopThoaiQuanTri>
 <HopThoaiQuanTri Mo="@(_dongPhucHoi != null)" TieuDe="Phục hồi tài liệu" Loi="@_loiThaoTac" DangLuu="@_dangGui" Dong="DongPhucHoi">
@@ -420,6 +435,14 @@
     private XacNhanThaoTac _xacNhan;
     private bool _moHuy;
     private bool _moChonMay;
+    private bool _moChuyenMay;
+    private async Task TaiLaiSauChuyenMay()
+    {
+        if (_donDangChon == null) return;
+        _donDangChon = await Http.GetFromJsonAsync<DonHangChiTietDto>($"api/don-hang/{_donDangChon.MaDonHang}", _dungTienDo.Token);
+        await TaiTrangThaiMayIn();
+        await TaiDanhSach();
+    }
     private void DongChonMay() { if (!_dangGui) { _moChonMay = false; _loiThaoTac = null; } }
     private DonHangChiTietDto _donPhucHoi;
     private DongInChiTietDto _dongPhucHoi;
@@ -545,6 +568,7 @@
     // GET api/don-hang/{id} — bấm vào 1 dòng thì mở panel chi tiết
     private async Task MoChiTiet(int maDonHang)
     {
+        _moChuyenMay = false;
         _loiThaoTac = null;
         _dsMayIn = null;
         _dsTrangThaiMayIn.Clear();
@@ -602,7 +626,7 @@
         try
         {
             _dsTrangThaiMayIn = await Http.GetFromJsonAsync<List<TrangThaiKetNoiMayInDto>>(
-                "api/may-in-ao/trang-thai") ?? new();
+                "api/may-in-ao/trang-thai", _dungTienDo.Token) ?? new();
         }
         catch
         {
@@ -617,6 +641,17 @@
 
     private bool MayDangKetNoi(int ma) => _dsTrangThaiMayIn.Any(x => x.MaMayIn == ma && x.TrangThai is "SAN_SANG" or "DANG_IN");
     private bool ChonDuocMay(MayInDto may) => may.DapUngDuoc && MayDangKetNoi(may.MaMayIn);
+    private bool LaMayThat(MayInDto may) => (may.KetNoi?.CheDo ?? _dsTrangThaiMayIn.FirstOrDefault(x => x.MaMayIn == may.MaMayIn)?.CheDo) == "THAT";
+    private string TenThietBi(MayInDto may) => LaMayThat(may)
+        ? may.KetNoi?.TenHangDoi ?? _dsTrangThaiMayIn.FirstOrDefault(x => x.MaMayIn == may.MaMayIn)?.TenHangDoi ?? may.TenMay : may.TenMay;
+    private string MoTaNangLuc(MayInDto may)
+    {
+        if (!LaMayThat(may)) return $"{may.KhoGiay} · {(may.InMau ? "In màu" : "Đen trắng")} · {(may.In2Mat ? "2 mặt" : "1 mặt")} · {may.TocDo} trang/phút";
+        var driver = may.KetNoi?.HangDoi;
+        string kho = driver?.KhoGiayHoTro is { Count: > 0 } ds ? string.Join(", ", ds) : "Chưa xác nhận khổ giấy";
+        return $"{kho} · Màu: {NangLuc(driver?.InMau)} · Hai mặt: {NangLuc(driver?.InHaiMat)}";
+    }
+    private static string NangLuc(bool? value) => value == null ? "Chưa rõ" : value.Value ? "Có" : "Không";
 
     private async Task PollTienDoAsync()
     {
@@ -645,6 +680,9 @@
                     StateHasChanged();
                     }
                     catch (HttpRequestException) { /* Nhịp sau thử lại, không gửi lại lệnh in. */ }
+                    // HttpClient báo timeout bằng OperationCanceledException. Không để nó
+                    // làm fault task polling rồi phát sinh lỗi khi router hủy trang cũ.
+                    catch (OperationCanceledException) when (!_dungTienDo.IsCancellationRequested) { }
                 });
         }
         catch (OperationCanceledException) when (_dungTienDo.IsCancellationRequested) { }

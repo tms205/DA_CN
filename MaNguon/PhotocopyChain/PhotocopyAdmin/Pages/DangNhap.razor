@@ -24,7 +24,7 @@
             <div class="o-loi">@((MarkupString)Svg.ChamThan())<span>@_loi</span></div>
         }
 
-        <EditForm Model="_form" OnValidSubmit="DangNhapAsync" class="dn-form">
+        <EditForm Model="_form" OnValidSubmit="DangNhapAsync" OnInvalidSubmit="DangNhapKhongHopLe" class="dn-form">
             <DataAnnotationsValidator />
 
             <div class="truong">
@@ -60,7 +60,7 @@
                     <span class="o-vuong">@((MarkupString)Svg.DauTich(11))</span>
                     Ghi nhớ trong 8 giờ
                 </label>
-                <a href="quen-mat-khau" class="lien-ket">Quên mật khẩu?</a>
+                <a href="quen-mat-khau" class="lien-ket" @onclick="QuenMatKhauAsync" @onclick:preventDefault="true">Quên mật khẩu?</a>
             </div>
 
             <button type="submit" class="nut-chinh" disabled="@_dangGui">
@@ -78,7 +78,18 @@
 
         <div class="dn-hoac"><span></span>hoặc<span></span></div>
 
-        <DangNhapGoogle GhiNho="_form.GhiNho" DangBan="_dangGui" DangXuLyChanged="GoogleDangXuLy" ThanhCong="HoanTatDangNhapAsync" />
+        @if (!_daTaiBaoTri)
+        {
+            <button type="button" class="nut-phu" disabled>@((MarkupString)Svg.Google)<span>Tiếp tục với Google</span></button>
+        }
+        else if (_baoTri?.DangBaoTri == true)
+        {
+            <button type="button" class="nut-phu" disabled="@_dangGui" @onclick="GoogleTrongBaoTriAsync">@((MarkupString)Svg.Google)<span>Tiếp tục với Google</span></button>
+        }
+        else
+        {
+            <DangNhapGoogle GhiNho="_form.GhiNho" DangBan="_dangGui" DangXuLyChanged="GoogleDangXuLy" ThanhCong="HoanTatDangNhapAsync" BaoTriPhatHien="ThongBaoBaoTriGoogle" BaoTriTrangThai="CapNhatBaoTriGoogle" />
+        }
 
         <details class="dn-chinh-sach">
             <summary>@((MarkupString)Svg.Khoa(14)) Chính sách đăng nhập</summary>
@@ -91,6 +102,11 @@
     <p class="dn-chan">Khách hàng và Shipper sử dụng <strong>PhotocopyChain App</strong></p>
 </main>
 
+<HopThoaiQuanTri Mo="@_moThongBaoBaoTri" TieuDe="Hệ thống đang bảo trì" Dong="DongThongBaoBaoTri">
+    <NoiDung><p style="margin:0; white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.65">@_baoTri?.LoiNhan</p></NoiDung>
+    <Chan><button type="button" class="nut-chinh" @onclick="DongThongBaoBaoTri" autofocus>Đã hiểu</button></Chan>
+</HopThoaiQuanTri>
+
 @code {
     // Trang nào đòi đăng nhập thì chuyển về đây kèm ?returnUrl=... — đăng nhập xong quay lại đúng trang đó
     [SupplyParameterFromQuery] public string ReturnUrl { get; set; }
@@ -100,9 +116,14 @@
     private string _loi;              // câu lỗi hiện trong hộp đỏ
     private bool _dangGui = false;    // đang chờ API trả lời thì khóa nút
     private bool _hienMatKhau = false;
+    private TrangThaiBaoTriWeb _baoTri;
+    private bool _daTaiBaoTri, _moThongBaoBaoTri;
+    private sealed class TrangThaiBaoTriWeb { public bool DangBaoTri { get; set; } public string LoiNhan { get; set; } }
 
     protected override async Task OnInitializedAsync()
     {
+        await TaiTrangThaiBaoTriAsync();
+        _daTaiBaoTri = true;
         // Đã đăng nhập rồi thì không cần ở lại màn này
         await Phien.GetAuthenticationStateAsync();
         if (Phien.NguoiDung != null)
@@ -128,7 +149,9 @@
             {
                 // API luôn trả lỗi dạng { "message": "..." }
                 var loi = await res.Content.ReadFromJsonAsync<ApiError>();
-                _loi = loi.Message;
+                await TaiTrangThaiBaoTriAsync();
+                if (_baoTri?.DangBaoTri == true) _moThongBaoBaoTri = true;
+                else _loi = loi?.Message ?? "Không đăng nhập được. Vui lòng thử lại.";
             }
         }
         catch
@@ -137,6 +160,42 @@
         }
         _dangGui = false;
     }
+
+    private async Task TaiTrangThaiBaoTriAsync()
+    {
+        try { _baoTri = await Http.GetFromJsonAsync<TrangThaiBaoTriWeb>("api/bao-tri/trang-thai"); }
+        catch { /* Giữ trạng thái gần nhất nếu mạng tạm lỗi. */ }
+    }
+
+    private async Task DangNhapKhongHopLe()
+    {
+        await TaiTrangThaiBaoTriAsync();
+        if (_baoTri?.DangBaoTri == true) _moThongBaoBaoTri = true;
+    }
+
+    private async Task QuenMatKhauAsync()
+    {
+        await TaiTrangThaiBaoTriAsync();
+        if (_baoTri?.DangBaoTri == true) _moThongBaoBaoTri = true;
+        else Nav.NavigateTo("quen-mat-khau");
+    }
+
+    private async Task GoogleTrongBaoTriAsync()
+    {
+        await TaiTrangThaiBaoTriAsync();
+        if (_baoTri?.DangBaoTri == true) _moThongBaoBaoTri = true;
+    }
+
+    private void CapNhatBaoTriGoogle(string loiNhan)
+        => _baoTri = new TrangThaiBaoTriWeb { DangBaoTri = true, LoiNhan = loiNhan };
+
+    private void ThongBaoBaoTriGoogle(string loiNhan)
+    {
+        CapNhatBaoTriGoogle(loiNhan);
+        _moThongBaoBaoTri = true;
+    }
+
+    private void DongThongBaoBaoTri() => _moThongBaoBaoTri = false;
 
     // Hiện dấu tích xanh khi ô tài khoản trông giống email hoặc số điện thoại 10 số
     private bool TaiKhoanHopLe()

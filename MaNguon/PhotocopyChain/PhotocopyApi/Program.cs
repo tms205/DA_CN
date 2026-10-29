@@ -2,6 +2,7 @@ using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using PhotocopyApi.Auth;
+using PhotocopyApi.BaoTri;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
@@ -61,6 +62,9 @@ builder.Services.AddControllers()
 
 // Bộ nhớ tạm của API: giữ mã OTP, đếm số lần nhập sai mật khẩu, quãng đường đã hỏi bản đồ (tắt API là mất)
 builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<KetNoiBaoTri>();
+builder.Services.AddSingleton(new BaoTriStore(Path.Combine(
+    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PhotocopyChain", "maintenance.json")));
 builder.Services.AddSingleton<PhotocopyApi.DichVu.ThuVienMauDon>();
 // Chỉ nguồn ảo đã có; adapter máy thật phải chạy qua connector/driver được kiểm chứng tại tiệm.
 builder.Services.AddSingleton<PhotocopyApi.MayQuet.IMayQuet, PhotocopyApi.MayQuet.MayQuetAo>();
@@ -109,6 +113,9 @@ builder.Services.AddSingleton(new QuyenNhanLenhInStore(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "PhotocopyChain", "PrinterClaims")));
 builder.Services.AddScoped<TuDongInService>();
+builder.Services.AddSingleton(new ChuyenMayInStore(
+    builder.Configuration["PrinterConnector:ThuMucChuyenMay"] ?? Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PhotocopyChain", "PrinterTransfers")));
 builder.Services.AddSingleton(new YeuCauInCodStore(
     builder.Configuration["PrinterConnector:ThuMucYeuCauCod"] ?? Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PhotocopyChain", "PrinterRequests")));
@@ -139,6 +146,16 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         // Chưa đăng nhập / token hết hạn / không đủ quyền → cũng trả { message } tiếng Việt
         options.Events = new JwtBearerEvents
         {
+            OnTokenValidated = context =>
+            {
+                if (!context.Principal.IsInRole(VaiTro.SuperAdmin))
+                {
+                    var generation = context.HttpContext.RequestServices.GetRequiredService<BaoTriStore>().Read().PhienBanPhien;
+                    long.TryParse(context.Principal.FindFirst("maintenance_version")?.Value, out var issued);
+                    if (!BaoTriStore.SessionValid(issued, generation, false)) context.Fail("Phiên đã kết thúc do bảo trì.");
+                }
+                return Task.CompletedTask;
+            },
             // SignalR chạy trên WebSocket — trình duyệt KHÔNG cho gửi header "Authorization" khi mở WebSocket,
             // nên client gửi token trong địa chỉ: /hubs/cap-nhat?access_token=... Đoạn này đọc token từ đó ra.
             OnMessageReceived = context =>
@@ -218,6 +235,7 @@ else
 
 app.UseCors("WebAdmin");
 app.UseAuthentication();
+app.UseMiddleware<BaoTriMiddleware>();
 // Sau khi đọc JWT, áp dụng chi nhánh CEO đã chọn trước khi kiểm [Authorize].
 app.UseMiddleware<PhamViChiNhanhMiddleware>();
 app.UseAuthorization();

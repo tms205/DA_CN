@@ -26,6 +26,17 @@ class _DangNhapScreenState extends State<DangNhapScreen> {
   bool _ghiNho = true;
   bool _dangGui = false;   // đang chờ API trả lời thì nút hiện vòng xoay
   String? _loi;            // câu lỗi hiện trong hộp đỏ
+  String? _loiNhanBaoTri;
+
+  @override
+  void initState() { super.initState(); _taiBaoTri(); }
+
+  Future<void> _taiBaoTri() async {
+    final result = await Api.get('/api/bao-tri/trang-thai');
+    if (mounted && result.thanhCong) {
+      setState(() => _loiNhanBaoTri = result.duLieu['dangBaoTri'] == true ? (result.duLieu['loiNhan'] as String? ?? '') : null);
+    }
+  }
 
   @override
   void dispose() {
@@ -64,6 +75,7 @@ class _DangNhapScreenState extends State<DangNhapScreen> {
     if (!mounted) return;
 
     if (!kq.thanhCong) {
+      _taiBaoTri();
       setState(() {
         _loi = kq.loi;
         _dangGui = false;
@@ -113,6 +125,7 @@ class _DangNhapScreenState extends State<DangNhapScreen> {
                       style: AppTheme.font(size: 12.5, color: AppColors.chuPhu, height: 1.5),
                     ),
                     const SizedBox(height: 20),
+                    if (_loiNhanBaoTri != null) ...[HopThongBao('Hệ thống đang bảo trì.\n$_loiNhanBaoTri'), const SizedBox(height: 12)],
                     if (_loi != null) ...[HopThongBao(_loi!), const SizedBox(height: 12)],
                     const NhanTruong('Email hoặc số điện thoại'),
                     const SizedBox(height: 6),

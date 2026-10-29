@@ -76,6 +76,17 @@ public sealed class TrangThaiKetNoiMayInDto
     public string? QuyCach { get; set; }
     public bool TamDung { get; set; }
     public string? ThongDiep { get; set; }
+    /// <summary>Mốc dự kiến theo heartbeat của đúng lệnh đang chạy, gồm 15 giây dự trù.</summary>
+    public DateTime? DuKienInXong
+    {
+        get
+        {
+            if (TrangThai != "DANG_IN" || TamDung || LanCuoiPhanHoi == default || SoGiayConLai is null or < 0) return null;
+            double giay = (double)SoGiayConLai.Value + 15;
+            return (DateTime.MaxValue - LanCuoiPhanHoi).TotalSeconds < giay
+                ? null : LanCuoiPhanHoi.AddSeconds(giay);
+        }
+    }
 }
 
 public sealed class DieuKhienMayInRequest
@@ -90,6 +101,7 @@ public sealed class DieuKhienMayInRequest
 // Chỉ trả cho connector qua khóa riêng, tuyệt đối không trả mã lệnh này ra web.
 public sealed class DieuKhienMayInDto
 {
+    public string? MaLenhDung { get; set; }
     public LienKetMayInDto? LienKet { get; set; }
     public bool TamDung { get; set; }
     public string? LoiMoPhong { get; set; }

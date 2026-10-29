@@ -125,6 +125,12 @@ public sealed class MayInSimulator : BackgroundService
                     maLenhDangXuLy = dangIn.MaLenh;
                     if (string.IsNullOrWhiteSpace(dangIn.MaLenh))
                         throw new InvalidDataException("Tiến trình cũ chưa có mã lệnh; cần kiểm tra thủ công, không tự báo in xong.");
+                    if (dangIn.DaDungDeChuyen || dieuKhien.MaLenhDung == dangIn.MaLenh)
+                    {
+                        await DungLenhDeChuyen(may.MaMayIn, dangIn, dung);
+                        await Task.Delay(1000, dung);
+                        continue;
+                    }
                     if (dangIn.CheDo != may.CheDo || (mayThat && dangIn.TenHangDoi != may.TenHangDoiWindows))
                         throw new InvalidOperationException("Có lệnh đang giữ: không đổi chế độ/queue. Khôi phục cấu hình cũ để kiểm tra lệnh.");
                     if (mayThat)
@@ -258,6 +264,9 @@ public sealed class MayInSimulator : BackgroundService
         CauHinhTocDoMayIn? may = null, DieuKhienMayInDto? dieuKhien = null, string? loi = null, int? trangThat = null)
     {
         int tong = tienTrinh?.Lenh?.DsDongIn.Sum(x => checked(x.SoTrang * x.SoBan)) ?? 0;
+        DateTime lucDoc = DateTime.Now;
+        if (tienTrinh?.CapNhatTamDungDuKien(dieuKhien?.TamDung == true || trangThai == "TAM_DUNG", lucDoc) == true)
+            await LuuTienTrinh(maMayIn, tienTrinh, dung);
         int? trang = tienTrinh?.CheDo == "THAT" ? trangThat : tienTrinh == null ? 0 :
             (int)Math.Floor(tong * (tienTrinh.TongSoGiay <= 0 ? 0 : tienTrinh.SoGiayDaIn / tienTrinh.TongSoGiay));
         var dong = tienTrinh?.Lenh?.DsDongIn.FirstOrDefault();
@@ -268,8 +277,7 @@ public sealed class MayInSimulator : BackgroundService
                 CheDo = may?.CheDo ?? "AO", TenHangDoi = may?.TenHangDoiWindows, Loi = loi,
                 TongTrang = tong, TrangDaIn = trang, TamDung = dieuKhien?.TamDung ?? false,
                 ThongDiep = tienTrinh?.CanhBao,
-                SoGiayConLai = tienTrinh?.CheDo == "AO" && tienTrinh.DaBatDau
-                    ? (int)Math.Ceiling(Math.Max(0, tienTrinh.TongSoGiay - tienTrinh.SoGiayDaIn)) : null,
+                SoGiayConLai = tienTrinh?.UocTinhSoGiayConLai(lucDoc),
                 TenFileDangIn = dong?.TenFile,
                 QuyCach = dong == null ? null : $"{dong.KhoGiay} · {dong.MatIn} · {dong.HuongGiay} · {dong.MauSac} · {dong.SoBan} bản / {tienTrinh!.Lenh!.DsDongIn.Count} file" },
             _json,
@@ -291,6 +299,18 @@ public sealed class MayInSimulator : BackgroundService
             // Kiểm tra toàn bộ quy cách trước khi gửi file đầu, tránh gửi một phần vì dữ liệu sai.
             foreach (var dong in lenh.DsDongIn) _ = MayInWindows.TaoThamSo(may.TenHangDoiWindows, "test.pdf", dong);
             var files = await TaiPdfChoMayThat(lenh, dung);
+            try
+            {
+                p.TongSoGiay = QuyTacMayInAo.TinhSoGiay(may, lenh.DsDongIn);
+                p.DuKienXong = DateTime.Now.AddSeconds(p.TongSoGiay);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or ArgumentOutOfRangeException)
+            {
+                // Chưa cấu hình tốc độ không được chặn việc gửi PDF thật.
+                p.TongSoGiay = 0;
+                p.DuKienXong = default;
+                _logger.LogWarning(ex, "Chưa ước tính được giờ in xong của máy {MaMayIn}.", may.MaMayIn);
+            }
             p.DaBatDau = true;
             p.CanhBao = "Đã bắt đầu gửi tới Windows. Nếu connector bị ngắt, kiểm tra queue và toàn bộ bản giấy; không tự gửi lại.";
             await LuuTienTrinh(may.MaMayIn, p, dung);
@@ -302,6 +322,7 @@ public sealed class MayInSimulator : BackgroundService
                     while (true)
                     {
                         var control = await DocDieuKhien(may.MaMayIn, dung);
+                        if (control.MaLenhDung == p.MaLenh) throw new InvalidOperationException("Đã nhận yêu cầu dừng để chuyển máy; không gửi thêm file.");
                         if (!control.TamDung) break;
                         await GuiHeartbeat(may.MaMayIn, "TAM_DUNG", dung, p, may, control);
                         await Task.Delay(1000, dung);
@@ -363,7 +384,8 @@ public sealed class MayInSimulator : BackgroundService
 
     private async Task GuiVaTheoDoi(CauHinhTocDoMayIn may, TienTrinhInDaLuu p, string tep, DongLenhInDto dong, CancellationToken dung)
     {
-        Task gui = _windows.GuiPdf(_config.SumatraPdfPath, may.TenHangDoiWindows, tep, dong, dung);
+        using var dungGui = CancellationTokenSource.CreateLinkedTokenSource(dung);
+        Task gui = _windows.GuiPdf(_config.SumatraPdfPath, may.TenHangDoiWindows, tep, dong, dungGui.Token);
         // Bộ render có thể chậm; tiếp tục heartbeat và xử lý pause đúng job khi nó chạy.
         while (!gui.IsCompleted)
         {
@@ -372,19 +394,53 @@ public sealed class MayInSimulator : BackgroundService
             try
             {
                 var control = await DocDieuKhien(may.MaMayIn, dung);
+                if (control.MaLenhDung == p.MaLenh)
+                {
+                    dungGui.Cancel();
+                    try { await gui; } catch (OperationCanceledException) when (!dung.IsCancellationRequested) { }
+                    throw new DungDeChuyenException();
+                }
                 var jobs = _windows.DocJob(may.TenHangDoiWindows).Where(x => MayInWindows.ThuocTep(x, tep)).ToList();
                 foreach (var job in jobs)
                     if (((job.Status & 1) != 0) != control.TamDung) _windows.TamDungJob(may.TenHangDoiWindows, job, control.TamDung);
                 await GuiHeartbeat(may.MaMayIn, control.TamDung ? "TAM_DUNG" : "DANG_IN", dung, p, may, control,
                     trangThat: jobs.Count == 0 ? null : jobs.Sum(j => j.TrangDaIn));
             }
-            catch (Exception ex) when (!dung.IsCancellationRequested)
+            catch (Exception ex) when (!dung.IsCancellationRequested && ex is not DungDeChuyenException)
             {
                 _logger.LogWarning(ex, "Chưa theo dõi được job khi đang gửi PDF của máy {MaMayIn}; không gửi lại.", may.MaMayIn);
             }
         }
         // Luôn quan sát task gửi, không bỏ một process in chạy mồ côi rồi gửi thêm lần nữa.
         await gui;
+    }
+
+    private sealed class DungDeChuyenException : Exception
+    { public DungDeChuyenException() : base("Đã dừng bộ gửi PDF để chuyển máy; đang đối chiếu queue.") { } }
+
+    private async Task DungLenhDeChuyen(int maMay, TienTrinhInDaLuu p, CancellationToken dung)
+    {
+        // Dùng queue của checkpoint, không dùng liên kết mới có thể đã đổi.
+        if (p.CheDo == "THAT")
+        {
+            var jobs = _windows.DocJob(p.TenHangDoi);
+            if (jobs.Count >= 1024) throw new InvalidOperationException("Queue quá lớn để xác minh đã dừng. Cần kiểm tra Windows trước khi chuyển.");
+            foreach (var job in jobs.Where(j => p.TepDaGui.Any(f => MayInWindows.ThuocTep(j, f))))
+                _windows.HuyJob(p.TenHangDoi, job);
+            if (_windows.DocJob(p.TenHangDoi).Any(j => p.TepDaGui.Any(f => MayInWindows.ThuocTep(j, f))))
+                throw new InvalidOperationException("Windows chưa loại bỏ hết job của đơn cũ; chưa cho phép chuyển máy.");
+        }
+        p.DaDungDeChuyen = true;
+        p.CanhBao = "Đã dừng lệnh cũ. Vẫn cần kiểm tra máy vật lý đã ngừng và đối chiếu bản giấy trước khi in ở máy mới.";
+        await LuuTienTrinh(maMay, p, dung);
+        using var res = await _http.PostAsJsonAsync($"api/may-in-ao/don/{p.MaDonHang}/da-dung",
+            new BaoCaoMayInRequest { MaMayIn = maMay, MaDonHang = p.MaDonHang, MaLenh = p.MaLenh }, _json, dung);
+        res.EnsureSuccessStatusCode();
+        string archive = Path.Combine(_thuMucTrangThai, "LichSuDung");
+        Directory.CreateDirectory(archive);
+        string id = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(p.MaLenh)))[..12];
+        File.Move(DuongDanTrangThai(maMay), Path.Combine(archive, $"DH{p.MaDonHang:D5}-may-{maMay}-{id}.json"), true);
+        // Giữ PDF và checkpoint lưu trữ làm bằng chứng; không xóa giấy tờ của người dùng.
     }
 
     private async Task<List<string>> TaiPdfChoMayThat(LenhInAoDto lenh, CancellationToken dung)

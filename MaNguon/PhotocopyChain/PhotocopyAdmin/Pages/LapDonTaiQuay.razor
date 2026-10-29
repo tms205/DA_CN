@@ -1,4 +1,4 @@
-@page "/lap-don-tai-quay"
+﻿@page "/lap-don-tai-quay"
 @attribute [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
 @inject HttpClient Http
 @inject PhienDangNhap Phien
@@ -181,145 +181,148 @@
 
     @if (_khach != null && _dsFile.Count > 0)
     {
-        <form @onsubmit="GuiQuyCachAsync" @onsubmit:preventDefault class="the the-rong">
-            <h2 class="the-tieu-de nho">3. Quy cách và báo giá</h2>
-            <div class="ca-loc-luoi">
-                @if (LaAnhThe)
-                {
-                    <p class="the-mo-ta">Ảnh thẻ @QuyCachAnhThe.Lay(_kichThuocAnh)?.Ten · Giấy ảnh A4 · In màu một mặt · Giá theo từng ảnh. Không nhân số bản hoặc gia công tài liệu.</p>
-                }
-                else
-                {
-                <div class="truong">
-                    <label class="nhan">Giấy in trong kho</label>
-                    <select class="ca-o-loc" value="@_khoaGiay" @onchange="DoiKhoGiay">
-                        @foreach (DichVuDto dv in DsKhoGiay())
-                        {
-                            <option value="@KhoaGiay(dv)">@(string.IsNullOrWhiteSpace(dv.TenVatTu) ? dv.KhoGiay + " " + dv.LoaiGiay : dv.TenVatTu)</option>
-                        }
-                    </select>
-                </div>
-                <div class="truong">
-                    <label class="nhan">Mặt in</label>
-                    <select class="ca-o-loc" value="@_matIn" @onchange="DoiMatIn">
-                        @foreach (string mat in DsMatIn())
-                        {
-                            <option value="@mat">@(mat == "2_MAT" ? "In 2 mặt" : "In 1 mặt")</option>
-                        }
-                    </select>
-                </div>
-                <div class="truong">
-                    <label class="nhan">Hướng giấy</label>
-                    <select class="ca-o-loc" @bind="_huongGiay" @bind:after="XoaBaoGia" disabled="@LaSaoChup">
-                        <option value="DUNG">Giấy đứng</option>
-                        <option value="NGANG">Giấy ngang</option>
-                    </select>
-                </div>
-                <div class="truong">
-                    <label class="nhan">Màu sắc</label>
-                    <select class="ca-o-loc" value="@_mauSac" @onchange="DoiMauSac">
-                        @foreach (string mau in DsMauSac())
-                        {
-                            <option value="@mau">@(mau == "MAU" ? "In màu" : "Đen trắng")</option>
-                        }
-                    </select>
-                </div>
-                <div class="truong">
-                    <label class="nhan">Số bản mỗi file</label>
-                    <input max="2147483647" required step="1" class="ca-o-loc" type="number" min="1" @bind="_soBan" @bind:after="XoaBaoGia" />
-                </div>
-                }
+        <form @onsubmit="GuiQuyCachAsync" @onsubmit:preventDefault class="the the-rong ldq-bao-gia" id="ldq-quy-cach-bao-gia" @ref="_khoiQuyCach">
+            <div class="ldq-tieu-de">
+                <div><h2 class="the-tieu-de nho" tabindex="-1">3. Quy cách và báo giá</h2><p>Chọn quy cách, kiểm tra chi phí và xác nhận lập đơn.</p></div>
+                <span class="bang-dem">@_dsFile.Count file đã chọn</span>
             </div>
-
-            <div class="ldq-thanh-toan-khuyen-mai">
-                <div class="truong ldq-thanh-toan">
-                    <label class="nhan" for="ldq-thanh-toan">Thanh toán</label>
-                    <select id="ldq-thanh-toan" class="ca-o-loc" @bind="_phuongThucThanhToan">
-                        <option value="VIETQR">Quét QR payOS tại quầy</option>
-                        <option value="COD">COD · trả khi nhận tài liệu</option>
-                    </select>
-                </div>
-                <div class="truong ldq-khuyen-mai">
-                    <label class="nhan" for="ldq-ma-khuyen-mai">Mã khuyến mãi</label>
-                    <input id="ldq-ma-khuyen-mai" maxlength="30" class="ca-o-loc mono" @bind="_maCode" @bind:after="XoaBaoGia" />
-                </div>
-                <div class="truong ldq-toc-do">
-                    <label class="nhan" for="ldq-toc-do">Tốc độ xử lý</label>
-                    <select id="ldq-toc-do" class="ca-o-loc" @bind="KieuIn" @bind:after="DoiKieuInAsync" disabled="@(_dangGui || _dangTaiFile)">
-                        <option value="THUONG">In thường · theo hàng đợi</option>
-                        <option value="HOA_TOC">In hỏa tốc (+10.000₫)</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="o-canh-bao" role="status" aria-live="polite">
-                <div>
-                    <div><b>@(_inGap ? "In hỏa tốc · ưu tiên xử lý" : "In thường · theo hàng đợi")</b></div>
-                    @if (_dangBaoGia)
+            <fieldset class="ldq-nhom">
+                <legend>Quy cách in</legend>
+                <div class="ca-loc-luoi ldq-quy-cach">
+                    @if (LaAnhThe)
                     {
-                        <div>Đang tính giờ nhận dự kiến…</div>
-                    }
-                    else if (_baoGia?.NgayHenTra != null)
-                    {
-                        <div>Giờ nhận dự kiến: <b>@_baoGia.NgayHenTra.Value.ToString("HH:mm dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)</b></div>
-                        <div class="nv-phu">Ước tính theo số trang, hàng đợi và tốc độ máy; có thể thay đổi theo tình trạng xử lý thực tế.</div>
+                        <p class="the-mo-ta">Ảnh thẻ @QuyCachAnhThe.Lay(_kichThuocAnh)?.Ten · Giấy ảnh A4 · In màu một mặt · Giá theo từng ảnh. Không nhân số bản hoặc gia công tài liệu.</p>
                     }
                     else
                     {
-                        <div>@(_baoGia == null ? "Bấm Tính lại giá để cập nhật giờ nhận theo quy cách đã chọn." : "Chưa ước tính được giờ nhận. Vui lòng kiểm tra máy in của chi nhánh.")</div>
+                        <div class="truong">
+                            <label class="nhan" for="ldq-giay">Giấy in trong kho</label>
+                            <select id="ldq-giay" class="ca-o-loc" value="@_khoaGiay" @onchange="DoiKhoGiay">
+                                @foreach (DichVuDto dv in DsKhoGiay())
+                                {
+                                    <option value="@KhoaGiay(dv)">@(string.IsNullOrWhiteSpace(dv.TenVatTu) ? dv.KhoGiay + " " + dv.LoaiGiay : dv.TenVatTu)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="truong">
+                            <label class="nhan" for="ldq-mat">Mặt in</label>
+                            <select id="ldq-mat" class="ca-o-loc" value="@_matIn" @onchange="DoiMatIn">
+                                @foreach (string mat in DsMatIn())
+                                {
+                                    <option value="@mat">@(mat == "2_MAT" ? "In 2 mặt" : "In 1 mặt")</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="truong">
+                            <label class="nhan" for="ldq-huong">Hướng giấy</label>
+                            <select id="ldq-huong" class="ca-o-loc" @bind="_huongGiay" @bind:after="XoaBaoGia" disabled="@LaSaoChup">
+                                <option value="DUNG">Giấy đứng</option>
+                                <option value="NGANG">Giấy ngang</option>
+                            </select>
+                        </div>
+                        <div class="truong">
+                            <label class="nhan" for="ldq-mau">Màu sắc</label>
+                            <select id="ldq-mau" class="ca-o-loc" value="@_mauSac" @onchange="DoiMauSac">
+                                @foreach (string mau in DsMauSac())
+                                {
+                                    <option value="@mau">@(mau == "MAU" ? "In màu" : "Đen trắng")</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="truong">
+                            <label class="nhan" for="ldq-ban">Số bản mỗi file</label>
+                            <input id="ldq-ban" max="2147483647" required step="1" class="ca-o-loc" type="number" min="1" @bind="_soBan" @bind:after="XoaBaoGia" />
+                        </div>
                     }
                 </div>
-            </div>
-
-            @if (!LaAnhThe)
-            {
-            <h3 class="hd-muc">Gia công</h3>
-            <div class="thanh-loc">
-                @foreach (DichVuDto dv in _dsDichVu.Where(x => x.LoaiDichVu == "GIA_CONG"))
-                {
-                    <label class="hop-chon">
-                        <input type="checkbox" checked="@_dsGiaCong.Contains(dv.MaDichVu)" disabled="@(QuyTacIn.LaKimGoc(dv.TenDichVu) && !KimGocHopLe())" @onchange="e => DoiGiaCong(dv, (bool)e.Value)" />
-                        <span class="o-vuong">✓</span>@dv.TenDichVu · @Tien(dv.DonGia)/bản
-                    </label>
-                }
-            </div>
-            <p class="nv-phu">Kim góc: tối đa 50 tờ giấy mỗi file, mỗi bản. Bìa kiếng và ép plastic có thể đi cùng lò xo; lò xo không chọn cùng kim góc.</p>
-            @if (!KimGocHopLe())
-            {
-                <div class="o-canh-bao">Có file vượt 50 tờ/bản theo mặt in hiện tại, không thể chọn bấm kim góc.</div>
-            }
-            @if (_thongBaoGiaCong != null)
-            {
-                <div class="o-canh-bao"><span>@_thongBaoGiaCong</span></div>
-            }
-            }
-
-            <div class="truong">
-                <label class="nhan">Ghi chú cho thợ in</label>
-                <div class="o-nhap"><input maxlength="255" @bind="_ghiChu" placeholder="Ví dụ: bấm kim góc trái" /></div>
-            </div>
-
-            @if (_baoGia != null)
-            {
-                <dl class="bang-thong-tin gon">
-                    <dt>Tiền in</dt><dd class="mono">@Tien(_baoGia.TienIn)</dd>
-                    <dt>Gia công</dt><dd class="mono">@Tien(_baoGia.TienGiaCong)</dd>
-                    @foreach (DichVuDto giaCong in DsGiaCongDaChon())
+            </fieldset>
+            <div class="ldq-hoan-tat">
+                <div class="ldq-thiet-lap">
+                    @if (!LaAnhThe)
                     {
-                        decimal thanhTienGiaCong = giaCong.DonGia * _soBan * _dsFile.Count;
-                        <dt class="nv-phu">↳ @giaCong.TenDichVu (@Tien(giaCong.DonGia) × @_soBan bản × @_dsFile.Count file)</dt>
-                        <dd class="mono nv-phu">@Tien(thanhTienGiaCong)</dd>
+                        <h3 class="ldq-muc">Gia công sau in <span>Không bắt buộc</span></h3>
+                        <div class="ldq-gia-cong">
+                            @foreach (DichVuDto dv in _dsDichVu.Where(x => x.LoaiDichVu == "GIA_CONG"))
+                            {
+                                <label class="hop-chon ldq-dich-vu">
+                                    <input type="checkbox" checked="@_dsGiaCong.Contains(dv.MaDichVu)" disabled="@(QuyTacIn.LaKimGoc(dv.TenDichVu) && !KimGocHopLe())" @onchange="e => DoiGiaCong(dv, (bool)e.Value)" />
+                                    <span class="o-vuong">✓</span><span class="ldq-dich-vu-chu">@dv.TenDichVu <small>· @Tien(dv.DonGia)/bản</small></span>
+                                </label>
+                            }
+                        </div>
+                        <p class="nv-phu">Kim góc: tối đa 50 tờ giấy mỗi file, mỗi bản. Bìa kiếng và ép plastic có thể đi cùng lò xo; lò xo không chọn cùng kim góc.</p>
+                        @if (!KimGocHopLe())
+                        {
+                            <div class="o-canh-bao">Có file vượt 50 tờ/bản theo mặt in hiện tại, không thể chọn bấm kim góc.</div>
+                        }
+                        @if (_thongBaoGiaCong != null)
+                        {
+                            <div class="o-canh-bao"><span>@_thongBaoGiaCong</span></div>
+                        }
                     }
-                    <dt>Phụ phí hỏa tốc</dt><dd class="mono">@Tien(_baoGia.PhuPhiGap)</dd>
-                    <dt>Giảm giá</dt><dd class="mono">−@Tien(_baoGia.GiamGia)</dd>
-                    <dt>@(_phuongThucThanhToan == "VIETQR" ? "Tổng thanh toán" : "Tổng thu khi giao")</dt><dd class="mono hd-tong">@Tien(_baoGia.TongTien)</dd>
-                </dl>
-                @if (_baoGia.KhuyenMaiHopLe == false) { <div class="o-canh-bao"><span>@_baoGia.LyDoKhuyenMai</span></div> }
-            }
-
-            <div class="xac-nhan-o">
-                <button type="submit" class="nut-nho" disabled="@(_dangGui || _dangTaiFile)" @onclick="() => _chiBaoGia = true">Tính lại giá</button>
-                <button type="submit" class="nut-nho chinh" disabled="@(_dangGui || _dangTaiFile || _baoGia == null)" @onclick="() => _chiBaoGia = false">@(_phuongThucThanhToan == "VIETQR" ? "Lập đơn & hiện mã QR" : "Lập đơn COD")</button>
+                    <section class="ldq-nhom-thanh-toan" aria-labelledby="ldq-tieu-de-thanh-toan">
+                        <h3 id="ldq-tieu-de-thanh-toan" class="ldq-muc">Thanh toán &amp; thời gian nhận</h3>
+                        <div class="ldq-thanh-toan-khuyen-mai">
+                            <div class="truong ldq-thanh-toan">
+                                <label class="nhan" for="ldq-thanh-toan">Thanh toán</label>
+                                <select id="ldq-thanh-toan" class="ca-o-loc" @bind="_phuongThucThanhToan">
+                                    <option value="VIETQR">Quét QR payOS tại quầy</option>
+                                    <option value="COD">COD · trả khi nhận tài liệu</option>
+                                </select>
+                            </div>
+                            <div class="truong ldq-khuyen-mai">
+                                <label class="nhan" for="ldq-ma-khuyen-mai">Mã khuyến mãi</label>
+                                <input id="ldq-ma-khuyen-mai" maxlength="30" class="ca-o-loc mono" @bind="_maCode" @bind:after="XoaBaoGia" />
+                            </div>
+                            <div class="truong ldq-toc-do">
+                                <label class="nhan" for="ldq-toc-do">Tốc độ xử lý</label>
+                                <select id="ldq-toc-do" class="ca-o-loc" @bind="KieuIn" @bind:after="DoiKieuInAsync" disabled="@(_dangGui || _dangTaiFile)">
+                                    <option value="THUONG">In thường · theo hàng đợi</option>
+                                    <option value="HOA_TOC">In hỏa tốc (+10.000₫)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="ldq-gio-nhan @(_inGap ? "hoa-toc" : "")" role="status" aria-live="polite">
+                            <div>
+                                <div><b>@(_inGap ? "In hỏa tốc · ưu tiên xử lý" : "In thường · theo hàng đợi")</b></div>
+                                <div>Giờ in xong sẽ hiển thị trong chi tiết đơn sau khi máy bắt đầu xử lý.</div>
+                            </div>
+                        </div>
+                    </section>
+                    <div class="truong">
+                        <label class="nhan" for="ldq-ghi-chu">Ghi chú cho thợ in</label>
+                        <div class="o-nhap"><input id="ldq-ghi-chu" maxlength="255" @bind="_ghiChu" placeholder="Ví dụ: bấm kim góc trái" /></div>
+                    </div>
+                </div>
+                <aside class="ldq-tom-tat" aria-labelledby="ldq-tieu-de-tom-tat">
+                    <h3 id="ldq-tieu-de-tom-tat" class="ldq-muc">Tóm tắt chi phí</h3>
+                    @if (_baoGia != null)
+                    {
+                        <dl class="bang-thong-tin gon ldq-chi-tiet-gia">
+                            <dt>Tiền in</dt><dd class="mono">@Tien(_baoGia.TienIn)</dd>
+                            <dt>Gia công</dt><dd class="mono">@Tien(_baoGia.TienGiaCong)</dd>
+                            @foreach (DichVuDto giaCong in DsGiaCongDaChon())
+                            {
+                                decimal thanhTienGiaCong = giaCong.DonGia * _soBan * _dsFile.Count;
+                                <dt class="nv-phu">↳ @giaCong.TenDichVu (@Tien(giaCong.DonGia) × @_soBan bản × @_dsFile.Count file)</dt>
+                                <dd class="mono nv-phu">@Tien(thanhTienGiaCong)</dd>
+                            }
+                            <dt>Phụ phí hỏa tốc</dt><dd class="mono">@Tien(_baoGia.PhuPhiGap)</dd>
+                            <dt>Giảm giá</dt><dd class="mono">−@Tien(_baoGia.GiamGia)</dd>
+                            <dt class="ldq-tong">@(_phuongThucThanhToan == "VIETQR" ? "Tổng thanh toán" : "Tổng thu khi giao")</dt><dd class="mono hd-tong ldq-tong">@Tien(_baoGia.TongTien)</dd>
+                        </dl>
+                        @if (_baoGia.KhuyenMaiHopLe == false) { <div class="o-canh-bao"><span>@_baoGia.LyDoKhuyenMai</span></div> }
+                    }
+                    else
+                    {
+                        <p class="ldq-gia-trong">Quy cách đã thay đổi. Tính lại giá để xem tổng tiền.</p>
+                    }
+                    <div class="xac-nhan-o ldq-xac-nhan">
+                        <button type="submit" class="nut-phu" disabled="@(_dangGui || _dangTaiFile || _dangBaoGia)" aria-busy="@(_dangBaoGia ? "true" : "false")" @onclick="() => _chiBaoGia = true">@(_dangBaoGia ? "Đang tính giá…" : "Tính lại giá")</button>
+                        <button type="submit" class="nut-chinh" disabled="@(_dangGui || _dangTaiFile || _dangBaoGia || _baoGia == null)" aria-busy="@(_dangGui ? "true" : "false")" @onclick="() => _chiBaoGia = false">@(_dangGui ? "Đang lập đơn…" : _phuongThucThanhToan == "VIETQR" ? "Lập đơn & hiện mã QR" : "Lập đơn COD")</button>
+                    </div>
+                    <p class="ldq-luu-y">@(_phuongThucThanhToan == "VIETQR" ? "Mã QR được hiển thị sau khi lập đơn." : "Thu tiền khi bàn giao tài liệu cho khách.")</p>
+                </aside>
             </div>
         </form>
     }
@@ -423,10 +426,13 @@
         (LaAnhThe ? x.KichThuocAnh == _kichThuocAnh : x.KichThuocAnh == null) &&
         (!LaSaoChup || (x.KhoGiay == "A4" && x.MatIn == "1_MAT")));
 
+    private ElementReference _khoiQuyCach;
+    private bool _cuonToiQuyCach;
+
     private void DangQuetThayDoi(bool dang) => _dangTaiFile = dang;
     private async Task NhanFileSaoChupAsync(FileInDto file)
     {
-        _dsFile.Add(file); XoaBaoGia();
+        _dsFile.Add(file); XoaBaoGia(); _cuonToiQuyCach = true;
         await BaoGiaAsync();
     }
 
@@ -462,9 +468,16 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!_canMoMau) return;
-        _canMoMau = false;
-        await Js.InvokeVoidAsync("moMauDon", _hopMau);
+        if (_canMoMau)
+        {
+            _canMoMau = false;
+            await Js.InvokeVoidAsync("moMauDon", _hopMau);
+        }
+        if (_cuonToiQuyCach && !_dangTaiFile && _khach != null && _dsFile.Count > 0)
+        {
+            _cuonToiQuyCach = false;
+            if (_loi == null) await Js.InvokeVoidAsync("cuonToiQuyCach", _khoiQuyCach);
+        }
     }
 
     private async Task DongXemMauAsync()
@@ -483,6 +496,7 @@
             if (res.IsSuccessStatusCode)
             {
                 _dsFile.Add(await res.Content.ReadFromJsonAsync<FileInDto>());
+                _cuonToiQuyCach = true;
                 await DongXemMauAsync();
             }
             else _loi = (await res.Content.ReadFromJsonAsync<ApiError>()).Message;
@@ -631,6 +645,7 @@
     private async Task TaiFileAsync(InputFileChangeEventArgs e)
     {
         if (_khach == null || _dangGui || _dangTaiFile) return;
+        int soFileTruoc = _dsFile.Count;
         XoaBaoGia();
         _dangTaiFile = true; _loi = null;
         foreach (IBrowserFile file in e.GetMultipleFiles(10))
@@ -650,6 +665,7 @@
             catch { _loi = "Không tải được file " + file.Name + "."; }
         }
         _dangTaiFile = false;
+        if (_dsFile.Count > soFileTruoc) _cuonToiQuyCach = true;
         KiemTraKimGoc();
         if (_dsFile.Count > 0) await BaoGiaAsync();
     }

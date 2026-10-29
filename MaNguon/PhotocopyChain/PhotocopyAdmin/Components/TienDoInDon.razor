@@ -9,6 +9,15 @@
     {
         <div class="tdi-dau"><strong>@TenTrangThai(TrangThai.TrangThai)</strong><span>@(TrangThai.CheDo == "AO" ? "Mô phỏng" : "Windows · máy thật")</span></div>
         <p>@TrangThai.TenFileDangIn</p>
+        @if (TrangThai.DuKienInXong is DateTime gioXong)
+        {
+            <p><strong>Dự kiến in xong: @gioXong.ToString("HH:mm:ss dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)</strong></p>
+            <p>Đã gồm 15 giây dự trù; chưa bao gồm thời gian giao hàng.</p>
+        }
+        else if (TrangThai.TrangThai == "DANG_IN")
+        {
+            <p>Máy đang xử lý; chưa cập nhật được giờ in xong dự kiến.</p>
+        }
         @if (TrangThai.CheDo == "AO" && TrangThai.TongTrang > 0 && TrangThai.TrangDaIn != null)
         {
             <progress max="@TrangThai.TongTrang" value="@TrangThai.TrangDaIn" aria-label="Tiến độ mô phỏng"></progress>

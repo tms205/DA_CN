@@ -1,0 +1,89 @@
+﻿@using System.Globalization
+
+@if (DuLieu.Any(x => x.SoTien < 0))
+{
+    <p class="o-canh-bao">Có giá trị dịch vụ âm. Cần kiểm tra số liệu trước khi tính tỷ trọng.</p>
+}
+else if (_tong <= 0)
+{
+    <p class="nv-phu">Chưa có dữ liệu dịch vụ trong kỳ.</p>
+}
+else
+{
+    <div class="cc-dich-vu">
+        <div class="cc-vong">
+            <svg viewBox="0 0 280 280" role="group" aria-label="Tỷ trọng giá trị dịch vụ">
+                <title>Cơ cấu dịch vụ theo phần trăm</title>
+                @for (int i = 0; i < _mien.Count; i++)
+                {
+                    int index = i;
+                    var mien = _mien[index];
+                    <g @key="mien.DichVu.Ten" class="cc-mien" role="button" tabindex="0" aria-label="@MoTa(mien)" @onmouseenter="() => _chon = index" @onmouseleave="() => _chon = -1" @onfocus="() => _chon = index" @onblur="() => _chon = -1" @onclick="() => _chon = index">
+                        <path d="@mien.Duong" class="cc-hit" />
+                        <path d="@mien.Duong" class="cc-cung @(_chon == index ? "noi-bat" : "")" style="@($"--mau-cung:{Mau(index)}")"><title>@MoTa(mien)</title></path>
+                    </g>
+                }
+                <text x="140" y="137" text-anchor="middle" class="cc-phan-tram">@(_chon >= 0 ? PhanTram(_mien[_chon]) : "100%")</text>
+                <text x="140" y="159" text-anchor="middle" class="cc-nhan">@(_chon >= 0 ? "Tỷ trọng dịch vụ" : "Tổng cơ cấu")</text>
+            </svg>
+            <div class="cc-thong-tin" aria-live="polite"><span>@(_chon >= 0 ? _mien[_chon].DichVu.Ten : "Tổng giá trị dịch vụ")</span><strong>@TongQuanBaoCao.Tien(_chon >= 0 ? _mien[_chon].DichVu.SoTien : _tong)</strong></div>
+        </div>
+        <div class="cc-chu-giai" role="group" aria-label="Các dịch vụ và tỷ trọng">
+            @for (int i = 0; i < _mien.Count; i++)
+            {
+                int index = i;
+                var mien = _mien[index];
+                <button type="button" class="cc-muc @(_chon == index ? "dang-chon" : "")" style="@($"--mau-cung:{Mau(index)}")" data-phan-tram="@((mien.DonViPhanTram / 10m).ToString(CultureInfo.InvariantCulture))" aria-label="@MoTa(mien)"
+                    @onmouseenter="() => _chon = index" @onmouseleave="() => _chon = -1" @onfocus="() => _chon = index" @onblur="() => _chon = -1" @onclick="() => _chon = index">
+                    <i aria-hidden="true"></i><span>@mien.DichVu.Ten<small>@TongQuanBaoCao.Tien(mien.DichVu.SoTien)</small></span><b>@PhanTram(mien)</b>
+                </button>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public List<CoCauDoanhThuDto> DuLieu { get; set; } = new();
+    private readonly List<Mien> _mien = new();
+    private decimal _tong;
+    private int _chon = -1;
+    protected override void OnParametersSet()
+    {
+        _mien.Clear(); _chon = -1;
+        _tong = DuLieu.Sum(x => x.SoTien);
+        if (_tong <= 0 || DuLieu.Any(x => x.SoTien < 0)) return;
+        double goc = -90;
+        foreach (var d in DuLieu.Where(x => x.SoTien > 0))
+        {
+            decimal tyLe = d.SoTien / _tong;
+            double rong = (double)tyLe * 360;
+            _mien.Add(new(d, Cung(goc, rong), (int)decimal.Floor(tyLe * 1000), tyLe * 1000 % 1));
+            goc += rong;
+        }
+        // Làm tròn đến 0,1% nhưng tổng các nhãn luôn bằng 100%.
+        int con = 1000 - _mien.Sum(x => x.DonViPhanTram);
+        foreach (var m in _mien.OrderByDescending(x => x.PhanLe).Take(con)) m.DonViPhanTram++;
+    }
+    private static string PhanTram(Mien m) => TongQuanBaoCao.So(m.DonViPhanTram / 10m) + "%";
+    private static string MoTa(Mien m) => $"{m.DichVu.Ten}: {PhanTram(m)} · {TongQuanBaoCao.Tien(m.DichVu.SoTien)}";
+    private static string Mau(int i) => (i % 6) switch {
+        0 => "var(--accent)", 1 => "color-mix(in srgb,var(--accent) 65%,var(--thanh-cong))",
+        2 => "color-mix(in srgb,var(--accent) 55%,var(--trang))", 3 => "var(--accent-dam)",
+        4 => "color-mix(in srgb,var(--accent) 55%,var(--cb-icon))", _ => "color-mix(in srgb,var(--accent) 35%,var(--chu-phu))"
+    };
+    private static string Diem(double r, double goc) => $"{So(140+r*Math.Cos(goc*Math.PI/180))},{So(140+r*Math.Sin(goc*Math.PI/180))}";
+    private static string So(double n) => n.ToString("0.####", CultureInfo.InvariantCulture);
+    private static string Cung(double dau, double rong)
+    {
+        if (rong >= 359.99999) return "M140,40 A100,100 0 1 1 140,240 A100,100 0 1 1 140,40 L140,70 A70,70 0 1 0 140,210 A70,70 0 1 0 140,70 Z";
+        int lon = rong > 180 ? 1 : 0;
+        return $"M{Diem(100,dau)} A100,100 0 {lon} 1 {Diem(100,dau+rong)} L{Diem(70,dau+rong)} A70,70 0 {lon} 0 {Diem(70,dau)} Z";
+    }
+    private sealed class Mien(CoCauDoanhThuDto d, string duong, int donVi, decimal phanLe)
+    {
+        public CoCauDoanhThuDto DichVu { get; } = d;
+        public string Duong { get; } = duong;
+        public int DonViPhanTram { get; set; } = donVi;
+        public decimal PhanLe { get; } = phanLe;
+    }
+}

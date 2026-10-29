@@ -1033,15 +1033,6 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
     }
     String tenGiaCong = dsTen.join(', ');
 
-    // Dòng "Dự kiến in xong sau N phút — lúc HH:mm"
-    String? dongHenTra;
-    if (b != null && b.ngayHenTra != null) {
-      int soPhut = b.ngayHenTra!.difference(DateTime.now()).inMinutes;
-      if (soPhut < 1) soPhut = 1;
-      dongHenTra =
-          'Dự kiến in xong sau $soPhut phút — lúc ${gioPhut(b.ngayHenTra!)}';
-    }
-
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.trang,
@@ -1185,31 +1176,6 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
                 ),
               ],
             ),
-            if (dongHenTra != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 5),
-                child: Row(
-                  children: [
-                    const AppIcon(
-                      Ico.dongHo,
-                      size: 13,
-                      color: AppColors.thanhCong,
-                      net: 1.9,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        dongHenTra,
-                        style: AppTheme.font(
-                          size: 11.5,
-                          weight: FontWeight.w600,
-                          color: AppColors.thanhCong,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             const SizedBox(height: 12),
             NutChinh(
               nhan: 'Tiếp tục chọn chi nhánh',

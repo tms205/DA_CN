@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'phien.dart';
+import 'api.dart';
 import 'realtime.dart';
 import 'screens/xac_thuc/dang_nhap_screen.dart';
 import 'screens/trang_chinh_screen.dart';
@@ -43,6 +44,15 @@ class _ManHinhChoState extends State<ManHinhCho> {
 
   Future<void> _kiemTraPhien() async {
     bool daDangNhap = await Phien.docTuMay();
+    if (daDangNhap) {
+      final status = await Api.get('/api/bao-tri/trang-thai');
+      var invalid = status.thanhCong && status.duLieu['dangBaoTri'] == true;
+      if (!invalid) { final session = await Api.get('/api/bao-tri/phien'); invalid = session.maHttp == 401; }
+      if (invalid) {
+        await Phien.dangXuat();
+        daDangNhap = false;
+      }
+    }
     if (daDangNhap) await Realtime.batDau();   // F-32: mở kênh nhận cập nhật real-time
     if (!mounted) return;
 

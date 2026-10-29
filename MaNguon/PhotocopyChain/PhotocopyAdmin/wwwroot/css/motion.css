@@ -1,0 +1,94 @@
+/* Interaction patterns adapted from Seokwoooo/lucian-uxui-prompt (MIT).
+   Source and license: docs/THIRD_PARTY_LUCIAN_UXUI.md. Colors use PhotocopyChain tokens. */
+:root {
+    --nhanh-ux: 140ms;
+    --vua-ux: 220ms;
+    --nhip-ux: cubic-bezier(.2, .8, .2, 1);
+}
+
+:is(.nut-chinh, .nut-phu, .nut-nho, .qt-popup-dong) {
+    transition: background-color var(--nhanh-ux), border-color var(--nhanh-ux),
+        box-shadow var(--nhanh-ux), transform var(--nhanh-ux) var(--nhip-ux);
+}
+@media (hover: hover) and (pointer: fine) {
+    :is(.nut-chinh, .nut-phu, .nut-nho):not(:disabled):hover {
+        transform: translateY(-1px);
+        box-shadow: 0 3px 9px color-mix(in srgb, var(--accent) 16%, transparent);
+    }
+    .bang tbody tr { transition: background-color var(--nhanh-ux); }
+    .bang tbody tr:hover { background-color: var(--accent-nhat); }
+}
+:is(.nut-chinh, .nut-phu, .nut-nho, .qt-popup-dong):not(:disabled):active {
+    transform: translateY(0) scale(.98);
+    box-shadow: none;
+}
+:is(.ca-o-loc, .o-nhap) {
+    transition: border-color var(--nhanh-ux), box-shadow var(--nhanh-ux);
+}
+.ca-o-loc:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* One short entrance when the native dialog opens; closing stays immediate. */
+.qt-popup[open] { animation: pc-popup-vao var(--vua-ux) var(--nhip-ux) both; }
+.qt-popup[open]::backdrop { animation: pc-nen-vao var(--vua-ux) ease-out both; }
+@keyframes pc-popup-vao {
+    from { opacity: 0; transform: translateY(10px) scale(.985); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes pc-nen-vao { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pc-noi-dung-vao {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: none; }
+}
+.than-trang > .the { animation: pc-noi-dung-vao var(--vua-ux) var(--nhip-ux) both; }
+:is(.o-thanh-cong, .o-loi) { animation: pc-noi-dung-vao 180ms var(--nhip-ux) both; }
+
+.ldq-dich-vu { transition: border-color var(--nhanh-ux), background-color var(--nhanh-ux); }
+.hop-chon .o-vuong { transition: color var(--nhanh-ux), border-color var(--nhanh-ux), background-color var(--nhanh-ux); }
+.ldq-dich-vu input:checked + .o-vuong { animation: pc-danh-dau 180ms var(--nhip-ux); }
+@keyframes pc-danh-dau { 0% { transform: scale(.85); } 65% { transform: scale(1.12); } 100% { transform: scale(1); } }
+
+/* Loading is driven by actual component state, without a simulated timer or percentage. */
+button[aria-busy="true"]::before {
+    content: "";
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    flex: 0 0 14px;
+    margin-right: 7px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: pc-xoay 800ms linear infinite;
+}
+@keyframes pc-xoay { to { transform: rotate(360deg); } }
+.bang-dang-tai { padding: 20px; }
+.tai-nhan { display: block; color: var(--chu-phu); font-size: 14px; margin-bottom: 16px; }
+.tai-khung { display: grid; gap: 16px; }
+.tai-hang { display: grid; grid-template-columns: 36px minmax(0, 2fr) minmax(0, 1fr); gap: 14px; align-items: center; }
+.tai-hang span { display: block; height: 14px; border-radius: 4px; background: var(--vach); }
+.tai-hang span:first-child { height: 36px; border-radius: 50%; }
+.tai-khung { position: relative; overflow: hidden; }
+.tai-khung::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(100deg, transparent 25%, var(--trang) 50%, transparent 75%);
+    opacity: .55;
+    animation: pc-tai-sang 1500ms linear infinite;
+}
+@keyframes pc-tai-sang { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+
+@media (prefers-reduced-motion: reduce) {
+    :is(.nut-chinh, .nut-phu, .nut-nho, .qt-popup-dong, .ca-o-loc, .o-nhap,
+        .qt-popup[open], .than-trang > .the, .o-thanh-cong, .o-loi,
+        .ldq-dich-vu, .hop-chon .o-vuong, .bang tbody tr),
+    .qt-popup[open]::backdrop, button[aria-busy="true"]::before, .tai-khung::after {
+        animation: none !important;
+        transition: none !important;
+        transform: none !important;
+    }
+    .tai-khung::after { display: none; }
+}

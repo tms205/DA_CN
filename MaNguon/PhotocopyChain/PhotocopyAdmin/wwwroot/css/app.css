@@ -771,3 +771,12 @@ button { font-family: inherit; }
     .ca-xu-ly-lech { grid-template-columns: 1fr; }
     .ca-ghi-chu-lech { grid-column: span 1; }
 }
+
+
+/* Trạng thái bảo trì hiển thị cho CEO */
+.layout-bao-tri { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 18px; background: #fff6e7; color: #774813; border-bottom: 1px solid #eed4a9; }
+.layout-bao-tri div { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.layout-bao-tri strong { font-size: 13px; }
+.layout-bao-tri span, .layout-bao-tri a { font-size: 12px; line-height: 1.45; }
+.layout-bao-tri a { color: #75420b; font-weight: 700; white-space: nowrap; }
+@media (max-width: 650px) { .layout-bao-tri { align-items: flex-start; flex-direction: column; gap: 6px; } }

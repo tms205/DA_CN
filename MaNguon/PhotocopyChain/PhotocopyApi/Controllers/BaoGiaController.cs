@@ -149,6 +149,8 @@ public class BaoGiaController : ControllerBase
                 DsGiaCong = bangGiaCong.AsTableValuedParameter("Kieu_DongGiaCong")
             }, commandType: CommandType.StoredProcedure);
 
+            // Chưa có lệnh/máy đang chạy: không dùng giờ ước lượng của bước báo giá làm giờ hẹn.
+            ketQua.NgayHenTra = null;
             if (phiGiao != null)
             {
                 ketQua.MaBaoGiaGiao = _giaoHang.GiuBaoGia(maKhachHangBaoGia, req.MaChiNhanh,

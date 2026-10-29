@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;
 using Microsoft.AspNetCore.Components;
@@ -201,7 +201,7 @@ public class LapDonTaiQuayWebTests
     [InlineData(false, false, false)]
     [InlineData(true, false, false)]
     [InlineData(false, true, true)]
-    public async Task Form_WebKhongBatBuocTungO_VaHienGioNhanCuThe(bool inGap, bool coGio, bool dangGui)
+    public async Task Form_WebKhongBatBuocTungO_KhongHienGioInTruocLapDon(bool inGap, bool coGio, bool dangGui)
     {
         using var http = new HttpClient(new ApiGia(req => Task.FromResult(Tra(Array.Empty<object>()))))
             { BaseAddress = new Uri("http://test.local/") };
@@ -233,26 +233,21 @@ public class LapDonTaiQuayWebTests
         Assert.Contains("2. Tài liệu", noiDungTrang);
         Assert.Contains("3. Quy cách và báo giá", noiDungTrang);
         Assert.DoesNotContain("Tạm đóng · giữ nội dung", html);
-        if (coGio)
-        {
-            Assert.Contains("15:30 12/10/2026", html);
-            Assert.Contains("Giờ nhận dự kiến", html);
-        }
-        else
-        {
-            Assert.Contains("Chưa ước tính được giờ nhận", html);
-            Assert.DoesNotContain("15:30", html);
-        }
+        Assert.DoesNotContain("15:30 12/10/2026", html);
+        Assert.DoesNotContain("Giờ nhận dự kiến", html);
+        Assert.Contains("Giờ in xong sẽ hiển thị trong chi tiết đơn sau khi máy bắt đầu xử lý.", html);
         Assert.Contains(inGap ? "<option value=\"HOA_TOC\" selected>" : "<option value=\"THUONG\" selected>", html);
         Assert.Contains("In thường", html);
-        int dauQuyCach = html.IndexOf("class=\"ca-loc-luoi\"", StringComparison.Ordinal);
+        int dauQuyCach = html.IndexOf("class=\"ca-loc-luoi ldq-quy-cach\"", StringComparison.Ordinal);
         int dauThanhToan = html.IndexOf("class=\"ldq-thanh-toan-khuyen-mai\"", StringComparison.Ordinal);
         Assert.True(dauThanhToan > dauQuyCach, "Thanh toán và mã khuyến mãi phải nằm ở hàng riêng sau quy cách in.");
-        string quyCach = html[dauQuyCach..dauThanhToan];
+        Assert.True(dauQuyCach >= 0);
+        string quyCach = html[dauQuyCach..html.IndexOf("</fieldset>", dauQuyCach, StringComparison.Ordinal)];
         Assert.DoesNotContain("Mã khuyến mãi", quyCach);
         Assert.DoesNotContain("Thanh toán", quyCach);
         Assert.DoesNotContain("Tốc độ xử lý", quyCach);
-        int dauGioNhan = html.IndexOf("class=\"o-canh-bao\"", dauThanhToan, StringComparison.Ordinal);
+        int dauGioNhan = html.IndexOf("class=\"ldq-gio-nhan", dauThanhToan, StringComparison.Ordinal);
+        Assert.True(dauGioNhan > dauThanhToan);
         string thanhToan = html[dauThanhToan..dauGioNhan];
         Assert.Contains("for=\"ldq-thanh-toan\"", thanhToan);
         Assert.Contains("id=\"ldq-thanh-toan\"", thanhToan);

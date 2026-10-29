@@ -27,6 +27,8 @@ else
     [Parameter] public bool DangBan { get; set; }
     [Parameter] public EventCallback<DangNhapResponse> ThanhCong { get; set; }
     [Parameter] public EventCallback<bool> DangXuLyChanged { get; set; }
+    [Parameter] public EventCallback<string> BaoTriPhatHien { get; set; }
+    [Parameter] public EventCallback<string> BaoTriTrangThai { get; set; }
     private GoogleCongKhaiDto _cauHinh;
     private ElementReference _oGoogle;
     private IJSObjectReference _module;
@@ -44,7 +46,22 @@ else
             _cauHinh = await Http.GetFromJsonAsync<GoogleCongKhaiDto>("api/auth/google/config");
             if (_cauHinh == null) throw new InvalidOperationException();
         }
-        catch { _loi = "Không tải được cấu hình Google. Kiểm tra API hoặc đăng nhập bằng mật khẩu."; }
+        catch
+        {
+            // Bảo trì có thể được bật giữa lúc trang tải trạng thái và lúc lấy cấu hình Google.
+            try
+            {
+                using var status = await Http.GetFromJsonAsync<System.Text.Json.JsonDocument>("api/bao-tri/trang-thai");
+                if (status?.RootElement.TryGetProperty("dangBaoTri", out var flag) == true && flag.ValueKind == System.Text.Json.JsonValueKind.True && BaoTriTrangThai.HasDelegate)
+                {
+                    var message = status.RootElement.TryGetProperty("loiNhan", out var value) ? value.GetString() : "";
+                    await BaoTriTrangThai.InvokeAsync(message);
+                    return;
+                }
+            }
+            catch { }
+            _loi = "Không tải được cấu hình Google. Kiểm tra API hoặc đăng nhập bằng mật khẩu.";
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -80,6 +97,20 @@ else
             if (_daDong) return;
             if (!res.IsSuccessStatusCode)
             {
+                if (res.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable)
+                {
+                    try
+                    {
+                        using var json = System.Text.Json.JsonDocument.Parse(await res.Content.ReadAsStringAsync());
+                        if (json.RootElement.TryGetProperty("dangBaoTri", out var flag) && flag.ValueKind == System.Text.Json.JsonValueKind.True)
+                        {
+                            var loiNhan = json.RootElement.TryGetProperty("loiNhan", out var value) ? value.GetString() : "";
+                            await BaoTriPhatHien.InvokeAsync(loiNhan);
+                            return;
+                        }
+                    }
+                    catch (System.Text.Json.JsonException) { }
+                }
                 _loi = await DocLoiApi.TuPhanHoiAsync(res, "Không đăng nhập được bằng Google.");
                 return;
             }

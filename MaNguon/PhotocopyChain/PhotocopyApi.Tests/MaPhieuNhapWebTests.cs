@@ -39,11 +39,11 @@ public class MaPhieuNhapWebTests
                 : await renderer.RenderComponentAsync<KhoVatTu>();
             return WebUtility.HtmlDecode(trang.ToHtmlString());
         });
-        var oMa = Regex.Match(html, "<td[^>]*data-nhan=\"Mã phiếu\"[^>]*><b>(.*?)</b></td>");
+        var oMa = Regex.Match(html, "<td[^>]*data-nhan=\"Mã phiếu\"[^>]*>\\s*<b\\b[^>]*>(.*?)</b>\\s*</td>");
         Assert.True(oMa.Success, "Phải có ô mã phiếu nhập trong bảng.");
         Assert.Equal(mongDoi, oMa.Groups[1].Value);
         Assert.DoesNotContain("MaPhieuNhap.ToString", html);
-        Assert.Contains("<b>20</b> " + donViTinh, html);
+        Assert.Matches("<b\\b[^>]*>20</b>\\s+" + Regex.Escape(donViTinh), html);
         Assert.DoesNotContain("bản/cuộn", html);
     }
 

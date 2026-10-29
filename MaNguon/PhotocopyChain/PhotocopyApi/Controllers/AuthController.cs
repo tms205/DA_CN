@@ -5,6 +5,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.RateLimiting;
 using PhotocopyApi.Auth;
+using PhotocopyApi.BaoTri;
 using System.Text;
 using Dapper;
 using Microsoft.AspNetCore.Authorization;
@@ -33,10 +34,12 @@ public partial class AuthController : ControllerBase
     private readonly ILogger<AuthController> _logger;
     private readonly OtpDatLaiStore _otpDatLai;
     private readonly IGoogleTokenVerifier _google;
+    private readonly BaoTriStore _baoTri;
 
-    public AuthController(IConfiguration config, IMemoryCache cache, IWebHostEnvironment env, ILogger<AuthController> logger, OtpDatLaiStore otpDatLai = null, IGoogleTokenVerifier google = null)
+    public AuthController(IConfiguration config, IMemoryCache cache, IWebHostEnvironment env, ILogger<AuthController> logger, OtpDatLaiStore otpDatLai = null, IGoogleTokenVerifier google = null, BaoTriStore baoTri = null)
     {
         _config = config;
+        _baoTri = baoTri;
         _google = google ?? new GoogleTokenVerifier(config);
         _cache = cache;
         _env = env;
@@ -98,6 +101,8 @@ public partial class AuthController : ControllerBase
     // Password và Google dùng cùng bước hoàn tất để không lệch quyền/ca làm việc.
     private async Task<IActionResult> HoanTatDangNhapAsync(SqlConnection conn, NguoiDung nd, bool laWeb, bool ghiNho)
     {
+        if (_baoTri?.Read().DangBaoTri == true && nd.VaiTro != VaiTro.SuperAdmin)
+            return StatusCode(503, new { message = "Hệ thống đang bảo trì.\n" + _baoTri.Read().LoiNhan });
         string loi = QuyTacDangNhap.KiemTraQuyen(nd.VaiTro, nd.TrangThai, laWeb);
         if (loi != null) return StatusCode(403, new { message = loi });
 
@@ -431,6 +436,7 @@ public partial class AuthController : ControllerBase
             hetHan = DateTime.UtcNow.AddHours(_config.GetValue<int>("Jwt:SoGioMobile"));
 
         var claims = new List<Claim>();
+        claims.Add(new Claim("maintenance_version", (HttpContext?.Items["maintenance_version"] as long? ?? _baoTri?.Read().PhienBanPhien ?? 0).ToString()));
         claims.Add(new Claim(TenClaim.MaNguoiDung, nd.MaNguoiDung.ToString()));
         claims.Add(new Claim(TenClaim.HoTen, nd.HoTen));
         claims.Add(new Claim(TenClaim.Email, nd.Email));

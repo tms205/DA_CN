@@ -21,18 +21,18 @@ public sealed class QuyenNhanLenhInStore
         return lenh != null && !lenh.DaHoanTat ? lenh : null;
     }
 
-    public QuyenNhanLenhIn NhanLenh(int maMayIn, int maDonHang, string connectorId)
+    public QuyenNhanLenhIn NhanLenh(int maMayIn, int maDonHang, string connectorId, string phienChuyen = null)
     {
         if (maMayIn <= 0 || maDonHang <= 0 || string.IsNullOrWhiteSpace(connectorId)) return null;
         using var khoa = KhoaMay(maMayIn);
         var lenh = DocLenh(maMayIn);
         if (lenh != null && !lenh.DaHoanTat)
-            return lenh.MaDonHang == maDonHang && lenh.ConnectorId == connectorId ? lenh : null;
-        if (lenh?.MaDonHang == maDonHang) return null;
+            return lenh.MaDonHang == maDonHang && lenh.ConnectorId == connectorId && lenh.PhienChuyen == phienChuyen ? lenh : null;
+        if (lenh?.MaDonHang == maDonHang && (string.IsNullOrWhiteSpace(phienChuyen) || lenh.PhienChuyen == phienChuyen)) return null;
 
         lenh = new QuyenNhanLenhIn
         {
-            MaDonHang = maDonHang, ConnectorId = connectorId,
+            MaDonHang = maDonHang, ConnectorId = connectorId, PhienChuyen = phienChuyen,
             MaLenh = Guid.NewGuid().ToString("N")
         };
         LuuLenh(maMayIn, lenh);
@@ -95,6 +95,7 @@ public sealed class QuyenNhanLenhInStore
 
 public sealed class QuyenNhanLenhIn
 {
+    public string PhienChuyen { get; set; }
     public int MaDonHang { get; set; }
     public string ConnectorId { get; set; } = "";
     public string MaLenh { get; set; } = "";

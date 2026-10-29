@@ -44,6 +44,12 @@ public sealed class HuyDonRequest
     [Required(ErrorMessage = "Vui lòng nhập lý do hủy.")]
     [MaxLength(255, ErrorMessage = "Lý do tối đa 255 ký tự.")]
     public string LyDo { get; set; } = "";
+
+    [MaxLength(60, ErrorMessage = "Tên ngân hàng tối đa 60 ký tự.")]
+    public string? NganHang { get; set; }
+
+    [RegularExpression("^[0-9]{6,30}$", ErrorMessage = "Số tài khoản phải gồm 6–30 chữ số.")]
+    public string? SoTaiKhoan { get; set; }
 }
 
 public sealed partial class TaoInLaiTaiQuayRequest
@@ -229,6 +235,8 @@ public sealed partial class ChiNhanhQuanTriDto
 
 public sealed class MayInQuanTriDto
 {
+    public PhotocopyShared.Dtos.MayInAo.KetNoiMayInDto? KetNoi { get; set; }
+    public string TenHienThi => KetNoi?.CheDo == "THAT" && !string.IsNullOrWhiteSpace(KetNoi.TenHangDoi) ? KetNoi.TenHangDoi : TenMay;
     public int MaMayIn { get; set; }
     public int MaChiNhanh { get; set; }
     public string TenChiNhanh { get; set; } = "";
@@ -385,6 +393,7 @@ public sealed class HoanTienChoDuyetDto
     public string TenChiNhanh { get; set; } = "";
     public decimal SoTien { get; set; }
     public string? GhiChu { get; set; }
+    public ThongTinHoanTienRequest? ThongTinHoanTien => ThongTinHoanTienRequest.DocGhiChu(GhiChu);
     public DateTime NgayDat { get; set; }
 }
 

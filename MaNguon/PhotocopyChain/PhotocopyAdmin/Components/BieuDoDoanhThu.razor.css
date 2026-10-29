@@ -1,0 +1,34 @@
+/* Interaction adapted from Lucian UX/UI #095, MIT. */
+.cd-xu-huong { min-width: 0; }
+.cd-dau { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 16px; margin-bottom: 26px; }
+.cd-so-lieu { min-width: 0; }
+.cd-so-lieu > span { display: block; color: var(--chu-phu); font-size: 13px; margin-bottom: 6px; }
+.cd-so-lieu > strong { display: block; color: var(--accent); font-size: clamp(24px, 3vw, 34px); font-weight: 750; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.cd-nhom { display: flex; padding: 4px; gap: 4px; border: 1px solid var(--vien); border-radius: 9px; background: var(--nen); }
+.cd-nhom button { border: 0; background: transparent; padding: 8px 14px; border-radius: 6px; color: var(--chu-phu); font: 600 13px var(--font); min-height: 36px; cursor: pointer; transition: background-color 180ms, color 180ms, box-shadow 180ms; }
+.cd-nhom button[aria-pressed="true"] { background: var(--trang); color: var(--accent); box-shadow: 0 1px 5px color-mix(in srgb, var(--accent) 15%, transparent); }
+.cd-nhom button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.cd-bieu-do { display: grid; grid-template-columns: 106px minmax(0, 1fr); grid-template-rows: 204px 30px; gap: 0 12px; }
+.cd-truc { display: flex; flex-direction: column; justify-content: space-between; align-items: end; color: var(--chu-phu); font-size: 11px; font-variant-numeric: tabular-nums; padding-block: 0; }
+.cd-truc > span { transform: translateY(-50%); }
+.cd-truc > span:last-child { transform: translateY(50%); }
+.cd-plot { position: relative; min-width: 0; }
+.cd-luoi { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }
+.cd-luoi span { border-top: 1px dashed var(--vien); }
+.cd-luoi span:last-child { border-top-style: solid; }
+.cd-cac-cot { position: absolute; inset: 0; display: flex; align-items: stretch; gap: var(--khoang-cot); }
+.cd-cot { position: relative; display: flex; flex: 1 1 0; align-items: end; min-width: 0; padding: 0; border: 0; background: transparent; cursor: pointer; }
+.cd-cot i { display: block; width: 100%; height: var(--cao); border-radius: 5px 5px 1px 1px; background: color-mix(in srgb, var(--accent) 38%, var(--trang)); transition: height 480ms cubic-bezier(.2,.8,.2,1), background-color 180ms, opacity 180ms; }
+.cd-cot.cot-cuoi i, .cd-cot.dang-chon i { background: var(--accent); }
+.co-chon .cd-cot:not(.dang-chon) i { opacity: .5; }
+.cd-cot.ghim i { box-shadow: 0 0 0 2px var(--trang), 0 0 0 4px var(--accent); }
+.cd-cot:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.cd-trung-binh { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--accent); transition: bottom 480ms cubic-bezier(.2,.8,.2,1); pointer-events: none; z-index: 1; }
+.cd-trung-binh span { position: absolute; right: 0; bottom: 3px; padding: 3px 6px; border-radius: 4px; background: var(--accent-nhat); color: var(--accent); font-size: 11px; }
+.cd-tooltip { position: absolute; top: 8px; left: 0; right: 0; width: max-content; max-width: 100%; margin: auto; display: grid; gap: 5px; padding: 12px 14px; border-radius: 8px; background: var(--accent-dam); color: var(--trang); box-shadow: 0 5px 18px color-mix(in srgb, var(--accent) 22%, transparent); z-index: 2; pointer-events: none; font-size: 13px; overflow-wrap: anywhere; }
+.cd-tooltip small { font-size: 11px; }
+.cd-truc-ngang { grid-column: 2; position: relative; margin-top: 12px; color: var(--chu-phu); font-size: 11px; }
+.cd-truc-ngang span { position: absolute; top: 0; white-space: nowrap; }
+.cd-huong-dan, .cd-rong { margin: 12px 0 0; font-size: 12px; line-height: 1.6; color: var(--chu-phu); }
+@media (max-width: 600px) { .cd-bieu-do { grid-template-columns: 82px minmax(0,1fr); column-gap: 8px; } .cd-truc { font-size: 10px; } .cd-nhom { width: 100%; } .cd-nhom button { flex: 1; } }
+@media (prefers-reduced-motion: reduce) { .cd-cot i, .cd-trung-binh, .cd-nhom button { transition: none !important; } }

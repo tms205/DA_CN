@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Reflection;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -30,17 +30,19 @@ public class DashboardHoanThienTests
     {
         string html = await BieuDo(0);
         Assert.DoesNotContain("class=\"tq-duong-truoc\"", html);
-        Assert.Contains("Kỳ đối chiếu chưa có doanh thu", html);
+        Assert.DoesNotContain("Infinity", html);
+        Assert.Contains("data-gia-tri=\"126000\"", html);
         Assert.Contains("50.000", html);
         Assert.DoesNotContain(">31.5k<", html);
     }
 
     [Fact]
-    public async Task BieuDoNgay_DungCotVaVanCoKyDoiChieu()
+    public async Task BieuDoNgay_DungCotTuongTacDungGiaTriAPI()
     {
         string html = await BieuDo(10000);
-        Assert.Contains("class=\"tq-cot-nay\"", html);
-        Assert.Contains("class=\"tq-cot-truoc\"", html);
+        Assert.Contains("data-gia-tri=\"126000\"", html);
+        Assert.Contains("Doanh thu theo từng kỳ", html);
+        Assert.Contains("aria-pressed=\"false\"", html);
     }
 
     [Fact]

@@ -1,0 +1,18 @@
+.hoan-tien-ghi-chu {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    line-height: 1.6;
+    min-width: 12rem;
+}
+@container bang-du-lieu (max-width: 850px) {
+    .bang { display: block; }
+    .bang thead { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); }
+    .bang tbody { display: grid; gap: 12px; padding: 12px; }
+    .bang tbody tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border: 1px solid var(--vien); border-radius: 6px; background: var(--trang); }
+    .bang td { display: block; min-width: 0; padding: 12px; text-align: left; }
+    .bang td::before { content: attr(data-nhan); display: block; margin-bottom: 8px; font-size: 12px; font-weight: 600; color: var(--chu-phu); }
+    .bang td.cot-hanh-dong { grid-column: 1 / -1; text-align: left; }
+}
+@container bang-du-lieu (max-width: 540px) {
+    .bang tbody tr { grid-template-columns: minmax(0, 1fr); }
+}

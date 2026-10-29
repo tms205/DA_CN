@@ -1,4 +1,4 @@
-namespace PhotocopyApi.DuLieu;
+﻿namespace PhotocopyApi.DuLieu;
 
 // Chỉ tập trung các câu SELECT dài để Controller dễ đọc:
 // Controller giữ luồng HTTP + quyền + nghiệp vụ, file này giữ chi tiết lấy dữ liệu.
@@ -20,7 +20,7 @@ internal static class TruyVanSql
     internal static class DonHang
     {
         public const string CuaKhachHang = @"
-            SELECT dh.MaDonHang,
+            SELECT dh.MaDonHang, dh.MaMayIn,
                    'DH' + RIGHT('00000' + CAST(dh.MaDonHang AS VARCHAR(10)), 5) AS MaDonHangHienThi,
                    dh.MaChiNhanh, cn.TenChiNhanh, dh.HinhThucNhan, dh.DiaChiGiao,
                    dh.InGap AS InHoaToc, dh.TrangThai AS TrangThaiDonHang,
@@ -91,14 +91,13 @@ internal static class TruyVanSql
                    dv.TenDichVu, dv.KhoGiay, dv.LoaiGiay, dv.MatIn, dv.MauSac,
                    ct.SoTrang, ct.TuTrang, ct.DenTrang, ct.SoBan, ct.HuongGiay, ct.DonGia, ct.ThanhTien,
                    ct.KichThuocAnh, ct.SoLuongAnh,
-                   STUFF((
-                       SELECT N', ' + gc.TenDichVu
+                   (
+                       SELECT STRING_AGG(CONVERT(NVARCHAR(MAX), gc.TenDichVu), N', ')
+                              WITHIN GROUP (ORDER BY gc.MaDichVu)
                        FROM ChiTietGiaCong g
                        JOIN DichVu gc ON gc.MaDichVu = g.MaDichVu
                        WHERE g.MaChiTiet = ct.MaChiTiet
-                       ORDER BY gc.MaDichVu
-                       FOR XML PATH(''), TYPE
-                   ).value('.', 'NVARCHAR(500)'), 1, 2, '') AS TenGiaCong
+                   ) AS TenGiaCong
             FROM ChiTietDonHang ct
             JOIN FileIn f ON f.MaFile = ct.MaFile
             JOIN DichVu dv ON dv.MaDichVu = ct.MaDichVu
@@ -106,7 +105,7 @@ internal static class TruyVanSql
             ORDER BY ct.MaChiTiet";
 
         public const string HangDoi = @"
-            SELECT dh.MaDonHang,
+            SELECT dh.MaDonHang, dh.MaMayIn,
                    'DH' + RIGHT('00000' + CAST(dh.MaDonHang AS VARCHAR(10)), 5) AS MaDonHangHienThi,
                    dh.MaDonHangGoc,
                    CASE WHEN dh.MaDonHangGoc IS NULL THEN NULL
@@ -151,6 +150,11 @@ internal static class TruyVanSql
             FROM ChiTietDonHang ct
             JOIN DichVu dv ON dv.MaDichVu = ct.MaDichVu
             WHERE ct.MaDonHang = @MaDonHang";
+
+        public const string QuyCachMayIn = @"
+            SELECT DISTINCT dv.KhoGiay, dv.MauSac, dv.MatIn
+            FROM ChiTietDonHang ct JOIN DichVu dv ON dv.MaDichVu=ct.MaDichVu
+            WHERE ct.MaDonHang=@MaDonHang";
 
         public const string FileTrongDon = @"
             SELECT dh.MaChiNhanh, f.TenFile, f.DuongDan, f.TrangThai

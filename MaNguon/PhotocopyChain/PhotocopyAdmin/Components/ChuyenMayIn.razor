@@ -1,0 +1,227 @@
+@using System.Net.Http.Json
+@using PhotocopyShared.Dtos.MayInAo
+@using PhotocopyShared.Dtos.DatIn
+@using PhotocopyShared.MayInAo
+@inject HttpClient Http
+@implements IAsyncDisposable
+
+<HopThoaiQuanTri Mo="@Mo" TieuDe="Chuyển máy khi gặp sự cố" MoTa="Giữ nguyên đơn và thanh toán. Chỉ gửi phần cần in sau khi lệnh cũ đã dừng." Rong="true" Loi="@_loi" DangLuu="@_dangGui" Dong="Dong">
+    <NoiDung>
+        @if (_duLieu == null)
+        {
+            <p role="status">Đang tải trạng thái đơn và máy in…</p>
+            @if (_loi != null) { <button type="button" class="nut-phu" @onclick="TaiLaiAsync">Tải lại trạng thái</button> }
+        }
+        else
+        {
+            <p>Đơn <b>@($"DH{MaDonHang:D5}")</b> · Máy hiện tại: <b>@TenMay(_duLieu.MaMayHienTai)</b></p>
+            @if (_duLieu.LichSu.Count > 0)
+            {
+                <details class="cm-lich-su"><summary>Lịch sử chuyển / yêu cầu dừng (@_duLieu.LichSu.Count)</summary>
+                    @foreach (var x in _duLieu.LichSu)
+                    {
+                        <div class="cm-muc-lich-su"><b>@TenMay(x.MaMayCu) → @(x.MaMayMoi == null ? "Chưa chọn máy mới" : TenMay(x.MaMayMoi))</b>
+                            <p>@x.LyDo · @x.LucYeuCau.ToLocalTime().ToString("dd/MM/yyyy HH:mm") · Yêu cầu bởi nhân sự #@x.MaNguoiYeuCau<br />@MoTaTrangThai(x.TrangThai)</p>
+                            @if (x.TrangThai == "DA_CHUYEN")
+                            {
+                                <p>Chuyển lúc @x.LucChuyen?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") · Nhân sự #@x.MaNguoiChuyen</p>
+                                @foreach (var dong in x.PhanConLai)
+                                { <p>@dong.TenFile · trang @dong.TuTrang–@dong.DenTrang · @dong.SoBan bản</p> }
+                                @if (x.HaoHut.Any(h=>h.SoToHong>0))
+                                { <p>Giấy hỏng đã ghi: @x.HaoHut.Sum(h=>h.SoToHong) tờ.</p> }
+                            }
+                        </div>
+                    }
+                </details>
+            }
+            @if (DangChoDung)
+            {
+                <div class="o-canh-bao" role="status"><b>Đang chờ connector dừng lệnh cũ</b><p>Chưa gửi sang máy mới. Nếu mất kết nối, hãy mở lại connector; hệ thống không tự bỏ khóa hoặc in lại.</p></div>
+                @if (!string.IsNullOrWhiteSpace(LoiDungMayCu))
+                {
+                    <div class="o-canh-bao" role="alert"><b>Connector chưa dừng được lệnh cũ</b><p>@LoiDungMayCu</p><p>Kiểm tra queue, driver và kết nối máy cũ. Connector sẽ kiểm tra lại; chưa gửi sang máy mới.</p></div>
+                }
+                <button class="nut-phu" type="button" @onclick="TaiLaiAsync">Kiểm tra lại trạng thái</button>
+            }
+            else if (DaDung)
+            {
+                <div class="cm-da-dung" role="status"><b>Connector đã dừng lệnh cũ</b><p>Queue đã được kiểm tra nhưng không chứng minh giấy đã ra đủ hoặc bộ nhớ máy đã hết dữ liệu. Hãy kiểm tra máy và bản giấy.</p></div>
+                <label class="cm-xac-nhan"><input type="checkbox" @bind="_mayCuDaDung" /> Tôi đã kiểm tra máy cũ ngừng in và không còn lệnh của đơn này chờ chạy trong Windows/máy in.</label>
+                <label for="cm-ket-qua-giay">Kết quả đối chiếu bản giấy <span aria-hidden="true">*</span></label>
+                <select id="cm-ket-qua-giay" value="@_ketQuaGiay" @onchange="DoiKetQuaGiay">
+                    <option value="">Chọn sau khi kiểm tra thực tế</option>
+                    <option value="CHUA_IN">Chưa có bản in đạt của phần đang xử lý</option>
+                    <option value="MOT_PHAN">Đã in được một phần — chọn chính xác phần còn lại</option>
+                    <option value="KHONG_RO">Chưa xác định được đã in bao nhiêu</option>
+                </select>
+                @if (_ketQuaGiay == "KHONG_RO")
+                { <div class="o-canh-bao">Chưa xác định phần đã in: chưa thể gửi lại. Kiểm tra giấy, người vận hành và queue trước khi tiếp tục.</div> }
+                @if (_ketQuaGiay is "CHUA_IN" or "MOT_PHAN")
+                {
+                    <h3>Phần cần in ở máy mới</h3>
+                    <p class="nv-phu">Bỏ chọn phần đã có đủ bản in đạt. In hai mặt cần chọn trọn cặp mặt của mỗi tờ. Có thể thêm phạm vi khi các bản còn thiếu khác nhau.</p>
+                    @foreach (var x in _dong)
+                    {
+                        <div class="cm-dong" @key="x.Id">
+                            <label class="cm-ten-file"><input type="checkbox" @bind="x.Chon" /> @x.Goc.TenFile <span class="nv-phu">(@(x.Goc.MatIn=="2_MAT" ? "In hai mặt" : "In một mặt"))</span></label>
+                            <p class="nv-phu">Phần đang xử lý: trang @(x.Goc.TuTrang??1)–@(x.Goc.DenTrang??x.Goc.SoTrang), @x.Goc.SoBan bản.</p>
+                            <div class="cm-pham-vi">
+                                <label for="@(x.Id+"-tu")">Từ trang<input id="@(x.Id+"-tu")" type="number" min="1" @bind="x.TuTrang" disabled="@(!x.Chon)" /></label>
+                                <label for="@(x.Id+"-den")">Đến trang<input id="@(x.Id+"-den")" type="number" min="1" @bind="x.DenTrang" disabled="@(!x.Chon)" /></label>
+                                <label for="@(x.Id+"-ban")">Số bản còn thiếu<input id="@(x.Id+"-ban")" type="number" min="1" max="10000" @bind="x.SoBan" disabled="@(!x.Chon)" /></label>
+                            </div>
+                            <button type="button" class="nut-nho" @onclick="() => ThemPhamVi(x)">Thêm phạm vi cho file này</button>
+                        </div>
+                    }
+                    <h3>Giấy hỏng do sự cố</h3>
+                    <p class="nv-phu">Phần vật tư của đơn đã được ghi ở lần bắt đầu. Chỉ số tờ hỏng khai dưới đây được trừ thêm kho; không thu thêm tiền khách.</p>
+                    @foreach (var x in _duLieu.PhanDangIn.DistinctBy(x=>x.MaChiTiet))
+                    {
+                        <label class="cm-hao-hut" for="@("cm-hong-"+x.MaChiTiet)">@x.TenFile — số tờ hỏng
+                            <input id="@("cm-hong-"+x.MaChiTiet)" type="number" min="0" max="1000000" @bind="_haoHut[x.MaChiTiet]" />
+                        </label>
+                    }
+                    <label for="cm-may-moi">Máy mới cùng chi nhánh</label>
+                    <select id="cm-may-moi" @bind="_maMayMoi">
+                        <option value="">Chọn máy sẵn sàng, đáp ứng quy cách</option>
+                        @foreach (var may in _may.Where(x=>x.MaMayIn!=_duLieu.MaMayHienTai))
+                        {
+                            <option value="@may.MaMayIn" disabled="@(!ChonDuoc(may))">@may.TenHienThi — @(ChonDuoc(may) ? "Sẵn sàng" : may.DapUngDuoc ? "Đang bận/chưa sẵn sàng" : may.LyDoKhongDapUng)</option>
+                        }
+                    </select>
+                    <label class="cm-xac-nhan"><input type="checkbox" @bind="_daDoiChieu" /> Tôi xác nhận các phạm vi/số bản còn thiếu và số tờ hỏng đã được đối chiếu thực tế.</label>
+                }
+            }
+            else if (_duLieu.TrangThaiDon == "DANG_IN")
+            {
+                <label for="cm-ly-do">Lý do cần chuyển máy</label>
+                <textarea id="cm-ly-do" rows="3" maxlength="255" @bind="_lyDo" @bind:event="oninput" placeholder="Ví dụ: máy hết giấy, kẹt giấy hoặc lỗi thiết bị"></textarea>
+                <p class="nv-phu">Bước này chỉ yêu cầu dừng đúng lệnh của đơn, không hủy đơn hoặc thanh toán. Máy cũ sẽ tạm dừng nhận thêm việc cho tới khi được khôi phục.</p>
+                <button class="nut-chinh" type="button" disabled="@(_dangGui || _lyDo.Trim().Length<3)" @onclick="YeuCauDungAsync">Yêu cầu dừng lệnh cũ</button>
+            }
+            else { <p>Đơn không còn ở bước đang in; không thực hiện chuyển máy.</p> }
+        }
+    </NoiDung>
+    <Chan>
+        <button type="button" class="nut-phu" disabled="@_dangGui" @onclick="Dong">Đóng</button>
+        <button type="button" class="nut-chinh" disabled="@(!CoTheChuyen)" @onclick="ChuyenAsync">@(_dangGui ? "Đang xử lý…" : "Chuyển phần còn lại")</button>
+    </Chan>
+</HopThoaiQuanTri>
+
+@code {
+    [Parameter] public bool Mo {get;set;}
+    [Parameter] public int MaDonHang {get;set;}
+    [Parameter] public EventCallback Dong {get;set;}
+    [Parameter] public EventCallback DaChuyen {get;set;}
+    private TrangThaiChuyenMayDto _duLieu;
+    private List<MayInDto> _may=new();
+    private List<TrangThaiKetNoiMayInDto> _ketNoi=new();
+    private List<LuaChon> _dong=new();
+    private Dictionary<int,int> _haoHut=new();
+    private bool _dangGui, _moTruoc, _mayCuDaDung, _daDoiChieu;
+    private int _donDaTai;
+    private int _lanTai;
+    private int? _maMayMoi;
+    private string _loi, _lyDo="", _ketQuaGiay="", _phienDaTai;
+    private readonly CancellationTokenSource _dung=new();
+    private Task _poll;
+    private ChuyenMayInDto Phien=>_duLieu?.LichSu.LastOrDefault();
+    private bool DangChoDung=>Phien?.TrangThai=="DANG_DUNG";
+    private string LoiDungMayCu=>_ketNoi.FirstOrDefault(x=>x.MaMayIn==_duLieu?.MaMayHienTai && x.MaDonHangDangIn==MaDonHang)?.Loi;
+    private bool DaDung=>Phien?.TrangThai=="DA_DUNG";
+    private bool CoTheChuyen=>!_dangGui && DaDung && _mayCuDaDung && _daDoiChieu
+        && (_ketQuaGiay is "CHUA_IN" or "MOT_PHAN") && _may.Any(x=>x.MaMayIn==_maMayMoi && ChonDuoc(x)) && _dong.Any(x=>x.Chon);
+    private string Url=>$"api/don-hang/{MaDonHang}/chuyen-may";
+    private bool ChonDuoc(MayInDto x)=>x.DapUngDuoc && _ketNoi.Any(k=>k.MaMayIn==x.MaMayIn && k.TrangThai=="SAN_SANG");
+    private string TenMay(int? id)=>_may.FirstOrDefault(x=>x.MaMayIn==id)?.TenHienThi ?? (id==null?"Chưa có":"#"+id);
+    private static string MoTaTrangThai(string s)=>s switch {"DANG_DUNG"=>"Đang chờ dừng lệnh cũ", "DA_DUNG"=>"Đã dừng — chờ đối chiếu và chọn máy mới", "DA_CHUYEN"=>"Đã chuyển phần còn lại", _=>s};
+
+    protected override void OnInitialized()=>_poll=PollAsync();
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Mo) _lanTai++;
+        if (Mo && (!_moTruoc || _donDaTai!=MaDonHang))
+        {
+            _duLieu=null; _maMayMoi=null; _loi=null; _lyDo=""; _phienDaTai=null;
+            _mayCuDaDung=_daDoiChieu=false; _ketQuaGiay="";
+            await TaiLaiAsync(); _donDaTai=MaDonHang;
+        }
+        _moTruoc=Mo;
+    }
+    private async Task TaiLaiAsync()
+    {
+        int lan=++_lanTai, don=MaDonHang;
+        string url=$"api/don-hang/{don}/chuyen-may";
+        try
+        {
+            using var res=await Http.GetAsync(url,_dung.Token);
+            if (!res.IsSuccessStatusCode) { string loi=await DocLoi(res); if(lan==_lanTai && Mo) _loi=loi; return; }
+            var duLieu=await res.Content.ReadFromJsonAsync<TrangThaiChuyenMayDto>(cancellationToken:_dung.Token);
+            var may=await Http.GetFromJsonAsync<List<MayInDto>>($"api/don-hang/{don}/may-in",_dung.Token) ?? new();
+            var ketNoi=await Http.GetFromJsonAsync<List<TrangThaiKetNoiMayInDto>>("api/may-in-ao/trang-thai",_dung.Token) ?? new();
+            if(lan!=_lanTai || !Mo || don!=MaDonHang) return;
+            _duLieu=duLieu; _may=may; _ketNoi=ketNoi; _loi=null;
+            if (Phien?.MaYeuCau!=_phienDaTai)
+            {
+                _phienDaTai=Phien?.MaYeuCau;
+                _dong=_duLieu.PhanDangIn.Select(x=>new LuaChon(x)).ToList();
+                _haoHut=_duLieu.PhanDangIn.DistinctBy(x=>x.MaChiTiet).ToDictionary(x=>x.MaChiTiet,x=>0);
+                _mayCuDaDung=_daDoiChieu=false; _ketQuaGiay="";
+            }
+        }
+        catch (OperationCanceledException) when (_dung.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or System.Text.Json.JsonException)
+        { if(lan==_lanTai && Mo) _loi="Chưa tải được trạng thái. Kiểm tra kết nối và bấm kiểm tra lại; không tự gửi lệnh in."; }
+    }
+    private void DoiKetQuaGiay(ChangeEventArgs e)
+    { _ketQuaGiay=e.Value?.ToString()??""; _daDoiChieu=false; foreach(var x in _dong) x.Chon=_ketQuaGiay=="CHUA_IN"; }
+    private void ThemPhamVi(LuaChon x) { if(_dong.Count<200) _dong.Add(new LuaChon(x.Goc)); }
+    private async Task YeuCauDungAsync()
+    {
+        if(_duLieu?.MaMayHienTai==null) return;
+        await Gui(async()=>await Http.PostAsJsonAsync(Url+"/dung",new YeuCauDungChuyenMayRequest{MaMayCu=_duLieu.MaMayHienTai.Value,LyDo=_lyDo},_dung.Token),false);
+    }
+    private async Task ChuyenAsync()
+    {
+        if(!CoTheChuyen) return;
+        var ds=_dong.Where(x=>x.Chon).Select(x=>new DongChuyenMayRequest{MaChiTiet=x.Goc.MaChiTiet,TuTrang=x.TuTrang,DenTrang=x.DenTrang,SoBan=x.SoBan}).ToList();
+        string loi=QuyTacChuyenMay.KiemTra(_duLieu.PhanDangIn,ds);
+        if(loi!=null){_loi=loi;return;}
+        await Gui(async()=>await Http.PostAsJsonAsync(Url,new ApDungChuyenMayRequest{MaYeuCau=Phien.MaYeuCau,MaMayMoi=_maMayMoi.Value,
+            DaKiemTraMayCu=_mayCuDaDung,DaDoiChieuBanGiay=_daDoiChieu,DongIn=ds,
+            HaoHut=_haoHut.Select(x=>new HaoHutChuyenMayRequest{MaChiTiet=x.Key,SoToHong=x.Value}).ToList()},_dung.Token),true);
+    }
+    private async Task Gui(Func<Task<HttpResponseMessage>> goi,bool xong)
+    {
+        if(_dangGui)return;_dangGui=true;_loi=null;
+        try
+        {
+            using var res=await goi();
+            if(!res.IsSuccessStatusCode){_loi=await DocLoi(res);return;}
+            await TaiLaiAsync();
+            if(xong){await DaChuyen.InvokeAsync();await Dong.InvokeAsync();}
+        }
+        catch(OperationCanceledException) when(_dung.IsCancellationRequested){}
+        catch(Exception ex) when(ex is HttpRequestException or OperationCanceledException)
+        {_loi="Chưa nhận được kết quả. Tải lại trạng thái để đối chiếu, không bấm gửi lặp.";}
+        finally{_dangGui=false;}
+    }
+    private static async Task<string> DocLoi(HttpResponseMessage res)
+    { try{return (await res.Content.ReadFromJsonAsync<LoiApi>())?.Message??"Thao tác chưa thành công. Tải lại đơn.";}catch{return "Chưa đọc được phản hồi máy chủ. Tải lại trạng thái.";} }
+    private async Task PollAsync()
+    {
+        using var timer=new PeriodicTimer(TimeSpan.FromSeconds(2));
+        try{while(await timer.WaitForNextTickAsync(_dung.Token))if(Mo && DangChoDung && !_dangGui)await InvokeAsync(async()=>{await TaiLaiAsync();StateHasChanged();});}
+        catch(OperationCanceledException) when(_dung.IsCancellationRequested){}
+    }
+    public async ValueTask DisposeAsync(){_dung.Cancel();if(_poll!=null)await _poll;_dung.Dispose();}
+    private sealed class LoiApi{public string Message{get;set;}}
+    private sealed class LuaChon
+    {
+        public string Id{get;}="cm-"+Guid.NewGuid().ToString("N");
+        public DongLenhInDto Goc{get;}
+        public bool Chon{get;set;}
+        public int TuTrang{get;set;} public int DenTrang{get;set;} public int SoBan{get;set;}
+        public LuaChon(DongLenhInDto g){Goc=g;TuTrang=g.TuTrang??1;DenTrang=g.DenTrang??g.SoTrang;SoBan=g.SoBan;}
+    }
+}

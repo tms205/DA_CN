@@ -8,16 +8,19 @@ public sealed class ThongBaoPheDuyet(HttpClient http)
 {
     public int? SoCho { get; private set; }
     public event Action ThayDoi;
+    private int _lanTai;
 
-    public void CapNhat(int? soCho) { SoCho = soCho; ThayDoi?.Invoke(); }
+    public void CapNhat(int? soCho) { ++_lanTai; SoCho = soCho; ThayDoi?.Invoke(); }
 
     public async Task TaiAsync()
     {
+        int lanTai = ++_lanTai;
         try
         {
             var ds = await http.GetFromJsonAsync<TongQuanHienTaiDto>("api/quan-tri/bao-cao/hien-tai");
-            CapNhat(ds == null ? null : ds.SoPhieuChoDuyet + ds.SoHoanTienChoDuyet);
+            if (lanTai == _lanTai)
+                CapNhat(ds == null ? null : ds.SoPhieuChoDuyet + ds.SoHoanTienChoDuyet);
         }
-        catch { CapNhat(null); }
+        catch { if (lanTai == _lanTai) CapNhat(null); }
     }
 }

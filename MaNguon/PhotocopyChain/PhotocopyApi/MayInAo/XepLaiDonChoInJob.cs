@@ -1,4 +1,5 @@
 using Dapper;
+using PhotocopyApi.BaoTri;
 using Microsoft.Data.SqlClient;
 
 namespace PhotocopyApi.MayInAo;
@@ -9,13 +10,15 @@ public sealed class XepLaiDonChoInJob : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly string _chuoiKetNoi;
     private readonly ILogger<XepLaiDonChoInJob> _logger;
+    private readonly BaoTriStore _baoTri;
 
     public XepLaiDonChoInJob(IServiceScopeFactory scopeFactory, IConfiguration config,
-        ILogger<XepLaiDonChoInJob> logger)
+        ILogger<XepLaiDonChoInJob> logger, BaoTriStore baoTri = null)
     {
         _scopeFactory = scopeFactory;
         _chuoiKetNoi = config.GetConnectionString("PhotocopyChain");
         _logger = logger;
+        _baoTri = baoTri;
     }
 
     protected override async Task ExecuteAsync(CancellationToken dung)
@@ -27,6 +30,7 @@ public sealed class XepLaiDonChoInJob : BackgroundService
             {
                 try
                 {
+                    if (_baoTri?.Read().DangBaoTri == true) continue;
                     using var scope = _scopeFactory.CreateScope();
                     using var conn = new SqlConnection(_chuoiKetNoi);
                     var ds = await conn.QueryAsync<int>(
@@ -39,6 +43,7 @@ public sealed class XepLaiDonChoInJob : BackgroundService
                     foreach (int maDon in ds)
                     {
                         if (dung.IsCancellationRequested) return;
+                        if (_baoTri?.Read().DangBaoTri == true) break;
                         await xepIn.XepInSauThanhToan(maDon);
                     }
                 }

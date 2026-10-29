@@ -1,5 +1,6 @@
 using System.Text.Json;
 using PhotocopyShared.Dtos.MayInAo;
+using PhotocopyShared.MayInAo;
 
 namespace PhotocopyApi.MayInAo;
 
@@ -56,6 +57,27 @@ public sealed class PhatHienMayInStore
         lock (Khoa)
             return _lienKet.TryGetValue(ma, out var x)
                 ? JsonSerializer.Deserialize<LienKetMayInDto>(JsonSerializer.Serialize(x)) : null;
+    }
+
+    public KetNoiMayInDto LayKetNoi(int ma)
+    {
+        lock (Khoa)
+        {
+            if (!_lienKet.TryGetValue(ma, out var lk)) return new();
+            _connectors.TryGetValue(lk.ConnectorId, out var c);
+            var queue = c?.HangDoi.FirstOrDefault(x => string.Equals(x.Ten, lk.TenHangDoi, StringComparison.OrdinalIgnoreCase));
+            return new() { CheDo = lk.CheDo, TenHangDoi = lk.TenHangDoi,
+                TrucTuyen = c != null && string.IsNullOrEmpty(c.Loi) && _gio.GetUtcNow() - c.LanCuoiPhatHien < TimeSpan.FromSeconds(90),
+                HangDoi = queue == null ? null : JsonSerializer.Deserialize<HangDoiWindowsDto>(JsonSerializer.Serialize(queue)) };
+        }
+    }
+
+    public string KiemTraQuyCach(int ma, IEnumerable<DongLenhInDto> dongIn)
+    {
+        var ketNoi = LayKetNoi(ma);
+        if (ketNoi.CheDo != "THAT") return null;
+        if (!ketNoi.TrucTuyen) return "Connector máy thật chưa phản hồi danh sách thiết bị mới; chưa gửi in.";
+        return QuyTacMayInThat.KiemTra(ketNoi.HangDoi, dongIn);
     }
 
     public string LienKet(int ma, int chiNhanh, LienKetMayInRequest req, Func<bool> dangIn)

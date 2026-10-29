@@ -1,4 +1,4 @@
-// Kiểm tra UI thật với API fixture; chặn toàn bộ request tới backend thật.
+﻿// Kiểm tra UI thật với API fixture; chặn toàn bộ request tới backend thật.
 // Dùng bản dotnet publish (thư mục wwwroot) truyền qua đối số đầu tiên.
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const { expect } = require((process.env.PLAYWRIGHT_MODULE || 'playwright') + '/test');
@@ -228,10 +228,8 @@ async function run() {
         await noOverflow();
         await page.screenshot({ animations: 'disabled', path: path.join(output, `dashboard-${width}.png`) });
         await page.getByRole('heading', { name: 'Xu hướng doanh thu', exact: true }).scrollIntoViewIfNeeded();
-        assert.ok(await page.getByRole('img', { name: 'Xu hướng doanh thu kỳ đã chọn so với cùng số ngày liền trước', exact: true }).evaluate(svg => {
-          const box = svg.getBoundingClientRect();
-          return [...svg.querySelectorAll('text')].every(text => { const r = text.getBoundingClientRect(); return r.left >= box.left - 1 && r.right <= box.right + 1; });
-        }), 'Nhãn biểu đồ không được bị cắt.');
+        await expect(page.getByRole('group', { name: 'Doanh thu theo từng kỳ', exact: true })).toBeVisible();
+        assert.ok(await page.locator('.cd-xu-huong').evaluate(el => el.scrollWidth <= el.clientWidth + 1), 'Biểu đồ không tràn ngang.');
         await page.screenshot({ animations: 'disabled', path: path.join(output, `chart-${width}.png`) });
         await expect(page.getByRole('heading', { name: 'Giờ cao điểm', exact: true })).toHaveCount(0);
         await expect(page.getByRole('heading', { name: 'Hiệu quả & trải nghiệm khách hàng', exact: true })).toHaveCount(0);
@@ -244,11 +242,10 @@ async function run() {
         await expect(page.getByLabel('Chỉ số doanh thu').getByText('600.000₫', { exact: true })).toHaveCount(1);
         mode = 'previous-zero';
         await apply.click();
-        await expect(page.getByText('Kỳ đối chiếu chưa có doanh thu', { exact: true })).toBeVisible();
+        await expect(page.locator('.cd-xu-huong')).not.toContainText('Infinity');
         mode = 'normal';
         for (const group of ['tuan', 'thang', 'ngay']) {
-          await page.getByLabel('Nhóm báo cáo', { exact: true }).selectOption(group);
-          await apply.click();
+          await page.getByRole('group', { name: 'Nhóm báo cáo', exact: true }).getByRole('button', { name: group === 'ngay' ? 'Ngày' : group === 'tuan' ? 'Tuần' : 'Tháng', exact: true }).click();
           await expect(apply).toBeEnabled();
           await noOverflow();
         }
