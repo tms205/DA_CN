@@ -42,6 +42,7 @@ public class GiaoHangWebTests
         var phamVi = new PhamViChiNhanh(null, http);
         var services = new ServiceCollection();
         services.AddLogging(); services.AddSingleton(http);
+        services.AddSingleton<Microsoft.AspNetCore.Components.NavigationManager, NavThu>();
         services.AddSingleton<Microsoft.JSInterop.IJSRuntime, JsRong>();
         services.AddSingleton(new PhienDangNhap(null, http, phamVi));
         await using var provider = services.BuildServiceProvider();
@@ -65,6 +66,11 @@ public class GiaoHangWebTests
     {
         public ValueTask<T> InvokeAsync<T>(string name, object[] args) => ValueTask.FromResult(default(T));
         public ValueTask<T> InvokeAsync<T>(string name, CancellationToken token, object[] args) => ValueTask.FromResult(default(T));
+    }
+    private sealed class NavThu : Microsoft.AspNetCore.Components.NavigationManager
+    {
+        public NavThu() => Initialize("http://fixture.local/", "http://fixture.local/giao-hang");
+        protected override void NavigateToCore(string uri,bool forceLoad) { }
     }
 
     private sealed class MayChuGiao : HttpMessageHandler

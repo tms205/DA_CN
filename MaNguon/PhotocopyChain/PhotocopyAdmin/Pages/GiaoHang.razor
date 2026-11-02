@@ -4,28 +4,32 @@
 @using Microsoft.AspNetCore.SignalR.Client
 @inject HttpClient Http
 @inject PhienDangNhap Phien
+@inject NavigationManager Nav
 @implements IAsyncDisposable
 
 <PageTitle>Giao hàng nội bộ · PhotocopyChain</PageTitle>
-<TieuDeTrang TieuDe="Giao hàng nội bộ" MoTa="Bàn giao tài liệu cho shipper, theo dõi từng lượt giao và lý do thất bại. Khách thanh toán QR trước, không thu COD." />
+<TieuDeTrang TieuDe="Giao hàng nội bộ" MoTa="Phân công shipper, theo dõi giao tài liệu và đối chiếu từng lượt." />
 
 <div class="than-trang khoi-doc">
-    @if (_loi != null && _donGiao == null) { <div class="o-loi" role="alert">@_loi</div> }
+    @if (_loi != null && _donGiao == null) { <TrangThaiTaiDuLieu DangBaoTri="_baoTri" NoiDung="@_loi" ThuLai="TaiAsync" /> }
     @if (_thongBao != null) { <div class="o-thanh-cong" role="status">@_thongBao</div> }
     <div class="the the-bang">
-        <div class="bang-tieu-de"><div><h2>Đơn giao và lịch sử</h2><p class="bang-mo-ta">Chỉ đơn đã thanh toán đầy đủ. Tối đa 100 đơn/lượt trong nhóm đang xem.</p></div><span class="bang-dem">@(_ds?.Count ?? 0) mục</span></div>
+        <div class="bang-tieu-de"><div><h2>Đơn giao và lịch sử</h2><p class="bang-mo-ta">Đã thanh toán trước · Không thu COD khi giao.</p></div><span class="bang-dem">@(_ds?.Count ?? 0) @(_nhom == "LICH_SU" ? "lượt giao" : "đơn")</span></div>
         <div class="bang-cong-cu gh-cong-cu">
             <div class="thanh-loc">
-                <button class="@NutNhom("CHO_GIAO")" disabled="@_dangGui" @onclick='() => DoiNhom("CHO_GIAO")'>Chờ giao</button>
-                <button class="@NutNhom("DANG_GIAO")" disabled="@_dangGui" @onclick='() => DoiNhom("DANG_GIAO")'>Đang giao</button>
-                <button class="@NutNhom("LICH_SU")" disabled="@_dangGui" @onclick='() => DoiNhom("LICH_SU")'>Lịch sử</button>
+                <button class="@NutNhom("CHO_GIAO")" aria-pressed="@(_nhom == "CHO_GIAO" ? "true" : "false")" disabled="@(_dangGui || _dangTai)" @onclick='() => DoiNhom("CHO_GIAO")'>Chờ giao</button>
+                <button class="@NutNhom("DANG_GIAO")" aria-pressed="@(_nhom == "DANG_GIAO" ? "true" : "false")" disabled="@(_dangGui || _dangTai)" @onclick='() => DoiNhom("DANG_GIAO")'>Đang giao</button>
+                <button class="@NutNhom("THAT_BAI")" aria-pressed="@(_nhom == "THAT_BAI" ? "true" : "false")" disabled="@(_dangGui || _dangTai)" @onclick='() => DoiNhom("THAT_BAI")'>Giao thất bại</button>
+                <button class="@NutNhom("THANH_CONG")" aria-pressed="@(_nhom == "THANH_CONG" ? "true" : "false")" disabled="@(_dangGui || _dangTai)" @onclick='() => DoiNhom("THANH_CONG")'>Giao thành công</button>
+                <button class="@NutNhom("LICH_SU")" aria-pressed="@(_nhom == "LICH_SU" ? "true" : "false")" disabled="@(_dangGui || _dangTai)" @onclick='() => DoiNhom("LICH_SU")'>Lịch sử</button>
             </div>
             <input class="ca-o-loc" aria-label="Tìm đơn giao" placeholder="Tìm mã đơn, khách, địa chỉ, shipper…" @bind="_tim" @bind:event="oninput" />
-            <button class="nut-nho" disabled="@_dangGui" @onclick="TaiAsync">@((MarkupString)Svg.TaiLai()) Làm mới</button>
+            <button class="nut-nho" disabled="@(_dangGui || _dangTai)" @onclick="TaiAsync">@((MarkupString)Svg.TaiLai()) @(_dangTai ? "Đang tải…" : "Làm mới")</button>
         </div>
-        @if (_ds == null) { <div class="gh-trong" role="status">Đang tải giao hàng…</div> }
-        else
+        @if (_dangTai) { <div class="gh-trong" role="status">Đang tải giao hàng…</div> }
+        else if (_ds != null && _loi == null)
         {
+            <div class="gh-ket-qua">@Loc().Count() / @_ds.Count @(_nhom == "LICH_SU" ? "lượt giao" : "đơn") trong nhóm · Tối đa 100 mục gần nhất</div>
             <div class="bang-cuon">
             <table class="bang gh-bang">
                 <colgroup><col class="gh-cot-don" /><col class="gh-cot-dia-chi" /><col class="gh-cot-tien" /><col class="gh-cot-trang-thai" /><col class="gh-cot-shipper" /></colgroup>
@@ -34,21 +38,28 @@
                 @foreach (var don in Loc())
                 {
                     <tr @key="@($"{don.MaDonHang}-{don.MaGiaoHang}-{_nhom}")">
-                        <td data-nhan="Đơn & khách"><b class="mono">@don.MaDonHangHienThi</b><div>@don.TenKhachHang</div><a href="@("tel:" + don.SdtNhan)">@don.SdtNhan</a><div class="nv-phu">Đặt @don.NgayDat.ToString("dd/MM/yyyy HH:mm")</div></td>
-                        <td data-nhan="Điểm lấy / giao"><b>@don.TenChiNhanh</b><div class="nv-phu">@don.DiaChiChiNhanh</div><div class="gh-dia-chi">@don.DiaChiGiao</div><a href="@BanDo(don)" target="_blank" rel="noopener noreferrer">Mở đường đi ↗</a></td>
-                        <td data-nhan="Thanh toán"><b class="mono">@Tien(don.TongTien)</b><div class="nv-phu">Phí giao: @Tien(don.PhiShip)</div><span class="nhan-nho">Đã thanh toán</span><div class="nv-phu">Không thu COD</div></td>
-                        <td data-nhan="Lượt giao & trạng thái"><span>@TenTrangThai(don)</span><div class="nv-phu">Lượt @(_nhom == "LICH_SU" ? don.LanGiao ?? don.SoLanGiao : don.SoLanGiao)/3</div>
+                        <td data-nhan="Đơn & khách"><b class="mono gh-ma-don">@don.MaDonHangHienThi</b><div class="gh-ten-khach">@don.TenKhachHang</div><a href="@("tel:" + don.SdtNhan)">@don.SdtNhan</a><div class="nv-phu">Đặt @don.NgayDat.ToString("dd/MM/yyyy HH:mm")</div></td>
+                        <td data-nhan="Điểm lấy / giao"><div class="gh-diem"><span class="gh-nhan-diem">Lấy tại</span><b>@don.TenChiNhanh</b><div class="nv-phu">@don.DiaChiChiNhanh</div></div><div class="gh-diem gh-diem-giao"><span class="gh-nhan-diem">Giao đến</span><div>@don.DiaChiGiao</div></div><a class="gh-ban-do" href="@BanDo(don)" target="_blank" rel="noopener noreferrer">Mở đường đi ↗</a></td>
+                        <td data-nhan="Thanh toán"><b class="mono gh-tong-tien">@Tien(don.TongTien)</b><div class="nv-phu">Phí giao: @Tien(don.PhiShip)</div><span class="gh-nhan gh-nhan-xanh">Đã thanh toán</span></td>
+                        <td data-nhan="Lượt giao & trạng thái"><span class="gh-nhan @MauTrangThai(don)">@TenTrangThai(don)</span><div class="nv-phu">@NhanLuot(don)</div>
                             @if (don.NgayNhan != null) { <div class="nv-phu">Nhận: @don.NgayNhan.Value.ToString("dd/MM HH:mm")</div> }
                             @if (don.NgayGiao != null) { <div class="nv-phu">Kết quả: @don.NgayGiao.Value.ToString("dd/MM HH:mm")</div> }
                             @if (!string.IsNullOrWhiteSpace(don.LyDo)) { <div class="gh-ly-do">@don.LyDo</div> }
-                            @if (_nhom == "CHO_GIAO" && don.SoLanGiao >= 3) { <div class="gh-ly-do">Đủ 3 lượt thất bại — liên hệ khách để xử lý, không tự hoàn tiền.</div> }
+                            @if (_nhom == "THAT_BAI" && don.SoLanGiao >= 3) { <div class="gh-can-xu-ly">Đã hết 3 lượt giao. Liên hệ khách để thống nhất xử lý.</div> }
                         </td>
                         <td data-nhan="Shipper / thao tác">
-                            @if (_nhom == "CHO_GIAO" && don.SoLanGiao < 3)
+                            <div class="gh-thao-tac">
+                            <b>@(string.IsNullOrWhiteSpace(don.TenShipper) ? "Chưa phân công" : don.TenShipper)</b>
+                            @if (_nhom is "CHO_GIAO" or "THAT_BAI" && don.SoLanGiao < 3)
                             {
-                                <button class="nut-nho chinh gh-nut-giao" disabled="@_dangGui" @onclick="() => MoXacNhan(don)">Bàn giao đi giao</button>
+                                <button class="nut-nho chinh gh-nut-giao" disabled="@_dangGui" @onclick="() => MoXacNhan(don)">@(_nhom == "THAT_BAI" ? "Phân công giao lại" : "Bàn giao đi giao")</button>
                             }
-                            else { <b>@(string.IsNullOrWhiteSpace(don.TenShipper) ? "Chưa phân công" : don.TenShipper)</b> }
+                            @if (don.SoLanGiao > 0 && Phien.NguoiDung?.TenVaiTro is "SUPER_ADMIN" or "BRANCH_ADMIN")
+                            {
+                                <button type="button" class="nut-nho gh-nut-bang-chung" @onclick="() => _donLichSu = don.MaDonHang">Lịch sử &amp; đối chiếu</button>
+                                @if (don.SoPhanHoiChoDoiChieu > 0) { <div class="gh-ly-do"><b>@don.SoPhanHoiChoDoiChieu phản hồi chờ đối chiếu</b></div> }
+                            }
+                            </div>
                         </td>
                     </tr>
                 }
@@ -60,8 +71,9 @@
     </div>
 </div>
 
-<HopThoaiQuanTri Mo="@(_donGiao != null)" TieuDe="Phân công & bàn giao shipper" Loi="@_loi" DangLuu="@_dangGui" Dong="DongPhanCong">
+<HopThoaiQuanTri Mo="@(_donGiao != null)" TieuDe="Phân công & bàn giao shipper" Loi="@(_baoTri ? null : _loi)" DangLuu="@_dangGui" Dong="DongPhanCong">
     <NoiDung>
+        @if (_baoTri) { <TrangThaiTaiDuLieu DangBaoTri="true" NoiDung="@_loi" /> }
         <p><b>@_donGiao?.MaDonHangHienThi · @_donGiao?.TenKhachHang</b></p><p>@_donGiao?.DiaChiGiao</p>
         <label class="nhan" for="gh-shipper">Shipper thuộc chi nhánh này</label>
         <select id="gh-shipper" class="ca-o-loc" disabled="@_dangGui" value="@ShipperChon(_donGiao.MaDonHang)" @onchange="e => ChonShipper(_donGiao.MaDonHang, e.Value)"><option value="0">Chọn shipper</option>@foreach (var sp in _shipper.Where(x => x.MaChiNhanh == _donGiao.MaChiNhanh)) { <option value="@sp.MaShipper">@sp.HoTen</option> }</select>
@@ -69,47 +81,68 @@
     </NoiDung>
     <Chan><button type="button" class="nut-phu" disabled="@_dangGui" @onclick="DongPhanCong">Hủy</button><button type="button" class="nut-chinh" disabled="@(_dangGui || ShipperChon(_donGiao?.MaDonHang ?? 0) == 0)" @onclick="() => PhanCong(_donGiao)">Xác nhận bàn giao</button></Chan>
 </HopThoaiQuanTri>
+<HopThoaiQuanTri Mo="@(_donLichSu != null)" TieuDe="Lịch sử giao hàng & đối chiếu" Rong="true" Dong="() => _donLichSu = null">
+    <NoiDung>
+        @if (_donLichSu != null) { <LichSuGiaoDon @key="_donLichSu" MaDonHang="_donLichSu.Value" DaDoiChieu="TaiAsync" /> }
+    </NoiDung>
+    <Chan><button type="button" class="nut-phu" @onclick="() => _donLichSu = null">Đóng</button></Chan>
+</HopThoaiQuanTri>
 @code {
+    private int? _donLichSu;
     private List<DonGiaoDto> _ds;
     private List<ShipperDto> _shipper = new();
     private readonly Dictionary<int, int> _daChon = new();
-    private string _nhom = "CHO_GIAO", _tim = "", _loi, _thongBao;
+    [Parameter, SupplyParameterFromQuery(Name="nhom")] public string NhomTuDashboard { get; set; }
+    private string _nhom, _tim = "", _loi, _thongBao;
     private DonGiaoDto _donGiao;
     private void DongPhanCong() { if (!_dangGui) { _donGiao = null; _loi = null; } }
-    private bool _dangGui, _daDong;
+    private bool _dangGui, _daDong, _dangTai, _baoTri;
     private int _lanTai;
     private HubConnection _ketNoi;
 
     protected override async Task OnInitializedAsync()
     {
-        await TaiAsync();
         if (string.IsNullOrEmpty(Phien.AccessToken)) return;
         try
         {
             _ketNoi = new HubConnectionBuilder().WithUrl(Http.BaseAddress + "hubs/cap-nhat", options => options.AccessTokenProvider = () => Task.FromResult(Phien.AccessToken)).WithAutomaticReconnect().Build();
-            _ketNoi.On<object>(HubEvents.OrderStatusChanged, _ => InvokeAsync(async () => { if (!_daDong) { await TaiAsync(); StateHasChanged(); } }));
+            _ketNoi.On<object>(HubEvents.OrderStatusChanged, _ => InvokeAsync(async () => { if (!_daDong && _nhom != null) { await TaiAsync(); StateHasChanged(); } }));
             await _ketNoi.StartAsync();
         }
         catch { /* Không nối được vẫn tải lại thủ công. */ }
     }
 
+    protected override async Task OnParametersSetAsync()
+    {
+        string nhom = NhomTuDashboard is "CHO_GIAO" or "DANG_GIAO" or "THAT_BAI" or "THANH_CONG" or "LICH_SU" ? NhomTuDashboard : "CHO_GIAO";
+        if (_nhom == nhom) return;
+        _nhom = nhom; _donGiao = null; _donLichSu = null; _ds = null; _thongBao = null;
+        await TaiAsync();
+    }
+
     private async Task TaiAsync()
     {
         int lan = ++_lanTai;
+        _dangTai = true;
+        _baoTri = false; _loi = null;
         try
         {
             using var res = await Http.GetAsync("api/giao-hang?nhom=" + _nhom);
+            await DocDuLieuApi.KiemTraBaoTriAsync(res);
             if (!res.IsSuccessStatusCode) { if (lan == _lanTai) { _loi = await Loi(res); _ds = new(); } return; }
             var ds = await res.Content.ReadFromJsonAsync<List<DonGiaoDto>>() ?? new();
             using var sp = await Http.GetAsync("api/giao-hang/shipper");
+            await DocDuLieuApi.KiemTraBaoTriAsync(sp);
             var shippers = sp.IsSuccessStatusCode ? await sp.Content.ReadFromJsonAsync<List<ShipperDto>>() ?? new() : new List<ShipperDto>();
             if (_daDong || lan != _lanTai) return;
-            _ds = ds; _shipper = shippers; _loi = sp.IsSuccessStatusCode ? null : await Loi(sp);
+            _ds = ds; _shipper = shippers; _baoTri = false; _loi = sp.IsSuccessStatusCode ? null : await Loi(sp);
         }
+        catch (NgoaiLeBaoTri ex) { if (!_daDong && lan == _lanTai) { _baoTri = true; _loi = ex.Message; _ds = null; } }
         catch { if (!_daDong && lan == _lanTai) { _loi = "Chưa tải được giao hàng. Kiểm tra API rồi bấm Làm mới."; _ds = new(); } }
+        finally { if (lan == _lanTai) _dangTai = false; }
     }
 
-    private async Task DoiNhom(string nhom) { _nhom = nhom; _donGiao = null; _ds = null; _thongBao = null; await TaiAsync(); }
+    private void DoiNhom(string nhom) => Nav.NavigateTo("giao-hang?nhom=" + nhom);
     private string NutNhom(string nhom) => _nhom == nhom ? "nut-nho chinh" : "nut-nho";
     private int ShipperChon(int ma) => _daChon.GetValueOrDefault(ma);
     private void ChonShipper(int ma, object giaTri) { _daChon[ma] = int.TryParse(giaTri?.ToString(), out int sp) ? sp : 0; }
@@ -122,18 +155,22 @@
         try
         {
             using var res = await Http.PostAsJsonAsync("api/giao-hang/" + don.MaDonHang + "/phan-cong", new PhanCongGiaoRequest { MaShipper = ShipperChon(don.MaDonHang) });
+            await DocDuLieuApi.KiemTraBaoTriAsync(res);
             if (!res.IsSuccessStatusCode) _loi = await Loi(res);
             else { _thongBao = "Đã bàn giao " + don.MaDonHangHienThi + " cho shipper. Đơn bắt đầu giao, không thu COD."; _donGiao = null; await TaiAsync(); }
         }
-        catch { _loi = "Chưa xác nhận được bàn giao. Hãy tải lại để kiểm tra kết quả trước khi thử lại."; }
+        catch (NgoaiLeBaoTri ex) { _baoTri = true; _loi = ex.Message; }
+        catch { _baoTri = false; _loi = "Chưa xác nhận được bàn giao. Hãy tải lại để kiểm tra kết quả trước khi thử lại."; }
         finally { _dangGui = false; }
     }
 
     private IEnumerable<DonGiaoDto> Loc() => (_ds ?? new()).Where(x =>
         $"{x.MaDonHangHienThi} {x.TenKhachHang} {x.SdtNhan} {x.DiaChiGiao} {x.TenShipper}".Contains(_tim.Trim(), StringComparison.OrdinalIgnoreCase));
-    private string TenTrangThai(DonGiaoDto don) => _nhom == "LICH_SU"
+    private string TenTrangThai(DonGiaoDto don) => _nhom is "LICH_SU" or "THAT_BAI" or "THANH_CONG"
         ? don.TrangThaiGiao == "THANH_CONG" ? "Giao thành công" : "Giao thất bại"
         : TrangThaiDonHang.TenHienThi(don.TrangThaiDonHang);
+    private static string MauTrangThai(DonGiaoDto don) => don.TrangThaiGiao switch { "THAT_BAI" => "gh-nhan-cam", "THANH_CONG" => "gh-nhan-xanh", "DANG_GIAO" => "gh-nhan-xanh-duong", _ => "gh-nhan-xam" };
+    private string NhanLuot(DonGiaoDto don) => don.SoLanGiao == 0 ? "Chưa giao lần nào" : $"Lượt {(_nhom == "LICH_SU" ? don.LanGiao ?? don.SoLanGiao : don.SoLanGiao)}/3";
     private static string Tien(decimal tien) => tien.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("vi-VN")) + "₫";
     private static string BanDo(DonGiaoDto don) => "https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=" + Uri.EscapeDataString(don.DiaChiGiao.Split(" · ")[0]);
     private static async Task<string> Loi(HttpResponseMessage res)

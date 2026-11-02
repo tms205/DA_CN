@@ -3,6 +3,7 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using PhotocopyApi.Auth;
 using PhotocopyApi.BaoTri;
+using PhotocopyApi.CaLamViec;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
@@ -62,6 +63,9 @@ builder.Services.AddControllers()
 
 // Bộ nhớ tạm của API: giữ mã OTP, đếm số lần nhập sai mật khẩu, quãng đường đã hỏi bản đồ (tắt API là mất)
 builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<PhotocopyApi.Ocr.IOcrProcessor, PhotocopyApi.Ocr.OcrPython>();
+builder.Services.AddSingleton<PhotocopyApi.Ocr.OcrQueue>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<PhotocopyApi.Ocr.OcrQueue>());
 builder.Services.AddSingleton<KetNoiBaoTri>();
 builder.Services.AddSingleton(new BaoTriStore(Path.Combine(
     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PhotocopyChain", "maintenance.json")));
@@ -70,7 +74,14 @@ builder.Services.AddSingleton<PhotocopyApi.DichVu.ThuVienMauDon>();
 builder.Services.AddSingleton<PhotocopyApi.MayQuet.IMayQuet, PhotocopyApi.MayQuet.MayQuetAo>();
 builder.Services.AddSingleton<PhotocopyApi.GiaoHang.GeoapifyService>();
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<LichCaService>();
+builder.Services.AddHostedService<ChotCaHetGioJob>();
 builder.Services.AddSingleton<OtpDatLaiStore>();
+builder.Services.AddSingleton(sp => new PhienDangNhapStore(Path.Combine(
+    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PhotocopyChain", "account-sessions.json"),
+    sp.GetRequiredService<IConfiguration>()["Jwt:Key"]));
+builder.Services.AddSingleton<KiemTraPhienDangNhap>();
+builder.Services.AddHostedService<KiemTraKetNoiPhienJob>();
 builder.Services.AddSingleton<IGoogleTokenVerifier>(sp => new GoogleTokenVerifier(sp.GetRequiredService<IConfiguration>()));
 
 // Dùng chung hạn mức cho gửi mã và đặt lại mật khẩu.
@@ -146,15 +157,21 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         // Chưa đăng nhập / token hết hạn / không đủ quyền → cũng trả { message } tiếng Việt
         options.Events = new JwtBearerEvents
         {
-            OnTokenValidated = context =>
+            OnTokenValidated = async context =>
             {
+                var phien = context.HttpContext.RequestServices.GetRequiredService<KiemTraPhienDangNhap>();
+                if (!await phien.HopLeAsync(context.Principal, context.HttpContext.RequestAborted))
+                {
+                    context.Fail("Tài khoản hoặc phiên đăng nhập không còn hợp lệ.");
+                    return;
+                }
                 if (!context.Principal.IsInRole(VaiTro.SuperAdmin))
                 {
-                    var generation = context.HttpContext.RequestServices.GetRequiredService<BaoTriStore>().Read().PhienBanPhien;
+                    var maintenance = context.HttpContext.RequestServices.GetRequiredService<BaoTriStore>().Read();
+                    var generation = BaoTriStore.Version(maintenance,BaoTriStore.NenTang(context.Principal));
                     long.TryParse(context.Principal.FindFirst("maintenance_version")?.Value, out var issued);
                     if (!BaoTriStore.SessionValid(issued, generation, false)) context.Fail("Phiên đã kết thúc do bảo trì.");
                 }
-                return Task.CompletedTask;
             },
             // SignalR chạy trên WebSocket — trình duyệt KHÔNG cho gửi header "Authorization" khi mở WebSocket,
             // nên client gửi token trong địa chỉ: /hubs/cap-nhat?access_token=... Đoạn này đọc token từ đó ra.
@@ -235,10 +252,12 @@ else
 
 app.UseCors("WebAdmin");
 app.UseAuthentication();
+app.UseMiddleware<PhotocopyApi.HuyDon.NhatKyHuyMiddleware>();
 app.UseMiddleware<BaoTriMiddleware>();
 // Sau khi đọc JWT, áp dụng chi nhánh CEO đã chọn trước khi kiểm [Authorize].
 app.UseMiddleware<PhamViChiNhanhMiddleware>();
 app.UseAuthorization();
+app.UseMiddleware<CaHetGioMiddleware>();
 app.UseRateLimiter();
 app.MapControllers();
 

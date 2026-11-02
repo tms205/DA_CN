@@ -30,7 +30,7 @@ public sealed class XepLaiDonChoInJob : BackgroundService
             {
                 try
                 {
-                    if (_baoTri?.Read().DangBaoTri == true) continue;
+                    if (BaoTriStore.KhoaTacVuNen(_baoTri?.Read(),"DON_HANG")) continue;
                     using var scope = _scopeFactory.CreateScope();
                     using var conn = new SqlConnection(_chuoiKetNoi);
                     var ds = await conn.QueryAsync<int>(
@@ -43,7 +43,7 @@ public sealed class XepLaiDonChoInJob : BackgroundService
                     foreach (int maDon in ds)
                     {
                         if (dung.IsCancellationRequested) return;
-                        if (_baoTri?.Read().DangBaoTri == true) break;
+                        if (BaoTriStore.KhoaTacVuNen(_baoTri?.Read(),"DON_HANG")) break;
                         await xepIn.XepInSauThanhToan(maDon);
                     }
                 }

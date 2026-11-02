@@ -1,0 +1,3 @@
+.tq-lien-ket-trang-thai { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:44px; text-decoration:none; color:inherit; border-radius:6px; }
+.tq-lien-ket-trang-thai:hover { color:var(--accent); background:var(--nen); }
+.tq-lien-ket-trang-thai:focus-visible { outline:3px solid var(--accent); outline-offset:3px; }

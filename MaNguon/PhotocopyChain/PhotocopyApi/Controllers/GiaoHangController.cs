@@ -15,25 +15,48 @@ namespace PhotocopyApi.Controllers;
 [ApiController]
 [Route("api/giao-hang")]
 [Authorize]
-public class GiaoHangController : ControllerBase
+public partial class GiaoHangController : ControllerBase
 {
     private readonly string _chuoiKetNoi;
     private readonly GeoapifyService _banDo;
     private readonly IHubContext<CapNhatHub> _hub;
     private readonly ILogger<GiaoHangController> _log;
+    private readonly BangChungGiaoHangStore _bangChung;
 
     public GiaoHangController(IConfiguration config, IMemoryCache cache, IHubContext<CapNhatHub> hub,
-        ILogger<GiaoHangController> log, GeoapifyService banDo = null)
+        ILogger<GiaoHangController> log, GeoapifyService banDo = null, BangChungGiaoHangStore bangChung = null)
     {
         _chuoiKetNoi = config.GetConnectionString("PhotocopyChain");
         _banDo = banDo ?? new GeoapifyService(config, cache);
         _hub = hub;
         _log = log;
+        _bangChung = bangChung ?? new BangChungGiaoHangStore(config);
     }
 
     private int MaNguoiDung => int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
     private int? ChiNhanh => int.TryParse(User.FindFirst(TenClaim.MaChiNhanh)?.Value, out int ma) ? ma : null;
     private bool KhongCoPhamVi => !User.IsInRole(VaiTro.SuperAdmin) && ChiNhanh == null;
+    // Phân nhóm theo trạng thái hiện tại và lượt giao mới nhất, không đếm lại các lượt cũ.
+    private const string NhomDonGiao = @"CASE
+        WHEN dh.TrangThai='DA_IN' AND (gh.MaGiaoHang IS NULL OR gh.TrangThai<>'DANG_GIAO') THEN 'CHO_GIAO'
+        WHEN dh.TrangThai='DANG_GIAO' AND gh.TrangThai='DANG_GIAO' THEN 'DANG_GIAO'
+        WHEN dh.TrangThai='GIAO_THAT_BAI' AND gh.TrangThai='THAT_BAI' THEN 'THAT_BAI'
+        WHEN dh.TrangThai IN ('DA_GIAO','HOAN_THANH') AND gh.TrangThai='THANH_CONG' THEN 'THANH_CONG' END";
+
+    [HttpGet("phan-bo")]
+    [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
+    public async Task<IActionResult> PhanBo()
+    {
+        if (KhongCoPhamVi) return Forbid();
+        using var conn = new SqlConnection(_chuoiKetNoi);
+        return Ok(await conn.QueryAsync<PhanBoGiaoHangDto>(@"SELECT Nhom,COUNT(*) AS SoDon FROM (
+            SELECT " + NhomDonGiao + @" AS Nhom
+            FROM DonHang dh JOIN ThanhToan tt ON tt.MaDonHang=dh.MaDonHang
+            OUTER APPLY (SELECT TOP 1 MaGiaoHang,TrangThai FROM GiaoHang g WHERE g.MaDonHang=dh.MaDonHang ORDER BY g.MaGiaoHang DESC) gh
+            WHERE dh.HinhThucNhan='GIAO_HANG' AND tt.TrangThai='DA_THANH_TOAN'
+              AND (@MaChiNhanh IS NULL OR dh.MaChiNhanh=@MaChiNhanh)
+            ) x WHERE Nhom IS NOT NULL GROUP BY Nhom", new { MaChiNhanh = ChiNhanh }));
+    }
 
     [HttpPost("dia-chi")]
     [Authorize(Roles = "CUSTOMER")]
@@ -66,7 +89,7 @@ public class GiaoHangController : ControllerBase
     public async Task<IActionResult> DanhSach([FromQuery] string nhom = "CHO_GIAO")
     {
         if (KhongCoPhamVi) return Forbid();
-        if (nhom != "CHO_GIAO" && nhom != "DANG_GIAO" && nhom != "LICH_SU")
+        if (nhom is not ("CHO_GIAO" or "DANG_GIAO" or "THAT_BAI" or "THANH_CONG" or "LICH_SU"))
             return BadRequest(new { message = "Bộ lọc giao hàng không hợp lệ." });
         using var conn = new SqlConnection(_chuoiKetNoi);
         int? shipper = User.IsInRole(VaiTro.Shipper) ? MaNguoiDung : null;
@@ -74,16 +97,18 @@ public class GiaoHangController : ControllerBase
         string joinGiao = nhom == "LICH_SU"
             ? "JOIN GiaoHang gh ON gh.MaDonHang=dh.MaDonHang AND gh.TrangThai<>'DANG_GIAO'"
             : "OUTER APPLY (SELECT TOP 1 * FROM GiaoHang g WHERE g.MaDonHang=dh.MaDonHang ORDER BY g.MaGiaoHang DESC) gh";
-        string loc = nhom == "CHO_GIAO"
-            ? "AND dh.TrangThai IN ('DA_IN','GIAO_THAT_BAI')"
-            : nhom == "DANG_GIAO" ? "AND dh.TrangThai='DANG_GIAO' AND (@MaShipper IS NULL OR gh.MaShipper=@MaShipper)"
-            : "AND (@MaShipper IS NULL OR gh.MaShipper=@MaShipper)";
+        string loc = nhom == "LICH_SU" ? "AND (@MaShipper IS NULL OR gh.MaShipper=@MaShipper)"
+            : "AND (" + NhomDonGiao + ")=@Nhom AND (@MaShipper IS NULL OR gh.MaShipper=@MaShipper OR @Nhom='CHO_GIAO')";
         var ds = await conn.QueryAsync<DonGiaoDto>(
             @"SELECT TOP 100 dh.MaDonHang, 'DH'+RIGHT('00000'+CAST(dh.MaDonHang AS VARCHAR(10)),5) AS MaDonHangHienThi,
                      dh.MaChiNhanh, cn.TenChiNhanh, cn.DiaChi AS DiaChiChiNhanh, kh.HoTen AS TenKhachHang,
                      dh.SdtNhan, dh.DiaChiGiao, dh.PhiShip, dh.TongTien, dh.TrangThai AS TrangThaiDonHang,
                      tt.TrangThai AS TrangThaiThanhToan, gh.MaGiaoHang, gh.MaShipper, sp.HoTen AS TenShipper,
                      gh.TrangThai AS TrangThaiGiao, gh.LanGiao, gh.LyDo, dh.NgayDat, gh.NgayNhan, gh.NgayGiao,
+                     CASE WHEN @XemDoiChieu=1 THEN JSON_VALUE(gh.DoiChieuKhachHangJson,'$.TrangThai') ELSE NULL END AS TrangThaiDoiChieu,
+                     CASE WHEN @XemDoiChieu=1 THEN (SELECT COUNT(*) FROM GiaoHang ph
+                         WHERE ph.MaDonHang=dh.MaDonHang AND ph.TrangThai='THAT_BAI'
+                           AND JSON_VALUE(ph.DoiChieuKhachHangJson,'$.TrangThai')='CHO_DOI_CHIEU') ELSE 0 END AS SoPhanHoiChoDoiChieu,
                      (SELECT COUNT(*) FROM GiaoHang dem WHERE dem.MaDonHang=dh.MaDonHang) AS SoLanGiao
               FROM DonHang dh JOIN ChiNhanh cn ON cn.MaChiNhanh=dh.MaChiNhanh
               JOIN NguoiDung kh ON kh.MaNguoiDung=dh.MaKhachHang
@@ -91,8 +116,8 @@ public class GiaoHangController : ControllerBase
               LEFT JOIN NguoiDung sp ON sp.MaNguoiDung=gh.MaShipper
               WHERE dh.HinhThucNhan='GIAO_HANG' AND tt.TrangThai='DA_THANH_TOAN'
                 AND (@MaChiNhanh IS NULL OR dh.MaChiNhanh=@MaChiNhanh) " + loc +
-              (nhom == "LICH_SU" ? " ORDER BY gh.MaGiaoHang DESC" : " ORDER BY dh.InGap DESC, dh.NgayHenTra, dh.MaDonHang"),
-            new { MaChiNhanh = ChiNhanh, MaShipper = shipper });
+              (nhom is "LICH_SU" or "THAT_BAI" or "THANH_CONG" ? " ORDER BY gh.MaGiaoHang DESC" : " ORDER BY dh.InGap DESC, dh.NgayHenTra, dh.MaDonHang"),
+            new { Nhom=nhom, MaChiNhanh = ChiNhanh, MaShipper = shipper, XemDoiChieu=User.IsInRole(VaiTro.SuperAdmin)||User.IsInRole(VaiTro.BranchAdmin) });
         return Ok(ds);
     }
 
@@ -148,7 +173,14 @@ public class GiaoHangController : ControllerBase
 
     [HttpPost("luot/{maGiaoHang:int:min(1)}/ket-qua")]
     [Authorize(Roles = "SHIPPER")]
-    public async Task<IActionResult> BaoKetQua(int maGiaoHang, KetQuaGiaoRequest req)
+    public Task<IActionResult> BaoKetQua(int maGiaoHang, KetQuaGiaoRequest req)
+    {
+        if (!req.ThanhCong)
+            return Task.FromResult<IActionResult>(BadRequest(new { message = "Giao thất bại cần GPS và ảnh nhật ký cuộc gọi. Hãy cập nhật app và dùng Gửi báo cáo giao thất bại." }));
+        return GhiKetQua(maGiaoHang, req);
+    }
+
+    private async Task<IActionResult> GhiKetQua(int maGiaoHang, KetQuaGiaoRequest req, HoSoBangChung hoSo = null)
     {
         if (KhongCoPhamVi) return Forbid();
         using var conn = new SqlConnection(_chuoiKetNoi);
@@ -180,6 +212,12 @@ public class GiaoHangController : ControllerBase
               UPDATE DonHang SET TrangThai=@TrangThaiDon,
                 NgayHoanThanh=CASE WHEN @ThanhCong=1 THEN GETDATE() ELSE NgayHoanThanh END WHERE MaDonHang=@MaDonHang;",
             new { TrangThaiGiao = trangThaiGiao, LyDo = lyDo, MaGiaoHang = maGiaoHang, TrangThaiDon = trangThaiDon, req.ThanhCong, MaDonHang = maDon }, tran);
+        if (hoSo != null)
+            await conn.ExecuteAsync(@"UPDATE GiaoHang SET ViDoBaoGiao=@ViDo, KinhDoBaoGiao=@KinhDo,
+                DoChinhXacGps=@DoChinhXac, ThoiDiemGps=@ThoiDiemGps, ThoiDiemBaoCao=SYSDATETIMEOFFSET(),
+                DiaChiBaoGiao=@DiaChi, AnhBangChungJson=@AnhJson WHERE MaGiaoHang=@MaGiaoHang",
+                new { hoSo.ViTri.ViDo, hoSo.ViTri.KinhDo, hoSo.ViTri.DoChinhXac, hoSo.ViTri.ThoiDiemGps,
+                    hoSo.DiaChi, AnhJson = System.Text.Json.JsonSerializer.Serialize(hoSo.Anh), MaGiaoHang = maGiaoHang }, tran);
         await ThongBao(conn, tran, don.MaKhachHang, maDon.Value,
             req.ThanhCong ? "Giao hàng thành công" : "Giao hàng chưa thành công",
             req.ThanhCong ? "Tài liệu đã giao đến bạn. Cảm ơn bạn đã sử dụng PhotocopyChain." : lyDo);
@@ -188,7 +226,9 @@ public class GiaoHangController : ControllerBase
                 SELECT MaNguoiDung,@MaDon,N'Đơn giao thất bại',@LyDo FROM NguoiDung
                 WHERE TrangThai=N'HOAT_DONG' AND (VaiTro='SUPER_ADMIN' OR (VaiTro='BRANCH_ADMIN' AND MaChiNhanh=@MaChiNhanh))",
                 new { MaDon = maDon, LyDo = $"DH{maDon:00000}: {lyDo}", don.MaChiNhanh }, tran);
+        if (hoSo != null) hoSo.BatDauCommit = true;
         await tran.CommitAsync();
+        if (hoSo != null) hoSo.DaLuu = true;
         await GuiTin(don, trangThaiDon, req.ThanhCong ? "Đã giao thành công." : "Giao thất bại: " + lyDo, MaNguoiDung);
         return Ok(new { message = req.ThanhCong ? "Đã giao thành công, đơn hoàn tất. Không thu thêm tiền." : "Đã lưu lý do giao thất bại và thông báo cửa hàng." });
     }

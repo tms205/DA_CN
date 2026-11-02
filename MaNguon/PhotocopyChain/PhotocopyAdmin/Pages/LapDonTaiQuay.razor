@@ -6,7 +6,7 @@
 @inject IJSRuntime Js
 @using PhotocopyShared.QuyCachIn
 
-<PageTitle>Lập đơn tại quầy · PhotocopyChain</PageTitle>
+@if (TrangDangMo) { <PageTitle>Lập đơn tại quầy · PhotocopyChain</PageTitle> }
 <TieuDeTrang TieuDe="Lập đơn tại quầy" MoTa="Khách chọn quét QR payOS hoặc COD · thanh toán khi nhận tài liệu" />
 
 <div class="than-trang khoi-doc">
@@ -358,6 +358,20 @@
 </dialog>
 
 @code {
+    [Parameter] public bool TrangDangMo { get; set; } = true;
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!TrangDangMo)
+        {
+            _xacNhan?.Dong();
+            if (_mauDangXem != null) await DongXemMauAsync();
+        }
+        else if (MaDonHangTuPayOS != null && MaDonHangTuPayOS != _maDonVuaLap)
+        {
+            _maDonVuaLap = MaDonHangTuPayOS;
+            await TaiLaiThanhToanAsync();
+        }
+    }
     private XacNhanThaoTac _xacNhan;
     [Parameter]
     [SupplyParameterFromQuery(Name = "maDonHang")]
@@ -468,6 +482,7 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (!TrangDangMo) return;
         if (_canMoMau)
         {
             _canMoMau = false;

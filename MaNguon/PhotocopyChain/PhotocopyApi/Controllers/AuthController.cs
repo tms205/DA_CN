@@ -35,9 +35,13 @@ public partial class AuthController : ControllerBase
     private readonly OtpDatLaiStore _otpDatLai;
     private readonly IGoogleTokenVerifier _google;
     private readonly BaoTriStore _baoTri;
+    private readonly PhienDangNhapStore _phien;
+    private readonly KiemTraPhienDangNhap _kiemTraPhien;
 
-    public AuthController(IConfiguration config, IMemoryCache cache, IWebHostEnvironment env, ILogger<AuthController> logger, OtpDatLaiStore otpDatLai = null, IGoogleTokenVerifier google = null, BaoTriStore baoTri = null)
+    public AuthController(IConfiguration config, IMemoryCache cache, IWebHostEnvironment env, ILogger<AuthController> logger, OtpDatLaiStore otpDatLai = null, IGoogleTokenVerifier google = null, BaoTriStore baoTri = null, PhienDangNhapStore phien = null, KiemTraPhienDangNhap kiemTraPhien = null)
     {
+        _phien = phien;
+        _kiemTraPhien = kiemTraPhien;
         _config = config;
         _baoTri = baoTri;
         _google = google ?? new GoogleTokenVerifier(config);
@@ -101,15 +105,19 @@ public partial class AuthController : ControllerBase
     // Password và Google dùng cùng bước hoàn tất để không lệch quyền/ca làm việc.
     private async Task<IActionResult> HoanTatDangNhapAsync(SqlConnection conn, NguoiDung nd, bool laWeb, bool ghiNho)
     {
-        if (_baoTri?.Read().DangBaoTri == true && nd.VaiTro != VaiTro.SuperAdmin)
-            return StatusCode(503, new { message = "Hệ thống đang bảo trì.\n" + _baoTri.Read().LoiNhan });
+        if (_baoTri!=null && (BaoTriStore.KhoaToanBo(_baoTri.Read(),laWeb?"web":"app") || BaoTriStore.ChucNang(_baoTri.Read(),laWeb?"web":"app").Contains("DANG_NHAP")) && nd.VaiTro != VaiTro.SuperAdmin)
+            return StatusCode(503, new { message = "Hệ thống đang bảo trì.\n" + BaoTriStore.ThongBao(_baoTri.Read()) });
         string loi = QuyTacDangNhap.KiemTraQuyen(nd.VaiTro, nd.TrangThai, laWeb);
         if (loi != null) return StatusCode(403, new { message = loi });
 
         // 5. Nhân viên và quản lý chi nhánh đăng nhập Web tự mở ca riêng 200.000đ.
         // CEO chỉ mở ca thủ công trên Web sau khi chọn chi nhánh.
         // sp_MoCa trả lại ca hiện có nếu nhân viên đăng nhập lại, nên không tạo trùng.
-        if (QuyTacCaDangNhap.CanTuDongMoCa(laWeb, nd.VaiTro))
+        var lichCa = HttpContext?.RequestServices?.GetService<LichCaService>();
+        if (lichCa != null && QuyTacCaDangNhap.CanTuDongMoCa(laWeb, nd.VaiTro))
+            await lichCa.ChotHetGioAsync(nd.MaNguoiDung, HttpContext.RequestAborted);
+        bool choTongKet = lichCa != null && await lichCa.ConCaChuaTongKetAsync(nd.MaNguoiDung, HttpContext.RequestAborted);
+        if (QuyTacCaDangNhap.CanTuDongMoCa(laWeb, nd.VaiTro) && LichCa.TrongGio(LichCa.BayGio(TimeProvider.System)) && !choTongKet)
         {
             var thamSo = new DynamicParameters();
             thamSo.Add("@MaNhanVien", nd.MaNguoiDung);
@@ -130,7 +138,7 @@ public partial class AuthController : ControllerBase
 
         // 6. Tạo token trả về cho client
         NguoiDungDto hoSo = await DocHoSo(conn, nd.MaNguoiDung);
-        return Ok(TaoToken(hoSo, laWeb, ghiNho));
+        return Ok(TaoToken(hoSo, laWeb, ghiNho, nd.MatKhau));
     }
 
     // ===================================================================== ĐĂNG KÝ (F-01)
@@ -231,7 +239,7 @@ public partial class AuthController : ControllerBase
         });
 
         NguoiDungDto hoSo = await DocHoSo(conn, maMoi);
-        return Ok(TaoToken(hoSo, false, true));
+        return Ok(TaoToken(hoSo, false, true, dangKy.MatKhauDaBam));
     }
 
     // ===================================================================== QUÊN MẬT KHẨU (F-04)
@@ -324,6 +332,7 @@ public partial class AuthController : ControllerBase
             new { MatKhau = BCrypt.Net.BCrypt.HashPassword(req.MatKhauMoi), MaNguoiDung = nd.MaNguoiDung });
         if (soDong != 1)
             return BadRequest(new { message = "Tài khoản không còn hoạt động. Vui lòng liên hệ quản trị viên." });
+        _kiemTraPhien?.Ngat(nd.MaNguoiDung);
 
         _cache.Remove("khoa-dang-nhap:" + email);
         _cache.Remove("sai-mat-khau:" + email);
@@ -409,8 +418,9 @@ public partial class AuthController : ControllerBase
 
         await conn.ExecuteAsync("UPDATE NguoiDung SET MatKhau = @MatKhau WHERE MaNguoiDung = @MaNguoiDung",
             new { MatKhau = BCrypt.Net.BCrypt.HashPassword(req.MatKhauMoi), MaNguoiDung = maNguoiDung });
+        _kiemTraPhien?.Ngat(maNguoiDung);
 
-        return Ok(new KetQuaDto { Message = "Đã đổi mật khẩu." });
+        return Ok(new KetQuaDto { Message = "Đã đổi mật khẩu. Vui lòng đăng nhập lại trên các thiết bị." });
     }
 
     // ===================================================================== CÁC HÀM PHỤ
@@ -424,7 +434,7 @@ public partial class AuthController : ControllerBase
     }
 
     // Tạo JWT: trong token có mã người dùng, họ tên, email, vai trò, chi nhánh (đặc tả F-02)
-    private DangNhapResponse TaoToken(NguoiDungDto nd, bool laWeb, bool ghiNho)
+    private DangNhapResponse TaoToken(NguoiDungDto nd, bool laWeb, bool ghiNho, string matKhauDaBam)
     {
         // Thời hạn: Web 8 giờ (1 ca làm); App 12 giờ, bấm "Ghi nhớ đăng nhập" thì 30 ngày
         DateTime hetHan;
@@ -436,7 +446,11 @@ public partial class AuthController : ControllerBase
             hetHan = DateTime.UtcNow.AddHours(_config.GetValue<int>("Jwt:SoGioMobile"));
 
         var claims = new List<Claim>();
-        claims.Add(new Claim("maintenance_version", (HttpContext?.Items["maintenance_version"] as long? ?? _baoTri?.Read().PhienBanPhien ?? 0).ToString()));
+        if (_phien != null)
+            claims.Add(new Claim(PhienDangNhapStore.TenClaimDauPhien, _phien.TaoDauPhien(new NguoiDung {
+                MaNguoiDung = nd.MaNguoiDung, MatKhau = matKhauDaBam, VaiTro = nd.TenVaiTro, MaChiNhanh = nd.MaChiNhanh })));
+        claims.Add(new Claim("client_platform",laWeb?"web":"app"));
+        claims.Add(new Claim("maintenance_version", (HttpContext?.Items["maintenance_version"] as long? ?? (_baoTri==null?0:BaoTriStore.Version(_baoTri.Read(),laWeb?"web":"app"))).ToString()));
         claims.Add(new Claim(TenClaim.MaNguoiDung, nd.MaNguoiDung.ToString()));
         claims.Add(new Claim(TenClaim.HoTen, nd.HoTen));
         claims.Add(new Claim(TenClaim.Email, nd.Email));

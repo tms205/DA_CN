@@ -21,13 +21,15 @@ public sealed class TuDongInService
     private readonly ILogger<TuDongInService> _logger;
     private readonly TrangThaiMayInAoStore _trangThaiMay;
     private readonly PhatHienMayInStore _phatHien;
+    private readonly PhotocopyApi.BaoTri.BaoTriStore _baoTri;
 
     public TuDongInService(
         IConfiguration config,
         IHubContext<CapNhatHub> hub,
         ILogger<TuDongInService> logger,
-        TrangThaiMayInAoStore trangThaiMay, PhatHienMayInStore phatHien = null)
+        TrangThaiMayInAoStore trangThaiMay, PhatHienMayInStore phatHien = null,PhotocopyApi.BaoTri.BaoTriStore baoTri=null)
     {
+        _baoTri=baoTri;
         _chuoiKetNoi = config.GetConnectionString("PhotocopyChain")!;
         _hub = hub;
         _logger = logger;
@@ -37,6 +39,7 @@ public sealed class TuDongInService
 
     public async Task<KetQuaXepIn> XepInSauThanhToan(int maDonHang)
     {
+        if(PhotocopyApi.BaoTri.BaoTriStore.KhoaTacVuNen(_baoTri?.Read(),"DON_HANG"))return new(false,"Đã ghi nhận thanh toán; chờ hết bảo trì chức năng đơn hàng để xếp in.");
         using var conn = new SqlConnection(_chuoiKetNoi);
         await conn.OpenAsync();
         await using var giaoDich = (SqlTransaction)await conn.BeginTransactionAsync();

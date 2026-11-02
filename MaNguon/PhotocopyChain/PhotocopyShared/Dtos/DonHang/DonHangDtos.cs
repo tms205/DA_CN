@@ -379,7 +379,12 @@ public sealed class MoCaRequest
 
 public sealed class DongCaRequest
 {
+    [Range(1, int.MaxValue)]
+    public int? MaCa { get; set; }
+    [StringLength(255)]
+    public string? GhiChu { get; set; }
     /// <summary>Số tiền mặt đếm được trong két lúc đóng ca.</summary>
+    [Required(ErrorMessage = "Vui lòng nhập số tiền thực tế kiểm đếm.")]
     [SoTien]
-    public decimal TongDoanhThuCuoiCa { get; set; }
+    public decimal? TongDoanhThuCuoiCa { get; set; }
 }

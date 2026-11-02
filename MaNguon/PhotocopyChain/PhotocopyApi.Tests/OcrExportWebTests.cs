@@ -15,7 +15,9 @@ public class OcrExportWebTests
         using var http = new HttpClient(new Handler(edited)) { BaseAddress = new Uri("http://fixture.local/") };
         var module = new Module(); var page = new PhotocopyAdmin.Pages.NhanDangChu(); var type = page.GetType();
         type.GetProperty("Http", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(page, http);
-        type.GetField("_ketQua", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(page, edited);
+        var images = (List<PhotocopyAdmin.Pages.NhanDangChu.AnhOcr>)type.GetField("_ds", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(page)!;
+        images.Add(new() { Name = "anh-1.jpg", Text = edited });
+        images.Add(new() { Name = "anh-2.jpg", Text = "Trang thứ hai đã sửa" });
         type.GetField("_congCu", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(page, module);
         await (Task)type.GetMethod("XuatWordAsync", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(page, null)!;
         Assert.True(module.Downloaded);
@@ -27,7 +29,7 @@ public class OcrExportWebTests
         {
             Assert.EndsWith("/api/ocr/xuat-word", request.RequestUri!.ToString());
             var json = await request.Content!.ReadFromJsonAsync<JsonElement>(ct);
-            Assert.Equal(expected, json.GetProperty("text").GetString());
+            Assert.Equal(new[] { expected, "Trang thứ hai đã sửa" }, json.GetProperty("pages").EnumerateArray().Select(x => x.GetString()));
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(OcrWord.Create(expected)) };
         }
     }

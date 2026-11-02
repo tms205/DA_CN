@@ -25,7 +25,7 @@
                     <div class="trang-thong-bao"><p>Đang kiểm tra phiên đăng nhập…</p></div>
                 </Authorizing>
             </AuthorizeRouteView>
-            <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+            <FocusOnNavigate RouteData="@routeData" Selector="h1:not([hidden] *)" />
         </Found>
         <NotFound>
             <PageTitle>Không tìm thấy trang</PageTitle>

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:file_picker/file_picker.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -22,9 +23,16 @@ import '../trang_chinh_screen.dart';
 //     Cứ 5 giây màn hình cũng tự hỏi lại máy chủ một lần cho chắc (chuyện tiền bạc, không để lỡ).
 //   - Đơn tiền mặt: không phải làm gì, chỉ báo đặt đơn thành công.
 class ThanhToanScreen extends StatefulWidget {
-  const ThanhToanScreen({super.key, required this.maDonHang});
+  const ThanhToanScreen({
+    super.key,
+    required this.maDonHang,
+    this.chonAnhHuy,
+    this.guiAnhHuy,
+  });
 
   final int maDonHang;
+  final Future<PlatformFile?> Function()? chonAnhHuy;
+  final Future<KetQuaApi> Function(int, List<Map<String, String>>)? guiAnhHuy;
 
   @override
   State<ThanhToanScreen> createState() => _ThanhToanScreenState();
@@ -331,9 +339,10 @@ class _ThanhToanScreenState extends State<ThanhToanScreen>
           _theMaDon(),
           const SizedBox(height: 12),
 
-          if (tt.trangThaiDonHang == 'CHO_XAC_NHAN' ||
-              tt.trangThaiDonHang == 'DA_XAC_NHAN') ...[
+          if (tt.trangThaiDonHang == 'CHO_XAC_NHAN') ...[
             NutHuyDon(
+              chonAnh: widget.chonAnhHuy,
+              guiAnh: widget.guiAnhHuy,
               maDonHang: widget.maDonHang,
               daThanhToan: tt.daTra,
               daHuy: () async => _xemTienDo(),

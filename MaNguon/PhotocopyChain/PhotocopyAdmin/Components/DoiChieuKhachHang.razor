@@ -1,0 +1,92 @@
+@using PhotocopyShared.Dtos.GiaoHang
+@inject HttpClient Http
+@implements IDisposable
+
+@if (_dangTai) { <p role="status">Đang tải phản hồi khách hàng…</p> }
+else if (_loi != null && _data == null) { <div class="o-loi" role="alert">@_loi</div><button class="nut-phu" @onclick="Tai">Thử lại</button> }
+else if (_data?.PhanHoi == null) { <p>Khách chưa gửi bằng chứng đối chiếu cho lượt giao này.</p> }
+else
+{
+    var report=_data.PhanHoi;
+    <p><b>@($"DH{_data.MaDonHang:D5}") · Lượt @_data.LanGiao</b></p>
+    <p class="dc-trang-thai">@(report.TrangThai=="DA_XU_LY" ? "Đã xử lý":"Chờ đối chiếu") · Gửi lúc @Gio(report.GuiLuc)</p>
+    <h3>Ý kiến của khách hàng</h3>
+    <p class="dc-noi-dung">@report.NoiDung</p>
+    <h3>Ảnh nhật ký cuộc gọi của khách</h3>
+    <div class="dc-cong-cu" role="group" aria-label="Chọn ảnh của khách">
+        @for(int i=0;i<report.Anh.Count;i++) { int index=i;
+            <button type="button" class="nut-nho @(_chiSo==i ? "chinh":"")" aria-pressed="@(_chiSo==i?"true":"false")" @onclick="()=>TaiAnh(index)">Ảnh @(i+1)</button>
+        }
+        <button class="nut-nho" disabled="@(_anh==null)" @onclick="()=>_phongTo=!_phongTo">@(_phongTo?"Thu gọn":"Phóng to ảnh")</button>
+    </div>
+    @if(_loiAnh!=null) { <p role="alert">@_loiAnh</p><button class="nut-phu" @onclick="()=>TaiAnh(_chiSo)">Tải lại ảnh</button> }
+    else if(_anh==null) { <p role="status">Đang tải ảnh…</p> }
+    else { <div class="dc-khung-anh @(_phongTo?"dc-phong-to":"")"><img src="@_anh" alt="Nhật ký cuộc gọi của khách, ảnh @(_chiSo+1)" /></div> }
+    @if(report.TrangThai=="DA_XU_LY")
+    {
+        <h3>Kết quả đối chiếu</h3><p class="dc-noi-dung">@report.KetLuan</p>
+        <p>@report.TenNguoiXuLy · @Gio(report.XuLyLuc)</p>
+    }
+    else
+    {
+        <h3>Ghi kết luận xử lý</h3>
+        <label for="dc-ket-luan">Nội dung trả lời khách <span aria-hidden="true">*</span></label>
+        <textarea id="dc-ket-luan" rows="4" maxlength="1000" disabled="@_dangLuu" @bind="_ketLuan" @bind:event="oninput" placeholder="Ghi kết quả đã kiểm tra và hướng xử lý đã thống nhất với khách…"></textarea>
+        <p class="dc-phu">Từ 10–1.000 ký tự · @_ketLuan.Trim().Length/1.000. Kết luận không tự thay đổi đơn, thanh toán hoặc tạo lượt giao mới.</p>
+        @if(_loi!=null) { <div class="o-loi" role="alert">@_loi</div> }
+        <button type="button" class="nut-chinh" disabled="@(_dangLuu || _ketLuan.Trim().Length<10)" @onclick="Luu">@(_dangLuu?"Đang lưu…":"Lưu kết luận và thông báo khách")</button>
+    }
+}
+
+@code {
+    [Parameter] public int MaGiaoHang {get;set;}
+    [Parameter] public EventCallback DaXuLy {get;set;}
+    private LuotDoiChieuGiaoDto _data;
+    private bool _dangTai=true,_dangLuu,_phongTo;
+    private int _chiSo,_lanAnh;
+    private string _loi,_loiAnh,_anh,_ketLuan="";
+    private readonly CancellationTokenSource _dung=new();
+    protected override Task OnInitializedAsync()=>Tai();
+    private async Task Tai()
+    {
+        _dangTai=true;_loi=null;
+        try {
+            using var response=await Http.GetAsync($"api/giao-hang/luot/{MaGiaoHang}/doi-chieu",_dung.Token);
+            if(!response.IsSuccessStatusCode){_loi="Chưa tải được phản hồi hoặc lượt giao ngoài phạm vi của bạn.";return;}
+            _data=await response.Content.ReadFromJsonAsync<LuotDoiChieuGiaoDto>(cancellationToken:_dung.Token);
+            if(_data?.PhanHoi?.Anh.Count>0)await TaiAnh(0);
+        }catch(OperationCanceledException) when(_dung.IsCancellationRequested) { }
+        catch{_loi="Chưa tải được phản hồi khách hàng. Hãy thử lại.";}
+        finally{_dangTai=false;}
+    }
+    private async Task TaiAnh(int index)
+    {
+        int lan=++_lanAnh;_chiSo=index;_anh=_loiAnh=null;_phongTo=false;
+        try{
+            var item=_data.PhanHoi.Anh[index];
+            using var response=await Http.GetAsync($"api/giao-hang/luot/{MaGiaoHang}/doi-chieu/anh/{item.MaAnh}",_dung.Token);
+            if(!response.IsSuccessStatusCode){if(lan==_lanAnh)_loiAnh="Chưa truy cập được ảnh đối chiếu.";return;}
+            var bytes=await response.Content.ReadAsByteArrayAsync(_dung.Token);var mime=response.Content.Headers.ContentType?.MediaType;
+            if(mime is not("image/png" or "image/jpeg") || bytes.Length>5*1024*1024)throw new InvalidDataException();
+            if(lan==_lanAnh)_anh=$"data:{mime};base64,{Convert.ToBase64String(bytes)}";
+        }catch(OperationCanceledException) when(_dung.IsCancellationRequested) { }
+        catch{if(lan==_lanAnh)_loiAnh="Không đọc được ảnh. Hãy thử tải lại.";}
+    }
+    private async Task Luu()
+    {
+        if(_dangLuu||_ketLuan.Trim().Length<10)return;
+        _dangLuu=true;_loi=null;
+        try{
+            using var response=await Http.PutAsJsonAsync($"api/giao-hang/luot/{MaGiaoHang}/doi-chieu/xu-ly",new XuLyDoiChieuRequest {KetLuan=_ketLuan.Trim()},_dung.Token);
+            if(!response.IsSuccessStatusCode){
+                try{_loi=(await response.Content.ReadFromJsonAsync<ApiError>(cancellationToken:_dung.Token))?.Message??"Chưa lưu được kết luận.";}catch{_loi="Chưa xác nhận lưu kết luận. Tải lại phản hồi để kiểm tra trước khi gửi lại.";}
+                return;
+            }
+            await Tai();await DaXuLy.InvokeAsync();
+        }catch(OperationCanceledException) when(_dung.IsCancellationRequested) { }
+        catch{_loi="Chưa xác nhận được kết quả lưu. Hãy tải lại phản hồi trước khi gửi lại.";}
+        finally{_dangLuu=false;}
+    }
+    private static string Gio(DateTimeOffset? time)=>time?.ToOffset(TimeSpan.FromHours(7)).ToString("dd/MM/yyyy HH:mm:ss")??"Chưa ghi nhận";
+    public void Dispose(){_lanAnh++;_dung.Cancel();_dung.Dispose();}
+}

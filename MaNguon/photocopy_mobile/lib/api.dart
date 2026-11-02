@@ -23,6 +23,64 @@ class KetQuaApi {
 //   KetQuaApi kq = await Api.post('/api/auth/login', {'taiKhoan': ..., 'matKhau': ...});
 //   if (kq.thanhCong) { ... kq.duLieu ... } else { ... kq.loi ... }
 class Api {
+  static Future<KetQuaApi> guiBangChungGiao(int maGiao,
+      Map<String, String> fields, List<Map<String, String>> anh) =>
+      _guiAnhGiaoHang('/api/giao-hang/luot/$maGiao/giao-that-bai', fields, anh);
+
+  static Future<KetQuaApi> guiDoiChieu(int maGiao, String noiDung, List<Map<String, String>> anh) =>
+      _guiAnhGiaoHang('/api/giao-hang/luot/$maGiao/doi-chieu', {'noiDung': noiDung}, anh);
+  static Future<KetQuaApi> guiBangChungHuy(int id,List<Map<String,String>> anh) =>
+      _guiAnhGiaoHang('/api/don-hang/$id/bang-chung-huy', {}, anh);
+  static Future<KetQuaApi> getAnhHuy(int id,String maAnh) =>
+      _getAnhGiaoHang('/api/don-hang/$id/bang-chung-huy/anh/${Uri.encodeComponent(maAnh)}');
+
+  static Future<KetQuaApi> _guiAnhGiaoHang(String path,
+      Map<String, String> fields, List<Map<String, String>> anh) async {
+    try {
+      final client = http.Client();
+      try {
+        final request = http.MultipartRequest('POST',
+            Uri.parse('$diaChiApi$path'));
+        if (Phien.token != null) request.headers['Authorization'] = 'Bearer ${Phien.token}';
+        request.fields.addAll(fields);
+        for (final file in anh) {
+          request.files.add(await http.MultipartFile.fromPath('Anh', file['path']!, filename: file['name']!));
+        }
+        final response = await (() async {
+          final stream = await client.send(request);
+          return http.Response.fromStream(stream);
+        })().timeout(const Duration(seconds: 90));
+        // API chưa nạp endpoint mới trả 404 rỗng; 404 có JSON vẫn là lỗi lượt giao/phạm vi.
+        if (response.statusCode == 404 && response.body.trim().isEmpty) {
+          return KetQuaApi()..maHttp = 404
+            ..loi = 'Máy chủ chưa hỗ trợ báo cáo giao hàng này. Vui lòng liên hệ quản lý để cập nhật hệ thống; ảnh và lý do vẫn được giữ.';
+        }
+        return _docKetQua(response);
+      } finally { client.close(); }
+    } catch (_) {
+      return KetQuaApi()..loi = 'Chưa xác nhận được báo cáo. Ảnh và lý do vẫn giữ ở đây; kiểm tra lịch sử trước khi gửi lại.';
+    }
+  }
+
+  static Future<KetQuaApi> getAnhBangChung(int maGiao, String maAnh) =>
+      _getAnhGiaoHang('/api/giao-hang/luot/$maGiao/bang-chung/anh/${Uri.encodeComponent(maAnh)}');
+
+  static Future<KetQuaApi> getAnhDoiChieu(int maGiao, String maAnh) =>
+      _getAnhGiaoHang('/api/giao-hang/luot/$maGiao/doi-chieu/anh/${Uri.encodeComponent(maAnh)}');
+
+  static Future<KetQuaApi> _getAnhGiaoHang(String path) async {
+    try {
+      final res = await http.get(Uri.parse('$diaChiApi$path'),
+          headers: _taoHeader()).timeout(const Duration(seconds: 30));
+      if (res.statusCode != 200) return _docKetQua(res);
+      if (!['image/png', 'image/jpeg'].contains(res.headers['content-type']?.split(';').first) ||
+          res.bodyBytes.length > 5 * 1024 * 1024) {
+        return KetQuaApi()..loi = 'Ảnh bằng chứng không hợp lệ.';
+      }
+      return KetQuaApi()..thanhCong = true..duLieu = res.bodyBytes;
+    } catch (_) { return KetQuaApi()..loi = 'Chưa tải được ảnh bằng chứng. Vui lòng thử lại.'; }
+  }
+
   // Ảnh xem trước lấy từ PDF có sẵn trên máy chủ; gửi token trong header, không đưa vào URL.
   static Future<KetQuaApi> getAnhMau(String maMau, int soTrang, {int? phienBan}) async {
     try {
@@ -125,9 +183,27 @@ class Api {
     }
   }
 
-  static Future<KetQuaApi> xuatWordOcr(String text) async {
+  static Future<KetQuaApi> taoTacVuOcr(String path, String name, String model, {List<double>? vungCat}) async {
+    final client = http.Client();
     try {
-      final response = await http.post(Uri.parse('$diaChiApi/api/ocr/xuat-word'), headers: _taoHeader(), body: jsonEncode({'text': text})).timeout(const Duration(seconds: 60));
+      final request = http.MultipartRequest('POST', Uri.parse('$diaChiApi/api/ocr/tac-vu'));
+      request.headers.addAll(_taoHeader()..remove('Content-Type'));
+      request.fields['model'] = model;
+      if (vungCat != null) request.fields['vungCat'] = jsonEncode(vungCat);
+      request.files.add(await http.MultipartFile.fromPath('file', path, filename: name));
+      final response = await (() async => http.Response.fromStream(await client.send(request)))().timeout(const Duration(seconds: 90));
+      return _docKetQua(response);
+    } catch (_) { return KetQuaApi()..loi = 'Không gửi được ảnh. Kiểm tra kết nối rồi thử lại.'; }
+    finally { client.close(); }
+  }
+
+  static Future<void> huyTacVuOcr(String id) async {
+    try { await http.delete(Uri.parse('$diaChiApi/api/ocr/tac-vu/$id'), headers: _taoHeader()).timeout(const Duration(seconds: 5)); } catch (_) { }
+  }
+
+  static Future<KetQuaApi> xuatWordOcr(String text, {List<String>? pages}) async {
+    try {
+      final response = await http.post(Uri.parse('$diaChiApi/api/ocr/xuat-word'), headers: _taoHeader(), body: jsonEncode(pages == null ? {'text': text} : {'pages': pages})).timeout(const Duration(seconds: 60));
       if (response.statusCode < 200 || response.statusCode >= 300) {
         if (response.headers['content-type']?.contains('json') == true) return _docKetQua(response);
         return KetQuaApi()..loi = 'Không xuất được file Word.';
@@ -142,7 +218,7 @@ class Api {
 
   // Header gửi kèm: dữ liệu dạng JSON + token nếu đã đăng nhập
   static Map<String, String> _taoHeader() {
-    Map<String, String> header = {'Content-Type': 'application/json'};
+    Map<String, String> header = {'Content-Type': 'application/json', 'X-Photocopy-Platform': 'app'};
     if (Phien.token != null) header['Authorization'] = 'Bearer ${Phien.token}';
     return header;
   }

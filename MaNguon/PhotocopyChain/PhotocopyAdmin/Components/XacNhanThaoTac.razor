@@ -24,6 +24,7 @@
     }
 
     private void Huy() => TraLoi(false);
+    public void Dong() => TraLoi(false);
     private void DongY() => TraLoi(true);
     private void TraLoi(bool dongY) { _mo = false; _ketQua?.TrySetResult(dongY); }
     public void Dispose() => _ketQua?.TrySetResult(false);

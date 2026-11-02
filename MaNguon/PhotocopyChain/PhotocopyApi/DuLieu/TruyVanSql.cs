@@ -228,6 +228,11 @@ internal static class TruyVanSql
             WHERE ca.MaNhanVien = @MaNhanVien AND ca.TrangThai = 'DANG_MO'
               AND (@MaChiNhanh IS NULL OR ca.MaChiNhanh = @MaChiNhanh)";
 
+        public const string ChoTongKetCuaNhanVien = ThongTin + @"
+            WHERE ca.MaNhanVien=@MaNhanVien AND ca.TrangThai='CHO_TONG_KET'
+              AND (@MaChiNhanh IS NULL OR ca.MaChiNhanh=@MaChiNhanh)
+            ORDER BY ca.GioMoCa";
+
         public const string ChuaKetThucCuaChiNhanh = ThongTin + @"
             WHERE ca.MaChiNhanh = @MaChiNhanh
               AND ca.TrangThai = 'DANG_MO'

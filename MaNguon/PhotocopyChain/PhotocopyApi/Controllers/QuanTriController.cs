@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using PhotocopyShared.Constants;
+using PhotocopyApi.Auth;
 using PhotocopyShared.Dtos;
 using PhotocopyShared.Dtos.Auth;
 using PhotocopyShared.Dtos.Tuan3;
@@ -18,9 +19,13 @@ namespace PhotocopyApi.Controllers;
 public partial class QuanTriController : ControllerBase
 {
     private readonly string _chuoiKetNoi;
+    private readonly PhienDangNhapStore _phien;
+    private readonly KiemTraPhienDangNhap _kiemTraPhien;
 
-    public QuanTriController(IConfiguration config)
+    public QuanTriController(IConfiguration config, PhienDangNhapStore phien = null, KiemTraPhienDangNhap kiemTraPhien = null)
     {
+        _phien = phien;
+        _kiemTraPhien = kiemTraPhien;
         _chuoiKetNoi = config.GetConnectionString("PhotocopyChain");
     }
 
@@ -249,10 +254,15 @@ public partial class QuanTriController : ControllerBase
             if (!thuocPhamVi)
                 return StatusCode(403, new { message = "Khách hàng không thuộc phạm vi chi nhánh đang chọn." });
         }
+        await conn.OpenAsync();
+        using var tx = await conn.BeginTransactionAsync();
         int soDong = await conn.ExecuteAsync(
             "UPDATE NguoiDung SET TrangThai=@TrangThai WHERE MaNguoiDung=@MaKhachHang AND VaiTro='CUSTOMER'",
-            new { req.TrangThai, MaKhachHang = maKhachHang });
+            new { req.TrangThai, MaKhachHang = maKhachHang }, tx);
         if (soDong == 0) return NotFound(new { message = "Không tìm thấy khách hàng." });
+        _phien?.ThuHoi(maKhachHang);
+        await tx.CommitAsync();
+        _kiemTraPhien?.Ngat(maKhachHang);
         return Ok(new KetQuaDto { Message = "Đã cập nhật tài khoản khách hàng." });
     }
 
@@ -476,8 +486,11 @@ public partial class QuanTriController : ControllerBase
     public async Task<IActionResult> BaoCaoDoanhThu(
         [FromQuery] DateTime? tuNgay,
         [FromQuery] DateTime? denNgay,
-        [FromQuery] string nhomTheo = "ngay")
+        [FromQuery] string nhomTheo = "ngay",
+        [FromQuery] string trangThai = null)
     {
+        if (!string.IsNullOrEmpty(trangThai) && !new[] { "CHO_XAC_NHAN", "DA_XAC_NHAN", "DANG_IN", "DA_IN", "DANG_GIAO", "DA_GIAO", "GIAO_THAT_BAI", "HOAN_THANH", "DA_HUY" }.Contains(trangThai))
+            return BadRequest(new { message = "Trạng thái báo cáo không hợp lệ." });
         DateTime tu = (tuNgay ?? DateTime.Today.AddDays(-6)).Date;
         DateTime den = (denNgay ?? DateTime.Today).Date;
         if (tu > den) return BadRequest(new { message = "Từ ngày không được lớn hơn đến ngày." });
@@ -510,18 +523,22 @@ public partial class QuanTriController : ControllerBase
         }
 
         int? maChiNhanh = LayChiNhanhTuToken();
+        // Hoàn tất theo ngày hoàn thành; đơn khác theo ngày đặt, dùng cho tra cứu/đối soát.
+        bieuThucNhom = bieuThucNhom.Replace("dh.NgayHoanThanh", "COALESCE(dh.NgayHoanThanh,dh.NgayDat)");
         using var conn = new SqlConnection(_chuoiKetNoi);
         string sql = $@"SELECT {bieuThucNhom} AS Ngay, dh.MaChiNhanh, cn.TenChiNhanh,
-                               COUNT(*) AS SoDon, SUM(dh.TongTien) AS DoanhThu
+                               dh.TrangThai, COUNT(*) AS SoDon, SUM(dh.TongTien) AS GiaTriDon,
+                               SUM(CASE WHEN dh.TrangThai='HOAN_THANH' AND ISNULL(dh.LoaiPhatSinh,'')<>'IN_LAI_LOI_QUAY' THEN 1 ELSE 0 END) AS SoDonDoanhThu,
+                               SUM(CASE WHEN dh.TrangThai='HOAN_THANH' AND ISNULL(dh.LoaiPhatSinh,'')<>'IN_LAI_LOI_QUAY' THEN dh.TongTien ELSE 0 END) AS DoanhThu
                         FROM DonHang dh JOIN ChiNhanh cn ON cn.MaChiNhanh=dh.MaChiNhanh
-                        WHERE dh.TrangThai='HOAN_THANH' AND dh.NgayHoanThanh>=@TuNgay
-                          AND dh.NgayHoanThanh<DATEADD(DAY,1,@DenNgay)
-                          AND ISNULL(dh.LoaiPhatSinh, '') <> 'IN_LAI_LOI_QUAY'
+                        WHERE COALESCE(dh.NgayHoanThanh,dh.NgayDat)>=@TuNgay
+                          AND COALESCE(dh.NgayHoanThanh,dh.NgayDat)<DATEADD(DAY,1,@DenNgay)
+                          AND (@TrangThai IS NULL OR dh.TrangThai=@TrangThai)
                           AND (@MaChiNhanh IS NULL OR dh.MaChiNhanh=@MaChiNhanh)
-                        GROUP BY {bieuThucNhom}, dh.MaChiNhanh, cn.TenChiNhanh
+                        GROUP BY {bieuThucNhom}, dh.MaChiNhanh, cn.TenChiNhanh, dh.TrangThai
                         ORDER BY Ngay, dh.MaChiNhanh";
         var ds = await conn.QueryAsync<BaoCaoDoanhThuDto>(
-            sql, new { TuNgay = tu, DenNgay = den, MaChiNhanh = maChiNhanh });
+            sql, new { TuNgay = tu, DenNgay = den, MaChiNhanh = maChiNhanh, TrangThai = string.IsNullOrEmpty(trangThai) ? null : trangThai });
         return Ok(ds);
     }
 

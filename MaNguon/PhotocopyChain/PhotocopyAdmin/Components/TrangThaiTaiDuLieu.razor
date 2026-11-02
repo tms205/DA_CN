@@ -1,0 +1,12 @@
+<div class="@(DangBaoTri ? "tt-bao-tri" : "o-loi")" role="@(DangBaoTri ? "status" : "alert")">
+    @if (DangBaoTri) { <strong>@TieuDe</strong> }
+    <p>@NoiDung</p>
+    @if (ThuLai.HasDelegate) { <button type="button" class="nut-nho" @onclick="ThuLai">@NhanThuLai</button> }
+</div>
+@code {
+    [Parameter] public bool DangBaoTri { get; set; }
+    [Parameter] public string TieuDe { get; set; } = "Tạm dừng để bảo trì";
+    [Parameter] public string NoiDung { get; set; }
+    [Parameter] public EventCallback ThuLai { get; set; }
+    [Parameter] public string NhanThuLai { get; set; } = "Kiểm tra lại";
+}

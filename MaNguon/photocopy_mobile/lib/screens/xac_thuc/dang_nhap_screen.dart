@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api.dart';
+import '../../google_auth.dart';
 import '../../phien.dart';
 import '../../realtime.dart';
 import '../../theme.dart';
@@ -32,10 +33,47 @@ class _DangNhapScreenState extends State<DangNhapScreen> {
   void initState() { super.initState(); _taiBaoTri(); }
 
   Future<void> _taiBaoTri() async {
-    final result = await Api.get('/api/bao-tri/trang-thai');
-    if (mounted && result.thanhCong) {
-      setState(() => _loiNhanBaoTri = result.duLieu['dangBaoTri'] == true ? (result.duLieu['loiNhan'] as String? ?? '') : null);
+    final result = await Api.get('/api/bao-tri/trang-thai?nenTang=app');
+    if (mounted && result.thanhCong && result.duLieu is Map) {
+      final data = result.duLieu;
+      final toanBo = data['dangBaoTri'] == true;
+      final khoaDangNhap = (data['tinhNangKhoa'] as List? ?? []).contains('DANG_NHAP');
+      final loiNhan = (data['loiNhan'] as String? ?? '').trim();
+      setState(() {
+        _loiNhanBaoTri = toanBo || khoaDangNhap
+            ? '${toanBo ? 'Hệ thống đang bảo trì.' : 'Chức năng đăng nhập đang bảo trì.'}${loiNhan.isEmpty ? '' : '\n$loiNhan'}'
+            : null;
+        if (_loiNhanBaoTri != null) _loi = null;
+      });
     }
+  }
+
+  Future<bool> _choPhepThaoTac() async {
+    // Đọc lại để bỏ chặn khi CEO đã kết thúc bảo trì, không giữ thông báo cũ mãi.
+    await _taiBaoTri();
+    return mounted && _loiNhanBaoTri == null;
+  }
+
+  Future<void> _moTrang(Widget trang) async {
+    if (_dangGui) return;
+    setState(() => _dangGui = true);
+    try {
+      if (!await _choPhepThaoTac()) return;
+      if (!mounted) return;
+      await Navigator.push(context, MaterialPageRoute(builder: (_) => trang));
+    } finally {
+      if (mounted) setState(() => _dangGui = false);
+    }
+  }
+
+  Future<KetQuaApi?> _dangNhapGoogle(bool ghiNho) async {
+    if (!await _choPhepThaoTac()) return null;
+    final result = await GoogleAuth.tiepTuc(ghiNho);
+    if (result != null && !result.thanhCong && result.maHttp == 503) {
+      await _taiBaoTri();
+      if (_loiNhanBaoTri != null) return null; // Chỉ dùng thông báo phía trên, không tạo lỗi ở nút Google.
+    }
+    return result;
   }
 
   @override
@@ -56,8 +94,17 @@ class _DangNhapScreenState extends State<DangNhapScreen> {
   Future<void> _dangNhap() async {
     if (_dangGui) return;
     FocusScope.of(context).unfocus(); // ẩn bàn phím
+    setState(() { _dangGui = true; _loi = null; });
+    if (_loiNhanBaoTri == null && (_taiKhoan.text.trim().isEmpty || _matKhau.text.isEmpty)) {
+      setState(() { _loi = 'Vui lòng nhập email/số điện thoại và mật khẩu.'; _dangGui = false; });
+      return;
+    }
+    if (!await _choPhepThaoTac()) {
+      if (mounted) setState(() => _dangGui = false);
+      return;
+    }
     if (_taiKhoan.text.trim().isEmpty || _matKhau.text.isEmpty) {
-      setState(() => _loi = 'Vui lòng nhập email/số điện thoại và mật khẩu.');
+      setState(() { _loi = 'Vui lòng nhập email/số điện thoại và mật khẩu.'; _dangGui = false; });
       return;
     }
 
@@ -75,9 +122,10 @@ class _DangNhapScreenState extends State<DangNhapScreen> {
     if (!mounted) return;
 
     if (!kq.thanhCong) {
-      _taiBaoTri();
+      await _taiBaoTri();
+      if (!mounted) return;
       setState(() {
-        _loi = kq.loi;
+        _loi = _loiNhanBaoTri == null ? kq.loi : null;
         _dangGui = false;
       });
       return;
@@ -125,8 +173,8 @@ class _DangNhapScreenState extends State<DangNhapScreen> {
                       style: AppTheme.font(size: 12.5, color: AppColors.chuPhu, height: 1.5),
                     ),
                     const SizedBox(height: 20),
-                    if (_loiNhanBaoTri != null) ...[HopThongBao('Hệ thống đang bảo trì.\n$_loiNhanBaoTri'), const SizedBox(height: 12)],
-                    if (_loi != null) ...[HopThongBao(_loi!), const SizedBox(height: 12)],
+                    if (_loiNhanBaoTri != null) ...[Semantics(liveRegion: true, child: HopThongBao(_loiNhanBaoTri!, loai: LoaiThongBao.canhBao)), const SizedBox(height: 12)],
+                    if (_loi != null && _loiNhanBaoTri == null) ...[HopThongBao(_loi!), const SizedBox(height: 12)],
                     const NhanTruong('Email hoặc số điện thoại'),
                     const SizedBox(height: 6),
                     ONhap(
@@ -172,9 +220,7 @@ class _DangNhapScreenState extends State<DangNhapScreen> {
                         ),
                         const SizedBox(width: 12),
                         GestureDetector(
-                          onTap: () {
-                            Navigator.push(context, MaterialPageRoute(builder: (context) => const QuenMatKhauScreen()));
-                          },
+                          onTap: () => _moTrang(const QuenMatKhauScreen()),
                           child: Text('Quên mật khẩu?',
                               style: AppTheme.font(size: 12, weight: FontWeight.w600, color: AppColors.accent)),
                         ),
@@ -185,7 +231,7 @@ class _DangNhapScreenState extends State<DangNhapScreen> {
                     const SizedBox(height: 14),
                     const DuongHoac('hoặc'),
                     const SizedBox(height: 14),
-                    NutGoogle(ghiNho: _ghiNho, dangBan: _dangGui,
+                    NutGoogle(ghiNho: _ghiNho, dangBan: _dangGui, anLoi: _loiNhanBaoTri != null, xacThuc: _dangNhapGoogle,
                         dangXuLyChanged: (v) { if (mounted) setState(() => _dangGui = v); }),
                     const SizedBox(height: 14),
                     KhungNetDut(
@@ -237,9 +283,7 @@ class _DangNhapScreenState extends State<DangNhapScreen> {
                     Text('Chưa có tài khoản?', style: AppTheme.font(size: 12.5, color: AppColors.chuPhu)),
                     const SizedBox(width: 5),
                     GestureDetector(
-                      onTap: () {
-                        Navigator.push(context, MaterialPageRoute(builder: (context) => const DangKyScreen()));
-                      },
+                      onTap: () => _moTrang(const DangKyScreen()),
                       child: Text('Đăng ký ngay',
                           style: AppTheme.font(size: 12.5, weight: FontWeight.w700, color: AppColors.accent)),
                     ),

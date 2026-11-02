@@ -11,10 +11,12 @@ class NutGoogle extends StatefulWidget {
     super.key,
     this.ghiNho = true,
     this.dangBan = false,
+    this.anLoi = false,
     this.dangXuLyChanged,
     this.xacThuc = GoogleAuth.tiepTuc,
   });
   final bool ghiNho, dangBan;
+  final bool anLoi;
   final ValueChanged<bool>? dangXuLyChanged;
   final Future<KetQuaApi?> Function(bool) xacThuc;
   @override
@@ -24,6 +26,12 @@ class NutGoogle extends StatefulWidget {
 class _NutGoogleState extends State<NutGoogle> {
   bool _dangGui = false;
   String? _loi;
+
+  @override
+  void didUpdateWidget(covariant NutGoogle oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.anLoi) _loi = null; // Thông báo bảo trì được quản lý ở màn cha, không giữ lỗi Google cũ.
+  }
 
   Future<void> _tiepTuc() async {
     if (_dangGui || widget.dangBan) return;
@@ -76,7 +84,7 @@ class _NutGoogleState extends State<NutGoogle> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (_loi != null) ...[HopThongBao(_loi!), const SizedBox(height: 12)],
+        if (_loi != null && !widget.anLoi) ...[HopThongBao(_loi!), const SizedBox(height: 12)],
         Semantics(
           button: true,
           label: 'Tiếp tục với Google',

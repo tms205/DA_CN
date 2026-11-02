@@ -39,7 +39,7 @@ public class FileInController : ControllerBase
     private static readonly string[] DuoiAnh = { "png", "jpg", "jpeg" };
 
     // Office đổi 2 file cùng lúc hay bị treo → mỗi lúc chỉ cho đổi 1 file
-    private static readonly object _khoaOffice = new object();
+    private static readonly SemaphoreSlim _khoaOffice = new(1, 1);
 
     public FileInController(IConfiguration config, ILogger<FileInController> logger, ThuVienMauDon thuVienMau = null)
     {
@@ -99,40 +99,21 @@ public class FileInController : ControllerBase
             return BadRequest(new { message = "Chỉ nhận file PDF, Word, Excel, PowerPoint, văn bản (.txt, .rtf, .odt) hoặc ảnh (.png, .jpg)." });
 
         // lưu file vào D:\PhotocopyData\năm\tháng theo đúng lúc khách tải lên.
-        // Giữ tên gốc cho dễ tìm; nếu trùng thì thêm (2), (3)... thay vì dùng chuỗi Guid khó đọc.
+        // Mỗi lượt có thư mục riêng cho cả nguồn và PDF; tên gốc chỉ lưu trong metadata.
         DateTime thoiDiemTaiLen = DateTime.Now;
-        string thuMuc = Path.Combine(_config["LuuTruFile:ThuMucGoc"],
-            thoiDiemTaiLen.ToString("yyyy"), thoiDiemTaiLen.ToString("MM"));
-        Directory.CreateDirectory(thuMuc);
-
-        string tenKhongDuoi = Path.GetFileNameWithoutExtension(file.FileName).Trim();
-        foreach (char kyTuCam in Path.GetInvalidFileNameChars())
-            tenKhongDuoi = tenKhongDuoi.Replace(kyTuCam, '_');
-        if (string.IsNullOrWhiteSpace(tenKhongDuoi)) tenKhongDuoi = "Tai_lieu";
-
-        int soTrung = 1;
-        string tenLuu;
-        string duongDanGoc;
-        string duongDanPdf;
-        while (true)
-        {
-            tenLuu = soTrung == 1 ? tenKhongDuoi : tenKhongDuoi + " (" + soTrung + ")";
-            duongDanGoc = Path.Combine(thuMuc, tenLuu + "." + duoi);
-            duongDanPdf = Path.Combine(thuMuc, tenLuu + ".pdf");
-
-            if (!System.IO.File.Exists(duongDanGoc) && !System.IO.File.Exists(duongDanPdf)) break;
-            soTrung++;
-        }
-
-        using (var luong = System.IO.File.Create(duongDanGoc))
-        {
-            await file.CopyToAsync(luong);
-        }
+        var paths = DuongDanTaiLen.Tao(_config["LuuTruFile:ThuMucGoc"], thoiDiemTaiLen, duoi);
+        string duongDanGoc = paths.Goc, duongDanPdf = paths.Pdf;
 
         // đổi sang PDF rồi đếm số trang
         int soTrang;
+        bool daTaoFile = false;
         try
         {
+            using (var luong = new FileStream(duongDanGoc, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                daTaoFile = true;
+                await file.CopyToAsync(luong, HttpContext.RequestAborted);
+            }
             if (duoi == "pdf")
                 duongDanPdf = duongDanGoc;// PDF sẵn rồi, không cần đổi
             else if (DuoiAnh.Contains(duoi))
@@ -149,8 +130,14 @@ public class FileInController : ControllerBase
         catch (Exception ex)
         {
             // Lỗi thì dọn file trên ổ đĩa, trả câu báo lỗi cho App
-            XoaFile(duongDanGoc);
-            XoaFile(duongDanPdf);
+            if (daTaoFile)
+            {
+                XoaFile(duongDanGoc);
+                XoaFile(duongDanPdf);
+                try { Directory.Delete(paths.ThuMuc, false); }
+                catch (Exception cleanup) when (cleanup is IOException or UnauthorizedAccessException)
+                { _logger.LogDebug("Thư mục lượt tải chưa thể dọn ngay."); }
+            }
             return BadRequest(new { message = ex.Message });
         }
 
@@ -382,11 +369,15 @@ public class FileInController : ControllerBase
 
     private void DoiBangMicrosoftOffice(string duongDanGoc, string duongDanPdf, string loai)
     {
-        lock (_khoaOffice)
         {
             // Office vừa khởi động đôi khi còn bận nên từ chối lệnh → lỗi thì cho thử lại thêm 1 lần
             for (int lanThu = 1; lanThu <= 2; lanThu++)
             {
+                if (!_khoaOffice.Wait(TimeSpan.FromSeconds(5)))
+                    throw new Exception("Bộ chuyển Office đang bận. Vui lòng thử lại hoặc tải bản PDF.");
+                TienTrinhOffice theoDoi;
+                try { theoDoi = new TienTrinhOffice(loai); }
+                catch { _khoaOffice.Release(); throw; }
                 // Chạy Office trên 1 luồng riêng để đặt giờ chờ tối đa 90 giây
                 // (file lạ có thể làm Office hiện hộp thoại rồi đứng chờ mãi)
                 Exception loi = null;
@@ -394,34 +385,39 @@ public class FileInController : ControllerBase
                 {
                     try
                     {
-                        XuatPdfBangOffice(duongDanGoc, duongDanPdf, loai);
+                        XuatPdfBangOffice(duongDanGoc, duongDanPdf, loai, theoDoi);
                     }
                     catch (Exception ex)
                     {
                         loi = ex;
                     }
+                    finally { _khoaOffice.Release(); }
                 });
+                luong.IsBackground = true;
                 luong.SetApartmentState(ApartmentState.STA);   // Office (COM) chạy ổn định nhất trên luồng STA
-                luong.Start();
+                try { luong.Start(); }
+                catch { _khoaOffice.Release(); throw; }
 
                 bool xongDungGio = luong.Join(TimeSpan.FromSeconds(90));
                 if (!xongDungGio)
                 {
-                    TatOfficeChayNgam(loai);
+                    theoDoi.TatNeuSoHuu();
+                    // Nếu COM chưa thoát, worker vẫn giữ semaphore để không chạy chồng.
+                    luong.Join(TimeSpan.FromSeconds(3));
                     throw new Exception($"Đổi file {loai} sang PDF quá lâu (file quá lớn hoặc đang đặt mật khẩu). Vui lòng xuất file sang PDF rồi tải lên.");
                 }
                 if (loi == null)
                     return;   // đổi xong
 
                 _logger.LogWarning(loi, "Lần {LanThu}: {Loai} không đổi được {File} sang PDF", lanThu, loai, duongDanGoc);
-                TatOfficeChayNgam(loai);   // Office lỗi giữa chừng có thể còn chạy ngầm → tắt đi
+                theoDoi.TatNeuSoHuu();
             }
             throw new Exception($"Không đổi được file {loai} sang PDF (file hỏng hoặc đang đặt mật khẩu). Vui lòng kiểm tra lại file.");
         }
     }
 
     // Mở file bằng Office đang chạy ẩn rồi xuất ra PDF. Các con số (17, 32...) là hằng số trong tài liệu Office.
-    private static void XuatPdfBangOffice(string duongDanGoc, string duongDanPdf, string loai)
+    private static void XuatPdfBangOffice(string duongDanGoc, string duongDanPdf, string loai, TienTrinhOffice theoDoi)
     {
         // Mật khẩu giả: file có đặt mật khẩu sẽ báo lỗi ngay thay vì hiện hộp thoại chờ nhập mật khẩu
         string matKhauGia = "khongcomk1";
@@ -435,12 +431,18 @@ public class FileInController : ControllerBase
             {
                 app.Visible = false;
                 app.DisplayAlerts = 0;                                                  // không hiện hộp thoại
+                dynamic blank = app.Documents.Add();
+                try { theoDoi.NhanCuaSo((long)blank.ActiveWindow.Hwnd); }
+                finally { blank.Close(0); Marshal.FinalReleaseComObject(blank); }
+                if (!theoDoi.SoHuu) throw new InvalidOperationException("Không xác định được tiến trình Word riêng để chuyển đổi an toàn. Vui lòng tải PDF.");
                 dynamic doc = app.Documents.Open(duongDanGoc, false, true, false, matKhauGia);   // mở chỉ đọc
                 doc.ExportAsFixedFormat(duongDanPdf, 17);                               // 17 = PDF
                 doc.Close(0);                                                           // 0 = không lưu thay đổi
             }
             else if (loai == "Excel")
             {
+                theoDoi.NhanCuaSo((long)app.Hwnd);
+                if (!theoDoi.SoHuu) throw new InvalidOperationException("Excel đang dùng chung tiến trình khác. Vui lòng tải PDF.");
                 app.Visible = false;
                 app.DisplayAlerts = false;
                 dynamic book = app.Workbooks.Open(duongDanGoc, 0, true, Type.Missing, matKhauGia);
@@ -449,6 +451,8 @@ public class FileInController : ControllerBase
             }
             else
             {
+                theoDoi.NhanCuaSo((long)app.HWND);
+                if (!theoDoi.SoHuu) throw new InvalidOperationException("PowerPoint đang dùng chung tiến trình khác. Vui lòng tải PDF.");
                 app.DisplayAlerts = 1;                                                  // PowerPoint: 1 = không hiện hộp thoại
                 dynamic slide = app.Presentations.Open(duongDanGoc, -1, 0, 0);          // chỉ đọc, không mở cửa sổ
                 slide.SaveAs(duongDanPdf, 32);                                          // 32 = PDF
@@ -460,27 +464,14 @@ public class FileInController : ControllerBase
             // Tắt Office. 
             try
             {
-                if (loai == "Word") app.Quit(0);
-                else if (loai == "Excel") app.Quit();
-                else if (app.Presentations.Count == 0) app.Quit();
+                if (theoDoi.SoHuu)
+                {
+                    if (loai == "Word") app.Quit(0);
+                    else app.Quit();
+                }
             }
             catch { }
             Marshal.FinalReleaseComObject(app);
-        }
-    }
-
-    // Office bị treo quá giờ → tắt các tiến trình Office chạy ngầm (không có cửa sổ) do API mở.
-    // Word / Excel người dùng đang mở trên máy có cửa sổ nên không bị tắt nhầm.
-    private void TatOfficeChayNgam(string loai)
-    {
-        string tenTienTrinh = "WINWORD";
-        if (loai == "Excel") tenTienTrinh = "EXCEL";
-        if (loai == "PowerPoint") tenTienTrinh = "POWERPNT";
-
-        foreach (var tienTrinh in Process.GetProcessesByName(tenTienTrinh))
-        {
-            if (tienTrinh.MainWindowHandle == IntPtr.Zero)
-                tienTrinh.Kill();
         }
     }
 

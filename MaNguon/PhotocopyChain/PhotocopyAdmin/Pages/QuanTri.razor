@@ -54,7 +54,9 @@
                     <select id="qt-truong-4" class="ca-o-loc" @bind="_suaChiNhanh.TrangThai">
                         <option value="HOAT_DONG">Đang hoạt động</option>
                         <option value="TAM_NGUNG">Tạm ngưng nhận đơn</option>
+                        <option value="DONG_CUA">Đóng cửa</option>
                     </select>
+                    <p class="nv-phu">Chỉ chi nhánh đang hoạt động mới nhận đơn mới. Chọn Đang hoạt động để mở lại.</p>
                 </div>
             </div>
             <div class="ca-loc-luoi">
@@ -137,7 +139,7 @@
                                 </td>
                                 <td data-nhan="Trạng thái hoạt động">
                                     <span class="nhan-mau @(c.TrangThai == "HOAT_DONG" ? "nhan-xanh" : "nhan-xam")">
-                                        @(c.TrangThai == "HOAT_DONG" ? "Đang hoạt động" : "Tạm ngưng")
+                                        @(c.TrangThai switch { "HOAT_DONG" => "Đang hoạt động", "TAM_NGUNG" => "Tạm ngưng nhận đơn", "DONG_CUA" => "Đóng cửa", _ => c.TrangThai })
                                     </span>
                                 </td>
                                 <td class="cot-hanh-dong" data-nhan="Thao tác">

@@ -1,0 +1,99 @@
+@using PhotocopyShared.Dtos.GiaoHang
+@using System.Globalization
+@inject HttpClient Http
+@implements IDisposable
+
+@if (_dangTai) { <p role="status">Đang tải bằng chứng…</p> }
+else if (_loi != null) { <div class="o-loi" role="alert">@_loi</div><button class="nut-phu" @onclick="Tai">Thử lại</button> }
+else if (_data != null)
+{
+    <div class="bc-cong-cu" role="group" aria-label="Bên cung cấp bằng chứng">
+        <button type="button" class="nut-nho @(!_phanHoi ? "chinh" : "")" aria-pressed="@(!_phanHoi ? "true":"false")" @onclick="() => _phanHoi=false">Bằng chứng shipper</button>
+        <button type="button" class="nut-nho @(_phanHoi ? "chinh" : "")" aria-pressed="@(_phanHoi ? "true":"false")" @onclick="() => _phanHoi=true">Phản hồi khách hàng</button>
+    </div>
+    @if (_phanHoi) { <DoiChieuKhachHang MaGiaoHang="MaGiaoHang" DaXuLy="DaDoiChieu" /> }
+    else {
+    <div class="bc-thong-tin">
+        <div><span>Đơn / lượt giao</span><strong>@($"DH{_data.MaDonHang:D5}") · Lượt @_data.LanGiao/3</strong></div>
+        <div><span>Shipper</span><strong>@_data.TenShipper</strong></div>
+        <div><span>Server ghi nhận</span><strong>@Gio(_data.ThoiDiemBaoCao)</strong></div>
+        <div><span>Thời điểm GPS</span><strong>@Gio(_data.ThoiDiemGps)</strong></div>
+    </div>
+    <section class="bc-ly-do"><h3>Lý do giao thất bại</h3><p>@_data.LyDo</p></section>
+    <section>
+        <h3>Vị trí ghi nhận</h3>
+        @if (_data.ViDo != null)
+        {
+            <p>@(_data.DiaChi ?? "Đã lưu GPS; chưa tra được địa chỉ mô tả.")</p>
+            <p class="bc-toa-do">@_data.ViDo.Value.ToString("F6", CultureInfo.InvariantCulture), @_data.KinhDo?.ToString("F6", CultureInfo.InvariantCulture) · Sai số khoảng @_data.DoChinhXac?.ToString("N0") m</p>
+            <a href="@BanDo()" target="_blank" rel="noopener noreferrer">Mở vị trí trên bản đồ ↗</a>
+        }
+        else { <p>Lượt giao cũ chưa ghi nhận GPS.</p> }
+    </section>
+    <section class="bc-anh">
+        <h3>Ảnh nhật ký cuộc gọi</h3>
+        @if (_data.Anh.Count == 0) { <p>Lượt giao cũ chưa có ảnh bằng chứng. Lịch sử trước khi nâng cấp được giữ nguyên.</p> }
+        else
+        {
+            <div class="bc-cong-cu" role="group" aria-label="Chọn ảnh bằng chứng">
+                @for (int i = 0; i < _data.Anh.Count; i++)
+                {
+                    int index = i;
+                    <button type="button" class="nut-nho @(_chiSo == i ? "chinh" : "")" aria-pressed="@(_chiSo == i ? "true" : "false")" @onclick="() => TaiAnh(index)">Ảnh @(i + 1)</button>
+                }
+                <button type="button" class="nut-nho" disabled="@(_anh == null)" @onclick="() => _phongTo = !_phongTo">@(_phongTo ? "Thu gọn" : "Phóng to ảnh")</button>
+            </div>
+            @if (_loiAnh != null) { <p role="alert">@_loiAnh</p><button class="nut-phu" @onclick="() => TaiAnh(_chiSo)">Tải lại ảnh</button> }
+            else if (_anh == null) { <p role="status">Đang tải ảnh…</p> }
+            else { <div class="bc-khung-anh @(_phongTo ? "bc-phong-to" : "")"><img src="@_anh" alt="Ảnh nhật ký cuộc gọi của lượt giao, ảnh @(_chiSo + 1)" /></div> }
+        }
+    </section>
+    }
+}
+
+@code {
+    [Parameter] public int MaGiaoHang { get; set; }
+    [Parameter] public bool MoPhanHoi { get; set; }
+    [Parameter] public EventCallback DaDoiChieu { get; set; }
+    private bool _phanHoi;
+    private BangChungGiaoDto _data;
+    private string _loi, _loiAnh, _anh;
+    private bool _dangTai = true, _phongTo;
+    private int _chiSo, _lanAnh;
+    private readonly CancellationTokenSource _dung = new();
+    protected override Task OnInitializedAsync() { _phanHoi=MoPhanHoi; return Tai(); }
+    private async Task Tai()
+    {
+        _dangTai = true; _loi = null;
+        try
+        {
+            using var response = await Http.GetAsync($"api/giao-hang/luot/{MaGiaoHang}/bang-chung", _dung.Token);
+            if (!response.IsSuccessStatusCode) { _loi = "Chưa tải được bằng chứng hoặc bạn không có quyền xem lượt này."; return; }
+            _data = await response.Content.ReadFromJsonAsync<BangChungGiaoDto>(cancellationToken: _dung.Token);
+            if (_data?.Anh.Count > 0) await TaiAnh(0);
+        }
+        catch (OperationCanceledException) when (_dung.IsCancellationRequested) { }
+        catch { _loi = "Chưa tải được bằng chứng. Thử lại hoặc liên hệ quản trị hệ thống."; }
+        finally { _dangTai = false; }
+    }
+    private async Task TaiAnh(int index)
+    {
+        int lan = ++_lanAnh; _chiSo = index; _anh = _loiAnh = null; _phongTo = false;
+        try
+        {
+            var item = _data.Anh[index];
+            using var response = await Http.GetAsync($"api/giao-hang/luot/{MaGiaoHang}/bang-chung/anh/{item.MaAnh}", _dung.Token);
+            if (!response.IsSuccessStatusCode) { if (lan == _lanAnh) _loiAnh = "Chưa tải được ảnh. Kiểm tra quyền truy cập/bản sao lưu."; return; }
+            byte[] bytes = await response.Content.ReadAsByteArrayAsync(_dung.Token);
+            string mime = response.Content.Headers.ContentType?.MediaType;
+            if (mime is not ("image/png" or "image/jpeg") || bytes.Length > 5 * 1024 * 1024) throw new InvalidDataException();
+            if (lan == _lanAnh) _anh = $"data:{mime};base64,{Convert.ToBase64String(bytes)}";
+        }
+        catch (OperationCanceledException) when (_dung.IsCancellationRequested) { }
+        catch { if (lan == _lanAnh) _loiAnh = "Không đọc được ảnh bằng chứng. Thử tải lại."; }
+    }
+    private static string Gio(DateTimeOffset? value) => value?.ToOffset(TimeSpan.FromHours(7)).ToString("dd/MM/yyyy HH:mm:ss") ?? "Chưa ghi nhận";
+    private string BanDo() => "https://www.google.com/maps/search/?api=1&query=" + Uri.EscapeDataString(
+        _data.ViDo.Value.ToString(CultureInfo.InvariantCulture) + "," + _data.KinhDo.Value.ToString(CultureInfo.InvariantCulture));
+    public void Dispose() { _lanAnh++; _dung.Cancel(); _dung.Dispose(); }
+}

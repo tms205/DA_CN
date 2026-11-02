@@ -12,9 +12,10 @@ import 'don_hang/don_hang_screen.dart';
 import 'shipper/shipper_screen.dart';
 import 'thong_bao/thong_bao_screen.dart';
 import 'toi/toi_screen.dart';
+import 'danh_gia/danh_gia_screen.dart';
 
 // Trang chính sau khi đăng nhập: thanh tab dưới đáy, mỗi vai trò thấy các tab của mình
-//  - Khách hàng: Đặt in · Đơn hàng · Thông báo · Tôi
+//  - Khách hàng: Đặt in · Đơn hàng · Đánh giá · Thông báo · Tôi
 //  - Shipper   : Đơn giao · Thông báo · Tôi
 class TrangChinhScreen extends StatefulWidget {
   const TrangChinhScreen({super.key, this.tabBanDau});
@@ -54,7 +55,7 @@ class _TrangChinhScreenState extends State<TrangChinhScreen> {
     if (_dangKiemTraBaoTri || Phien.token == null) return;
     _dangKiemTraBaoTri = true;
     try {
-      final status = await Api.get('/api/bao-tri/trang-thai');
+      final status = await Api.get('/api/bao-tri/trang-thai?nenTang=app');
       var invalid = status.thanhCong && status.duLieu['dangBaoTri'] == true;
       if (!invalid) { final session = await Api.get('/api/bao-tri/phien'); invalid = session.maHttp == 401; }
       if (!mounted) return;
@@ -100,6 +101,7 @@ class _TrangChinhScreenState extends State<TrangChinhScreen> {
       );
     }
     if (_tab == 'DON_GIAO') return const ShipperScreen();
+    if (_tab == 'DANH_GIA' && !Phien.laShipper) return const DanhGiaScreen();
     if (_tab == 'THONG_BAO') {
       return ThongBaoScreen(
         moDonHang: () => _moDonHang('TAT_CA'),
@@ -117,6 +119,7 @@ class _TrangChinhScreenState extends State<TrangChinhScreen> {
     } else {
       dsTab.add(_nutTab('DAT_IN', 'Đặt in', Ico.mayIn));
       dsTab.add(_nutTab('DON_HANG', 'Đơn hàng', Ico.donHang));
+      dsTab.add(_nutTab('DANH_GIA', 'Đánh giá', Ico.sao));
     }
     dsTab.add(_nutTab('THONG_BAO', 'Thông báo', Ico.chuong));
     dsTab.add(_nutTab('TOI', 'Tôi', Ico.nguoi));

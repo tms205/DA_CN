@@ -265,12 +265,10 @@ class DonHang {
       trangThaiThanhToan == 'CHUA_THANH_TOAN' &&
       trangThaiDonHang != 'DA_HUY';
 
-  // Nhóm lọc trên tab Đơn hàng: DANG_XU_LY / DANG_GIAO / HOAN_TAT / DA_HUY
+  // Nhóm lọc trên tab Đơn hàng: tách giao thất bại khỏi các đơn đang giao.
   String get nhom {
-    if (trangThaiDonHang == 'DANG_GIAO' ||
-        trangThaiDonHang == 'GIAO_THAT_BAI') {
-      return 'DANG_GIAO';
-    }
+    if (trangThaiDonHang == 'DANG_GIAO') return 'DANG_GIAO';
+    if (trangThaiDonHang == 'GIAO_THAT_BAI') return 'GIAO_THAT_BAI';
     if (trangThaiDonHang == 'DA_GIAO' || trangThaiDonHang == 'HOAN_THANH') {
       return 'HOAN_TAT';
     }
@@ -283,6 +281,7 @@ class DonHang {
 String tenNhomDon(String nhom) {
   if (nhom == 'DANG_XU_LY') return 'Đang xử lý';
   if (nhom == 'DANG_GIAO') return 'Đang giao';
+  if (nhom == 'GIAO_THAT_BAI') return 'Giao thất bại';
   if (nhom == 'HOAN_TAT') return 'Hoàn tất';
   if (nhom == 'DA_HUY') return 'Đã hủy';
   return 'Tất cả';
@@ -481,7 +480,7 @@ class DonHangChiTiet {
   bool get daTra => trangThaiThanhToan == 'DA_THANH_TOAN';
 
   bool get choPhepHuy =>
-      trangThaiDonHang == 'CHO_XAC_NHAN' || trangThaiDonHang == 'DA_XAC_NHAN';
+      trangThaiDonHang == 'CHO_XAC_NHAN';
 
   String get nhanThanhToan {
     if (trangThaiThanhToan == 'DA_HOAN_TIEN') return 'Đã hoàn tiền';

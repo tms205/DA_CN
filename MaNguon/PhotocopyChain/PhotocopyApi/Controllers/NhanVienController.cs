@@ -7,6 +7,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Caching.Memory;
 using PhotocopyApi.DuLieu;
 using PhotocopyApi.Models;
+using PhotocopyApi.Auth;
 using PhotocopyShared.Constants;
 using PhotocopyShared.Dtos.NhanVien;
 using PhotocopyShared.Dtos.Tuan3;
@@ -22,9 +23,13 @@ public class NhanVienController : ControllerBase
 {
     private readonly string _chuoiKetNoi;
     private readonly IMemoryCache _cache;
+    private readonly PhienDangNhapStore _phien;
+    private readonly KiemTraPhienDangNhap _kiemTraPhien;
 
-    public NhanVienController(IConfiguration config, IMemoryCache cache)
+    public NhanVienController(IConfiguration config, IMemoryCache cache, PhienDangNhapStore phien = null, KiemTraPhienDangNhap kiemTraPhien = null)
     {
+        _phien = phien;
+        _kiemTraPhien = kiemTraPhien;
         _chuoiKetNoi = config.GetConnectionString("PhotocopyChain");
         _cache = cache;
     }
@@ -83,6 +88,7 @@ public class NhanVienController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
 
+        _kiemTraPhien?.Ngat(maNhanVien);
         NguoiDung nv = await conn.QueryFirstAsync<NguoiDung>(
             "SELECT * FROM NguoiDung WHERE MaNguoiDung = @MaNguoiDung", new { MaNguoiDung = maNhanVien });
 
@@ -162,14 +168,19 @@ public class NhanVienController : ControllerBase
             return BadRequest(new { message = "Bạn không thể tự khóa tài khoản của mình." });
 
         using var conn = new SqlConnection(_chuoiKetNoi);
+        await conn.OpenAsync();
+        using var tx = await conn.BeginTransactionAsync();
         int soDong = await conn.ExecuteAsync(
             @"UPDATE NguoiDung SET TrangThai = @TrangThai
               WHERE MaNguoiDung = @MaNhanVien AND VaiTro NOT IN ('CUSTOMER','SUPER_ADMIN')
                 AND (@VaiTro = 'SUPER_ADMIN'
                      OR (VaiTro IN ('STAFF','SHIPPER') AND MaChiNhanh = @MaChiNhanh))",
-            new { req.TrangThai, MaNhanVien = maNhanVien, VaiTro = vaiTro, MaChiNhanh = maChiNhanh });
+            new { req.TrangThai, MaNhanVien = maNhanVien, VaiTro = vaiTro, MaChiNhanh = maChiNhanh }, tx);
         if (soDong == 0)
             return BadRequest(new { message = "Không thể đổi trạng thái tài khoản này." });
+        _phien?.ThuHoi(maNhanVien);
+        await tx.CommitAsync();
+        _kiemTraPhien?.Ngat(maNhanVien);
         return Ok(new { message = req.TrangThai == "KHOA" ? "Đã khóa tài khoản." : "Đã mở lại tài khoản." });
     }
 

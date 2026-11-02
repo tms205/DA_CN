@@ -30,6 +30,31 @@ public class DanhMucController : ControllerBase
     }
 
     // các dòng giá in ấn + gia công đang hiển thị 
+    [HttpGet("chi-nhanh/{maChiNhanh:int}/danh-gia")]
+    public async Task<IActionResult> DanhGiaChiNhanh([Range(1, int.MaxValue)] int maChiNhanh, [FromQuery, Range(1, 10000)] int trang = 1)
+    {
+        Response.Headers.CacheControl = "no-store";
+        if (maChiNhanh <= 0 || trang is < 1 or > 10000) return BadRequest(new { message = "Chi nhánh hoặc trang đánh giá không hợp lệ." });
+        using var conn = new SqlConnection(_chuoiKetNoi);
+        var result = await conn.QuerySingleOrDefaultAsync<DanhGiaChiNhanhDto>(
+            @"SELECT cn.MaChiNhanh, cn.TenChiNhanh, ISNULL(dg.DiemTrungBinh,0) AS DiemTrungBinh,
+                     ISNULL(dg.SoLuotDanhGia,0) AS SoLuotDanhGia
+              FROM ChiNhanh cn LEFT JOIN vw_DanhGiaChiNhanh dg ON dg.MaChiNhanh=cn.MaChiNhanh
+              WHERE cn.MaChiNhanh=@maChiNhanh AND cn.TrangThai=N'HOAT_DONG'", new { maChiNhanh });
+        if (result == null) return NotFound(new { message = "Chi nhánh không tồn tại hoặc đang ngừng hoạt động." });
+        var reviews = (await conn.QueryAsync<DanhGiaCongKhaiDto>(
+            @"SELECT CASE WHEN LEN(LTRIM(RTRIM(kh.HoTen)))>0 THEN LEFT(LTRIM(kh.HoTen),1)+N'***' ELSE N'Khách hàng' END AS TenKhachHang,
+                     dg.SoSao,dg.NhanXet,dg.NgayDanhGia
+              FROM DanhGia dg JOIN DonHang dh ON dh.MaDonHang=dg.MaDonHang
+              JOIN NguoiDung kh ON kh.MaNguoiDung=dh.MaKhachHang
+              WHERE dh.MaChiNhanh=@maChiNhanh AND dg.TrangThai=N'HIEN'
+              ORDER BY dg.NgayDanhGia DESC,dg.MaDanhGia DESC
+              OFFSET @boQua ROWS FETCH NEXT 21 ROWS ONLY", new { maChiNhanh, boQua = (trang - 1) * 20 })).ToList();
+        result.Trang = trang; result.CoTrangSau = reviews.Count > 20; result.DanhGia = reviews.Take(20).ToList();
+        return Ok(result);
+    }
+
+    // các dòng giá in ấn + gia công đang hiển thị
     [HttpGet("bang-gia")]
     public async Task<IActionResult> BangGia([FromQuery] [Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maChiNhanh)
     {

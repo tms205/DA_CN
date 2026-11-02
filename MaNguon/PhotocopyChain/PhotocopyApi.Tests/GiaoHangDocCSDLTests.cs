@@ -46,19 +46,105 @@ public class GiaoHangDocCSDLTests
                     User = new ClaimsPrincipal(new ClaimsIdentity(claims, "fixture", ClaimTypes.Name, TenClaim.VaiTro))
                 } }
             };
-            foreach (string group in new[] { "CHO_GIAO", "DANG_GIAO", "LICH_SU" })
+            foreach (string group in new[] { "CHO_GIAO", "DANG_GIAO", "THAT_BAI", "THANH_CONG", "LICH_SU" })
             {
                 var ds = Assert.IsAssignableFrom<IEnumerable<DonGiaoDto>>(Assert.IsType<OkObjectResult>(await api.DanhSach(group)).Value).ToList();
                 Assert.InRange(ds.Count, 0, 100);
                 Assert.All(ds, x => {
                     if (branch != null) Assert.Equal(branch, x.MaChiNhanh);
                     Assert.Equal("DA_THANH_TOAN", x.TrangThaiThanhToan);
-                    if (group == "CHO_GIAO") Assert.Contains(x.TrangThaiDonHang, new[] { "DA_IN", "GIAO_THAT_BAI" });
+                    if (group == "CHO_GIAO") Assert.Equal("DA_IN", x.TrangThaiDonHang);
+                    if (group == "THAT_BAI") { Assert.Equal("GIAO_THAT_BAI",x.TrangThaiDonHang);Assert.Equal("THAT_BAI",x.TrangThaiGiao); }
+                    if (group == "THANH_CONG") { Assert.Contains(x.TrangThaiDonHang,new[]{"DA_GIAO","HOAN_THANH"});Assert.Equal("THANH_CONG",x.TrangThaiGiao); }
                 });
             }
+            var counts=Assert.IsAssignableFrom<IEnumerable<PhanBoGiaoHangDto>>(Assert.IsType<OkObjectResult>(await api.PhanBo()).Value).ToDictionary(x=>x.Nhom,x=>x.SoDon);
+            var states=await conn.QueryAsync(@"SELECT dh.TrangThai AS TrangThaiDon,gh.TrangThai AS TrangThaiGiao
+                FROM DonHang dh JOIN ThanhToan tt ON tt.MaDonHang=dh.MaDonHang
+                OUTER APPLY(SELECT TOP 1 TrangThai FROM GiaoHang WHERE MaDonHang=dh.MaDonHang ORDER BY MaGiaoHang DESC) gh
+                WHERE dh.HinhThucNhan='GIAO_HANG' AND tt.TrangThai='DA_THANH_TOAN'
+                AND (@branch IS NULL OR dh.MaChiNhanh=@branch)",new{branch});
+            var expected=new Dictionary<string,int>();
+            foreach(var row in states)
+            {
+                string group=(string)row.TrangThaiDon switch {
+                    "DA_IN" when (string)row.TrangThaiGiao!="DANG_GIAO"=>"CHO_GIAO",
+                    "DANG_GIAO" when (string)row.TrangThaiGiao=="DANG_GIAO"=>"DANG_GIAO",
+                    "GIAO_THAT_BAI" when (string)row.TrangThaiGiao=="THAT_BAI"=>"THAT_BAI",
+                    "DA_GIAO" or "HOAN_THANH" when (string)row.TrangThaiGiao=="THANH_CONG"=>"THANH_CONG",_=>null};
+                if(group!=null) expected[group]=expected.GetValueOrDefault(group)+1;
+            }
+            Assert.Equal(expected.OrderBy(x=>x.Key),counts.OrderBy(x=>x.Key));
             var shippers = Assert.IsAssignableFrom<IEnumerable<ShipperDto>>(Assert.IsType<OkObjectResult>(await api.Shipper()).Value);
             if (branch != null) Assert.All(shippers, x => Assert.Equal(branch, x.MaChiNhanh));
         }
+    }
+
+    [KiemThuGiaoHangDoc]
+    public async Task BangChungLuotThat_DocDuocSauMigration_VaChanNgoaiPhamVi()
+    {
+        var config = CauHinh();
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        using var conn = new SqlConnection(config.GetConnectionString("PhotocopyChain"));
+        var rows = (await conn.QueryAsync(@"SELECT TOP 3 gh.MaGiaoHang,gh.MaDonHang,gh.MaShipper,dh.MaChiNhanh
+            FROM GiaoHang gh JOIN DonHang dh ON dh.MaDonHang=gh.MaDonHang ORDER BY gh.MaGiaoHang DESC")).ToList();
+        Assert.NotEmpty(rows);
+        GiaoHangController Controller(string role,int id,int? branch)
+        {
+            var claims = new List<Claim> { new(TenClaim.MaNguoiDung,id.ToString()),new(TenClaim.VaiTro,role) };
+            if(branch!=null) claims.Add(new(TenClaim.MaChiNhanh,branch.ToString()));
+            return new GiaoHangController(config,cache,null,NullLogger<GiaoHangController>.Instance) {
+                ControllerContext=new ControllerContext { HttpContext=new DefaultHttpContext {
+                    User=new ClaimsPrincipal(new ClaimsIdentity(claims,"fixture",ClaimTypes.Name,TenClaim.VaiTro)) }} };
+        }
+        foreach(var row in rows)
+        {
+            int attempt=row.MaGiaoHang,branch=row.MaChiNhanh,shipper=row.MaShipper,order=row.MaDonHang;
+            var result=Assert.IsType<OkObjectResult>(await Controller(VaiTro.Shipper,shipper,branch).XemBangChung(attempt));
+            var data=Assert.IsType<BangChungGiaoDto>(result.Value);
+            Assert.Equal(attempt,data.MaGiaoHang);Assert.Equal(order,data.MaDonHang);
+            Assert.IsType<NotFoundObjectResult>(await Controller(VaiTro.Shipper,int.MaxValue,branch).XemBangChung(attempt));
+            Assert.IsType<NotFoundObjectResult>(await Controller(VaiTro.BranchAdmin,1,int.MaxValue).XemBangChung(attempt));
+        }
+        _output.WriteLine("PASS: đọc 3 lượt thật, kể cả trường mới NULL; shipper khác/chi nhánh khác bị chặn. Không ghi báo cáo hoặc đổi trạng thái.");
+    }
+
+    [KiemThuGiaoHangDoc]
+    public async Task LichSuTheoDon_DuMoiLuot_DemPhanHoiCu_ChanKhacChiNhanh()
+    {
+        var config = CauHinh();
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        using var conn = new SqlConnection(config.GetConnectionString("PhotocopyChain"));
+        GiaoHangController Api(int? branch) => new(config, cache, null, NullLogger<GiaoHangController>.Instance)
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext {
+                User = new ClaimsPrincipal(new ClaimsIdentity(new[] {
+                    new Claim(TenClaim.MaNguoiDung,"1"), new Claim(TenClaim.VaiTro,branch==null?VaiTro.SuperAdmin:VaiTro.BranchAdmin)
+                }.Concat(branch==null?Array.Empty<Claim>():new[] { new Claim(TenClaim.MaChiNhanh,branch.ToString()) }),"fixture",ClaimTypes.Name,TenClaim.VaiTro))
+            } }
+        };
+        var orders = (await conn.QueryAsync<int>(@"SELECT DISTINCT g.MaDonHang FROM GiaoHang g
+            JOIN DonHang d ON d.MaDonHang=g.MaDonHang WHERE d.HinhThucNhan='GIAO_HANG'")).ToList();
+        Assert.NotEmpty(orders);
+        foreach (int order in orders)
+        {
+            var list = Assert.IsAssignableFrom<IEnumerable<LuotLichSuGiaoDto>>(
+                Assert.IsType<OkObjectResult>(await Api(null).LichSuGiaoCuaDon(order)).Value).ToList();
+            var actual = (await conn.QueryAsync<int>("SELECT MaGiaoHang FROM GiaoHang WHERE MaDonHang=@order ORDER BY LanGiao,MaGiaoHang",new { order })).ToList();
+            Assert.Equal(actual,list.Select(x=>x.MaGiaoHang));
+            Assert.IsType<NotFoundObjectResult>(await Api(int.MaxValue).LichSuGiaoCuaDon(order));
+        }
+        foreach (string group in new[] { "CHO_GIAO","DANG_GIAO","LICH_SU" })
+        {
+            var list = Assert.IsAssignableFrom<IEnumerable<DonGiaoDto>>(Assert.IsType<OkObjectResult>(await Api(null).DanhSach(group)).Value);
+            foreach (var row in list)
+            {
+                int count = await conn.ExecuteScalarAsync<int>(@"SELECT COUNT(*) FROM GiaoHang WHERE MaDonHang=@id
+                    AND TrangThai='THAT_BAI' AND JSON_VALUE(DoiChieuKhachHangJson,'$.TrangThai')='CHO_DOI_CHIEU'", new { id=row.MaDonHang });
+                Assert.Equal(count,row.SoPhanHoiChoDoiChieu);
+            }
+        }
+        _output.WriteLine("PASS: đủ mọi lượt giao; số phản hồi chờ bao gồm lượt cũ; chi nhánh khác bị chặn. Chỉ SELECT.");
     }
 
     [KiemThuGiaoHangDoc]

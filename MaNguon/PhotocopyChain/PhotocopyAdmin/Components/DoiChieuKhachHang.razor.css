@@ -1,0 +1,11 @@
+h3 { font-size:16px; margin:20px 0 10px; }
+p { margin:8px 0; line-height:1.6; overflow-wrap:anywhere; }
+.dc-noi-dung { white-space:pre-wrap; }
+.dc-trang-thai { font-weight:600; }
+.dc-phu { color:var(--chu-phu); font-size:14px; }
+.dc-cong-cu { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+.dc-khung-anh { padding:12px; border:1px solid var(--vien); border-radius:8px; background:var(--nen); }
+.dc-khung-anh img { display:block; max-width:100%; max-height:55vh; object-fit:contain; margin:auto; }
+.dc-phong-to img { max-height:none; width:100%; }
+label { display:block; font-weight:600; margin-bottom:8px; }
+textarea { display:block; width:100%; min-height:120px; padding:12px; border:1px solid var(--vien); border-radius:8px; font:inherit; resize:vertical; }

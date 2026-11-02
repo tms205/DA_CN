@@ -21,15 +21,15 @@
         <section class="the tq-bo-loc" aria-label="Bộ lọc tổng quan">
             <fieldset class="tq-loc-luoi" disabled="@_dangTai">
                 <div class="truong"><label class="nhan" for="tq-khoang">Khoảng thời gian</label>
-                    <select id="tq-khoang" class="ca-o-loc" value="@_khoang" @onchange="DoiKhoang"><option value="ngay">Hôm nay</option><option value="tuan">Tuần này</option><option value="thang">Tháng này</option><option value="tuy-chon">Tùy chọn ngày</option></select>
+                    <select id="tq-khoang" class="ca-o-loc" value="@_khoang" @onchange="DoiKhoang"><option value="" hidden disabled>Chọn mốc thời gian</option><option value="thang">Tháng này</option><option value="thang-truoc">Tháng trước</option><option value="tuan">Tuần này</option><option value="tuan-truoc">Tuần trước</option><option value="ngay">Hôm nay</option></select>
                 </div>
                 <div class="truong"><label class="nhan" for="tq-tu">Từ ngày</label><input id="tq-tu" class="ca-o-loc" type="text" inputmode="numeric" placeholder="dd/MM/yyyy" maxlength="10" @bind="_tuNhap" @bind:after="ChonTuyChon" /></div>
                 <div class="truong"><label class="nhan" for="tq-den">Đến ngày</label><input id="tq-den" class="ca-o-loc" type="text" inputmode="numeric" placeholder="dd/MM/yyyy" maxlength="10" @bind="_denNhap" @bind:after="ChonTuyChon" /></div>
                 <button type="button" class="nut-chinh" @onclick="TaiAsync">@(_dangTai ? "Đang tải…" : "Xem tổng quan")</button>
             </fieldset>
-            <p class="nv-phu">Preset ngày/tuần/tháng tự áp dụng · Ngày nhập dd/MM/yyyy · Tối đa 366 ngày.</p>
+            <p class="nv-phu">@(_khoang == "" ? "Đang dùng khoảng ngày nhập trực tiếp. " : "Chọn mốc thời gian để tự áp dụng. ")Ngày nhập dd/MM/yyyy · Không chọn ngày tương lai · Tối đa 366 ngày.</p>
         </section>
-        @if (_loi != null) { <div class="o-loi" role="alert">@_loi</div> }
+        @if (_loi != null) { <TrangThaiTaiDuLieu DangBaoTri="_baoTri" NoiDung="@_loi" ThuLai="TaiAsync" /> }
         @if (_dangTai) { <div class="the bang-trong" role="status">Đang tải tổng quan…</div> }
         else if (_ds != null && _loi == null)
         {
@@ -81,6 +81,7 @@
     private int _soNgayDaTai;
     private bool _dangTai;
     private string _loi;
+    private bool _baoTri;
     private List<BaoCaoDoanhThuDto> _ds;
     private List<BaoCaoDoanhThuDto> _truoc = new();
     private List<BaoCaoDoanhThuDto> _ky = new();
@@ -116,20 +117,18 @@
 
     private async Task DoiKhoang(ChangeEventArgs e)
     {
-        _khoang = e.Value?.ToString() ?? "tuy-chon";
-        if (_khoang == "tuy-chon") return;
-        _denNgay = DateTime.Today;
-        _tuNgay = TongQuanBaoCao.DauKy(_denNgay, _khoang);
+        _khoang = e.Value?.ToString() ?? "thang";
+        (_tuNgay, _denNgay) = TongQuanBaoCao.KhoangThoiGian(DateTime.Today, _khoang);
         _tuNhap = _tuNgay.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture);
         _denNhap = _denNgay.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture);
         await TaiAsync();
     }
 
-    private void ChonTuyChon() => _khoang = "tuy-chon";
+    private void ChonTuyChon() => _khoang = "";
 
     private async Task<List<BaoCaoDoanhThuDto>> DocDoanhThu(DateTime tu, DateTime den)
     {
-        var ds = await Http.GetFromJsonAsync<List<BaoCaoDoanhThuDto>>($"api/quan-tri/bao-cao/doanh-thu?tuNgay={tu:yyyy-MM-dd}&denNgay={den:yyyy-MM-dd}&nhomTheo=ngay") ?? new();
+        var ds = await Http.DocJsonAsync<List<BaoCaoDoanhThuDto>>($"api/quan-tri/bao-cao/doanh-thu?tuNgay={tu:yyyy-MM-dd}&denNgay={den:yyyy-MM-dd}&nhomTheo=ngay") ?? new();
         return ds.Where(x => x.Ngay.Date >= tu.Date && x.Ngay.Date <= den.Date).ToList();
     }
 
@@ -137,12 +136,9 @@
     {
         if (_dangTai) return;
         _loi = null;
-        if (!DateTime.TryParseExact(_tuNhap, "dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out _tuNgay)
-            || !DateTime.TryParseExact(_denNhap, "dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out _denNgay))
-        {
-            _loi = "Nhập ngày đúng định dạng dd/MM/yyyy, ví dụ 13/10/2026.";
-            return;
-        }
+        _baoTri = false;
+        _loi = TongQuanBaoCao.KiemTraNgayNhap(_tuNhap, _denNhap, DateTime.Today, out _tuNgay, out _denNgay);
+        if (_loi != null) return;
         DateTime tu = _tuNgay.Date, den = _denNgay.Date;
         (DateTime TuNgay, DateTime DenNgay) truoc;
         try { truoc = TongQuanBaoCao.KyTruoc(tu, den); }
@@ -168,6 +164,7 @@
                 MaChiNhanh = g.Key, TenChiNhanh = g.First().TenChiNhanh, SoDon = g.Sum(x => x.SoDon), DoanhThu = g.Sum(x => x.DoanhThu)
             }).OrderByDescending(x => x.DoanhThu).ToList();
         }
+        catch (NgoaiLeBaoTri ex) { _ds = null; _baoTri = true; _loi = ex.Message; }
         catch
         {
             _ds = null;

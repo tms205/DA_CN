@@ -1,0 +1,24 @@
+@inject HttpClient Http
+@if(_error!=null){<p role="alert">@_error</p>}
+else if(_data==null){<p role="status">Đang tải bằng chứng…</p>}
+else {
+ <p><b>@(_data.Loai=="TU_DONG"?"Hệ thống tự hủy do hết hạn thanh toán":"Bằng chứng hủy thủ công")</b></p>
+ <p>Ghi nhận: @_data.GuiLuc.ToOffset(TimeSpan.FromHours(7)).ToString("dd/MM/yyyy HH:mm:ss") · Người gửi #@_data.MaNguoiGui</p>
+ @if(_data.Loai=="TU_DONG"){<p>@_data.LyDo · Thanh toán: @_data.TrangThaiThanhToan</p><p>Hết hạn: @_data.HetHanThanhToan?.ToString("dd/MM/yyyy HH:mm:ss")</p>}
+ @foreach(var a in _data.Anh){<button class="nut-phu" @onclick="()=>Xem(a.MaAnh)">Xem ảnh @(_data.Anh.IndexOf(a)+1)</button>}
+ @if(_anh!=null){<img src="@_anh" alt="Bằng chứng yêu cầu hủy đơn" style="display:block;max-width:100%;max-height:65vh;object-fit:contain;margin:16px auto" />}
+}
+@code {
+ [Parameter]public int MaDonHang{get;set;}
+ private HoSo _data;private string _error,_anh;
+ protected override async Task OnInitializedAsync(){
+  try{using var r=await Http.GetAsync($"api/don-hang/{MaDonHang}/bang-chung-huy");if(!r.IsSuccessStatusCode){_error="Đơn cũ chưa có bằng chứng hoặc bạn không có quyền xem.";return;}_data=await r.Content.ReadFromJsonAsync<HoSo>();}
+  catch{_error="Chưa tải được bằng chứng.";}
+ }
+ private async Task Xem(string id){
+  try{using var r=await Http.GetAsync($"api/don-hang/{MaDonHang}/bang-chung-huy/anh/{id}");r.EnsureSuccessStatusCode();var mime=r.Content.Headers.ContentType?.MediaType;
+   var bytes=await r.Content.ReadAsByteArrayAsync();if(mime is not("image/png" or "image/jpeg")||bytes.Length>5*1024*1024)throw new InvalidDataException();_anh=$"data:{mime};base64,{Convert.ToBase64String(bytes)}";
+  }catch{_error="Không đọc được ảnh bằng chứng. Hãy kiểm tra bản sao lưu.";}
+ }
+ private sealed class HoSo{public string Loai{get;set;}public int MaNguoiGui{get;set;}public DateTimeOffset GuiLuc{get;set;}public string LyDo{get;set;}public DateTime? HetHanThanhToan{get;set;}public string TrangThaiThanhToan{get;set;}public List<PhotocopyShared.Dtos.GiaoHang.AnhBangChungDto> Anh{get;set;}=new();}
+}

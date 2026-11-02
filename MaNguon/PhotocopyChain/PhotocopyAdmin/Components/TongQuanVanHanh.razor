@@ -1,4 +1,5 @@
 @using PhotocopyShared.Dtos.MayInAo
+@using PhotocopyShared.Dtos.GiaoHang
 @inject HttpClient Http
 @inject IServiceProvider DichVu
 @implements IDisposable
@@ -16,7 +17,7 @@
     {
         @if (_loiDon != null)
         {
-            <div class="o-loi" role="alert">@_loiDon</div>
+            <TrangThaiTaiDuLieu DangBaoTri="_baoTriDon" NoiDung="@_loiDon" />
         }
         else
         {
@@ -64,19 +65,19 @@
                     }
                 </section>
                 <section class="the the-bang" aria-label="Phân bố trạng thái">
-                    <div class="bang-tieu-de"><div><h3>Phân bố trạng thái</h3><p class="bang-mo-ta">@_don.Count đơn chưa kết thúc · Không phải lịch sử đơn theo kỳ.</p></div></div>
+                    <div class="bang-tieu-de"><div><h3>Phân bố trạng thái</h3><p class="bang-mo-ta">Đơn đang vận hành và đơn giao thành công trong phạm vi đang xem.</p></div></div>
                     <div class="tq-danh-sach">
-                        @foreach (var nhom in _don.GroupBy(x => x.TrangThaiDonHang).OrderByDescending(x => x.Count()))
+                        @if (_loiGiao != null) { <TrangThaiTaiDuLieu DangBaoTri="_baoTriGiao" NoiDung="@_loiGiao" /> }
+                        @foreach (var nhom in PhanBoTrangThai())
                         {
-                            <div class="tq-phan-bo"><div><span>@TrangThaiDonHang.TenHienThi(nhom.Key)</span><b>@nhom.Count() đơn</b></div><meter min="0" max="@_don.Count" value="@nhom.Count()" aria-label="@TrangThaiDonHang.TenHienThi(nhom.Key)">@nhom.Count() / @_don.Count</meter></div>
+                            <div class="tq-phan-bo"><a href="@nhom.Url" class="tq-lien-ket-trang-thai" aria-label="@($"{nhom.Ten}: {nhom.SoDon} đơn. Mở danh sách")"><span>@nhom.Ten</span><b>@nhom.SoDon đơn →</b></a><meter min="0" max="@Math.Max(1,PhanBoTrangThai().Sum(x=>x.SoDon))" value="@nhom.SoDon" aria-label="@nhom.Ten">@nhom.SoDon</meter></div>
                         }
-                        @if (_don.Count == 0) { <p class="nv-phu">Không có đơn đang xử lý.</p> }
                     </div>
                 </section>
             </div>
         }
 
-        @if (_loiHienTai != null) { <div class="o-loi" role="alert">@_loiHienTai</div> }
+        @if (_loiHienTai != null) { <TrangThaiTaiDuLieu DangBaoTri="_baoTriHienTai" TieuDe="Chỉ số ca / phê duyệt tạm dừng" NoiDung="@_loiHienTai" /> }
         else if (_hienTai != null)
         {
             <section class="the tq-ca-hien-tai" aria-label="Ca và phê duyệt">
@@ -96,7 +97,7 @@
         <div class="tq-luoi-deu">
             <section class="the the-bang" aria-label="Cảnh báo vật tư">
                 <div class="bang-tieu-de"><div><h3>Cảnh báo vật tư</h3><p class="bang-mo-ta">Tồn kho bằng hoặc dưới mức tối thiểu đã cấu hình.</p></div><a class="nut-nho" href="kho-vat-tu">Mở kho →</a></div>
-                @if (_loiKho != null) { <p class="o-loi" role="alert">@_loiKho</p> }
+                @if (_loiKho != null) { <TrangThaiTaiDuLieu DangBaoTri="_baoTriKho" NoiDung="@_loiKho" /> }
                 else
                 {
                     <div class="tq-danh-sach">
@@ -111,7 +112,7 @@
             </section>
             <section class="the the-bang" aria-label="Phiếu nhập chờ duyệt">
                 <div class="bang-tieu-de"><div><h3>Phiếu nhập chờ duyệt</h3><p class="bang-mo-ta">Đề nghị vật tư cần được CEO phê duyệt.</p></div><a class="nut-nho" href="kho-vat-tu">Xem phiếu →</a></div>
-                @if (_loiPhieu != null) { <p class="o-loi" role="alert">@_loiPhieu</p> }
+                @if (_loiPhieu != null) { <TrangThaiTaiDuLieu DangBaoTri="_baoTriPhieu" NoiDung="@_loiPhieu" /> }
                 else
                 {
                     <div class="tq-danh-sach">
@@ -129,8 +130,8 @@
 
         <section class="the the-bang" aria-label="Tình trạng máy in">
             <div class="bang-tieu-de"><div><h3>Tình trạng máy in</h3><p class="bang-mo-ta">Cấu hình máy và phản hồi connector là hai trạng thái khác nhau.</p></div><a class="nut-nho" href="quan-tri">Quản lý máy →</a></div>
-            @if (_loiMay != null) { <p class="o-loi" role="alert">@_loiMay</p> }
-            @if (_loiKetNoi != null) { <p class="o-loi" role="alert">@_loiKetNoi</p> }
+            @if (_loiMay != null) { <TrangThaiTaiDuLieu DangBaoTri="_baoTriMay" NoiDung="@_loiMay" /> }
+            @if (_loiKetNoi != null) { <TrangThaiTaiDuLieu DangBaoTri="_baoTriKetNoi" NoiDung="@_loiKetNoi" /> }
             @if (_may != null)
             {
                 @if (_ketNoi != null) { <p class="tq-dem-may">Máy kết nối: @_may.Count(m => _ketNoi.Any(k => k.MaMayIn == m.MaMayIn && k.TrangThai != "MAT_KET_NOI")) / @_may.Count</p> }
@@ -173,6 +174,11 @@
     private List<MayInQuanTriDto> _may;
     private List<TrangThaiKetNoiMayInDto> _ketNoi;
     private string _loiDon, _loiKho, _loiPhieu, _loiMay, _loiKetNoi;
+    private bool _baoTriDon, _baoTriKho, _baoTriPhieu, _baoTriMay, _baoTriKetNoi, _baoTriHienTai;
+    private List<PhanBoGiaoHangDto> _giao;
+    private string _loiGiao;
+    private bool _baoTriGiao;
+    private static readonly Dictionary<string,string> TenNhomGiao = new() { ["CHO_GIAO"]="Chờ giao",["DANG_GIAO"]="Đang giao",["THAT_BAI"]="Giao thất bại",["THANH_CONG"]="Giao thành công" };
 
     protected override async Task OnInitializedAsync() => await TaiAsync();
 
@@ -199,10 +205,12 @@
                         var don = Doc<HangDoiDonDto>("api/don-hang/hang-doi", "hàng đợi");
                         var ketNoi = Doc<TrangThaiKetNoiMayInDto>("api/may-in-ao/trang-thai", "kết nối máy");
                         var ca = DocHienTai();
-                        await Task.WhenAll(don, ketNoi, ca);
+                        var giao = Doc<PhanBoGiaoHangDto>("api/giao-hang/phan-bo", "phân bố giao hàng");
+                        await Task.WhenAll(don, ketNoi, ca, giao);
                         if (_dung.IsCancellationRequested) return;
-                        (_don, _loiDon) = await don;
-                        (_ketNoi, _loiKetNoi) = await ketNoi;
+                        (_don, _loiDon, _baoTriDon) = await don;
+                        (_ketNoi, _loiKetNoi, _baoTriKetNoi) = await ketNoi;
+                        (_giao, _loiGiao, _baoTriGiao) = await giao;
                         _don = _don?.Where(x => x.TrangThaiDonHang is not ("HOAN_THANH" or "DA_HUY")).ToList();
                         _lucTai = DateTime.Now;
                     }
@@ -228,12 +236,14 @@
         var may = Doc<MayInQuanTriDto>("api/quan-tri/may-in", "danh sách máy");
         var ketNoi = Doc<TrangThaiKetNoiMayInDto>("api/may-in-ao/trang-thai", "kết nối máy");
         var hienTai = DocHienTai();
-        await Task.WhenAll(don, kho, phieu, may, ketNoi, hienTai);
-        (_don, _loiDon) = await don;
-        (_kho, _loiKho) = await kho;
-        (_phieu, _loiPhieu) = await phieu;
-        (_may, _loiMay) = await may;
-        (_ketNoi, _loiKetNoi) = await ketNoi;
+        var giao = Doc<PhanBoGiaoHangDto>("api/giao-hang/phan-bo", "phân bố giao hàng");
+        await Task.WhenAll(don, kho, phieu, may, ketNoi, hienTai, giao);
+        (_don, _loiDon, _baoTriDon) = await don;
+        (_kho, _loiKho, _baoTriKho) = await kho;
+        (_phieu, _loiPhieu, _baoTriPhieu) = await phieu;
+        (_may, _loiMay, _baoTriMay) = await may;
+        (_ketNoi, _loiKetNoi, _baoTriKetNoi) = await ketNoi;
+        (_giao, _loiGiao, _baoTriGiao) = await giao;
         // API hàng đợi có cả đơn kết thúc gần đây; không cộng chúng vào việc đang xử lý.
         _don = _don?.Where(x => x.TrangThaiDonHang is not ("HOAN_THANH" or "DA_HUY")).ToList();
         _lucTai = DateTime.Now;
@@ -241,17 +251,19 @@
         _dangTai = false;
     }
 
-    private async Task<(List<T> Ds, string Loi)> Doc<T>(string duongDan, string ten)
+    private async Task<(List<T> Ds, string Loi, bool BaoTri)> Doc<T>(string duongDan, string ten)
     {
-        try { return (await Http.GetFromJsonAsync<List<T>>(duongDan, _dung.Token) ?? new(), null); }
-        catch { return (null, $"Không tải được {ten}. Kiểm tra API và quyền truy cập, rồi bấm Làm mới vận hành."); }
+        try { return (await Http.DocJsonAsync<List<T>>(duongDan, _dung.Token) ?? new(), null, false); }
+        catch (NgoaiLeBaoTri ex) { return (null, ex.Message, true); }
+        catch { return (null, $"Không tải được {ten}. Kiểm tra API và quyền truy cập, rồi bấm Làm mới vận hành.", false); }
     }
 
     private async Task DocHienTai()
     {
+        _baoTriHienTai = false;
         try
         {
-            var ds = await Http.GetFromJsonAsync<TongQuanHienTaiDto>("api/quan-tri/bao-cao/hien-tai", _dung.Token);
+            var ds = await Http.DocJsonAsync<TongQuanHienTaiDto>("api/quan-tri/bao-cao/hien-tai", _dung.Token);
             if (_dung.IsCancellationRequested) return;
             _hienTai = ds;
             _loiHienTai = ds == null ? "Không tải được chỉ số ca/phê duyệt." : null;
@@ -261,6 +273,11 @@
                 thongBao?.CapNhat(ds.SoPhieuChoDuyet + ds.SoHoanTienChoDuyet);
             }
         }
+        catch (NgoaiLeBaoTri ex)
+        {
+            _hienTai = null; _baoTriHienTai = true; _loiHienTai = ex.Message;
+            (DichVu.GetService(typeof(ThongBaoPheDuyet)) as ThongBaoPheDuyet)?.TamDungBaoTri();
+        }
         catch
         {
             _hienTai = null;
@@ -269,6 +286,21 @@
     }
 
     public void Dispose() { _dung.Cancel(); _dung.Dispose(); }
+
+    private IEnumerable<(string Ten,int SoDon,string Url)> PhanBoTrangThai()
+    {
+        bool DaTongHopGiao(HangDoiDonDto x) => _giao != null && x.HinhThucNhan == "GIAO_HANG" && x.TrangThaiThanhToan == "DA_THANH_TOAN"
+            && x.TrangThaiDonHang is "DA_IN" or "DANG_GIAO" or "GIAO_THAT_BAI" or "DA_GIAO";
+        foreach (var nhom in (_don ?? new()).Where(x=>!DaTongHopGiao(x)).GroupBy(x=>x.TrangThaiDonHang).OrderByDescending(x=>x.Count()))
+        {
+            string giao = nhom.Key switch { "DANG_GIAO"=>"DANG_GIAO","GIAO_THAT_BAI"=>"THAT_BAI","DA_GIAO"=>"THANH_CONG",_=>null };
+            string url = giao != null ? "giao-hang?nhom="+giao : "/?trangThai="+Uri.EscapeDataString(nhom.Key);
+            yield return (TrangThaiDonHang.TenHienThi(nhom.Key),nhom.Count(),url);
+        }
+        if (_giao != null)
+            foreach (var nhom in TenNhomGiao)
+                yield return (nhom.Value,_giao.Where(x=>x.Nhom==nhom.Key).Sum(x=>x.SoDon),"giao-hang?nhom="+nhom.Key);
+    }
 
     private int DemDon(string trangThai) => _don.Count(x => x.TrangThaiDonHang == trangThai);
     private int DemCho(string nhan) => _don.Count(x => QuyTacHangDoi.NhanCho(x) == nhan);

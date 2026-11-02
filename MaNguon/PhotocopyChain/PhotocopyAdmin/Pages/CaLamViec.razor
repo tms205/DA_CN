@@ -4,11 +4,12 @@
 @inject HttpClient Http
 @inject PhienDangNhap Phien
 @inject PhamViChiNhanh PhamVi
+@implements IDisposable
 
 <PageTitle>Ca làm việc &amp; két tiền · PhotocopyChain</PageTitle>
 
 @* F-24B: mở ca / đóng ca đếm tiền / quản lý xác nhận lệch két.
-   Tiệm chạy 3 ca 4 tiếng (09:00–13:00, 13:00–17:00, 17:00–21:00) nhưng hệ thống không ép giờ —
+   Ba ca 07:30–12:30, 12:30–17:30, 17:30–21:30; hết giờ chờ tổng kết tiền —
    Nhân viên/quản lý đăng nhập tự mở ca riêng 200.000đ; CEO chọn chi nhánh rồi mở ca thủ công.
    Hết ca thì đếm tiền rồi bấm Đóng ca.
    Người trực ca không được tự xác nhận ca của chính mình. *@
@@ -45,7 +46,8 @@
     {
         @* ---- Đang trong ca ---- *@
         <section class="the ca-the">
-            <div class="ca-dau"><div><h2 class="the-tieu-de nho">Ca đang mở</h2><div class="nv-phu">@_ca.TenNhanVien · @_ca.TenChiNhanh · mở lúc @_ca.GioMoCa.ToString("HH:mm dd/MM")</div></div><span class="nhan-mau nhan-xanh">Đang mở</span></div>
+            <div class="ca-dau"><div><h2 class="the-tieu-de nho">@(_ca.TrangThai == "CHO_TONG_KET" ? "Ca hết giờ — chờ tổng kết" : "Ca đang mở")</h2><div class="nv-phu">@_ca.TenNhanVien · @_ca.TenChiNhanh · mở lúc @_ca.GioMoCa.ToString("HH:mm dd/MM")</div></div><span class="nhan-mau @MauTrangThaiCa(_ca.TrangThai)">@TenTrangThaiCa(_ca)</span></div>
+            @if (_ca.TrangThai == "CHO_TONG_KET") { <p class="o-canh-bao">Ca đã ngừng nhận giao dịch từ @_ca.GioDongCa?.ToString("HH:mm dd/MM/yyyy"). Nhập tiền thực đếm và lý do nếu chênh lệch để gửi quản lý đối soát.</p> }
             <div class="ca-so-lieu"><div class="ca-o"><div class="ca-o-nhan">Tiền đầu ca</div><b class="mono">@Tien(_ca.TienDauCa)</b></div><div class="ca-o"><div class="ca-o-nhan">COD đã thu</div><b class="mono">@Tien(_ca.DoanhThuTrongCa)</b></div><div class="ca-o"><div class="ca-o-nhan">VietQR · không vào két</div><b class="mono">@Tien(_ca.DoanhThuVietQr)</b></div><div class="ca-o"><div class="ca-o-nhan">Két phải có</div><b class="mono">@Tien(TienPhaiCo(_ca))</b></div></div>
             <button type="button" class="nut-chinh" @onclick="MoHopCa">Đóng ca &amp; kiểm đếm</button>
         </section>
@@ -77,10 +79,10 @@
         <form id="ca-form-dong" @onsubmit="DongCaAsync" @onsubmit:preventDefault class="the ca-the">
             <div class="ca-dau">
                 <div>
-                    <h2 class="the-tieu-de nho">Ca đang mở</h2>
+                    <h2 class="the-tieu-de nho">@(_ca.TrangThai == "CHO_TONG_KET" ? "Ca hết giờ — nhập tổng kết" : "Ca đang mở")</h2>
                     <div class="nv-phu">@_ca.TenNhanVien · @_ca.TenChiNhanh · mở lúc @_ca.GioMoCa.ToString("HH:mm dd/MM")</div>
                 </div>
-                <span class="nhan-mau nhan-xanh">@((MarkupString)Svg.DongHo(13)) Đang mở</span>
+                <span class="nhan-mau @MauTrangThaiCa(_ca.TrangThai)">@((MarkupString)Svg.DongHo(13)) @TenTrangThaiCa(_ca)</span>
             </div>
 
             <div class="ca-so-lieu">
@@ -118,9 +120,9 @@
             </div>
 
             @* Xem trước phần lệch để nhân viên biết trước khi bấm *@
-            @if (_tienDemDuoc > 0)
+            @if (_tienDemDuoc.HasValue)
             {
-                decimal lech = _tienDemDuoc - (_ca.TienDauCa + _ca.DoanhThuTrongCa);
+                decimal lech = _tienDemDuoc.Value - (_ca.TienDauCa + _ca.DoanhThuTrongCa);
                 @if (lech == 0)
                 {
                     <div class="o-thanh-cong">@((MarkupString)Svg.DauTich(16))<span>Khớp két.</span></div>
@@ -147,6 +149,7 @@
                 }
             }
 
+            <div class="truong"><label class="nhan" for="ca-ly-do">Lý do chênh lệch / ghi chú</label><textarea id="ca-ly-do" class="ca-o-loc" maxlength="255" rows="3" @bind="_ghiChuTongKet" placeholder="Bắt buộc khi tiền thực đếm khác số tiền két phải có"></textarea></div>
         </form>
     }
     </NoiDung>
@@ -287,8 +290,8 @@
                             {
                                 <div class="truong"><label class="nhan">Tiền đã chi cho tiệm</label><input max="999999999999" required step="1" class="ca-o-loc mono" type="number" min="0" @bind="_tienChi" /></div>
                                 <div class="truong"><label class="nhan">Nhân viên bù</label><input max="999999999999" required step="1" class="ca-o-loc mono" type="number" min="0" @bind="_tienBu" /></div>
-                                <div class="truong ca-ghi-chu-lech"><label class="nhan">Ghi chú khoản chi</label><input maxlength="255" class="ca-o-loc" placeholder="Ví dụ: mua băng keo cho tiệm" @bind="_ghiChuXacNhan" /></div>
                             }
+                            @if (lechQuanLy != 0) { <div class="truong ca-ghi-chu-lech"><label class="nhan">Lý do chênh lệch / khoản chi</label><input maxlength="255" class="ca-o-loc" placeholder="Ghi rõ nguyên nhân thiếu hoặc thừa tiền" @bind="_ghiChuXacNhan" /></div> }
                         }
                     </div>
                     <button type="button" class="nut-phu" disabled="@_dangGui" @onclick="QuayLaiChonKetQua">Quay lại</button>
@@ -306,7 +309,37 @@
     private const int SoCaMoiTrang = 5;
     private int _trangCa = 1;
     private decimal _tienDauCa = 200000;
-    private decimal _tienDemDuoc = 0;
+    private decimal? _tienDemDuoc;
+    private string _ghiChuTongKet;
+    private int? _maCaDaNhacTongKet;
+    private readonly CancellationTokenSource _theoDoiDung = new();
+    private bool _daHuy;
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) _ = TheoDoiCaAsync(_theoDoiDung.Token);
+        return Task.CompletedTask;
+    }
+
+    private async Task TheoDoiCaAsync(CancellationToken token)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(token))
+            {
+                if (_daHuy || _dangGui || CeoDangXemToanChuoi()) continue;
+                await InvokeAsync(async () =>
+                {
+                    if (_daHuy) return;
+                    await TaiCaDangMo(token);
+                    if (!_daHuy) StateHasChanged();
+                });
+            }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+    }
+    public void Dispose() { _daHuy = true; _theoDoiDung.Cancel(); _theoDoiDung.Dispose(); }
     private bool _dangTai = true;
     private bool _dangGui = false;
     private string _loi;
@@ -436,22 +469,31 @@
     }
 
     // GET api/ca/dang-mo — trả 204 nếu chưa mở ca nào
-    private async Task TaiCaDangMo()
+    private async Task TaiCaDangMo(CancellationToken token = default)
     {
         try
         {
-            var res = await Http.GetAsync("api/ca/dang-mo");
+            var res = await Http.GetAsync("api/ca/dang-mo", token);
             if (res.StatusCode == System.Net.HttpStatusCode.OK)
             {
                 _ca = await res.Content.ReadFromJsonAsync<CaLamViecDto>();
-                // Gợi ý sẵn số tiền đúng để nhân viên chỉ việc sửa nếu lệch
-                if (_tienDemDuoc == 0) _tienDemDuoc = _ca.TienDauCa + _ca.DoanhThuTrongCa;
             }
             else
             {
                 _ca = null;
+                using var cho = await Http.GetAsync("api/ca/cho-tong-ket", token);
+                if (cho.StatusCode == System.Net.HttpStatusCode.OK)
+                {
+                    _ca = await cho.Content.ReadFromJsonAsync<CaLamViecDto>();
+                    if (_maCaDaNhacTongKet != _ca.MaCa)
+                    {
+                        _maCaDaNhacTongKet = _ca.MaCa;
+                        _moCa = true;
+                    }
+                }
             }
         }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch
         {
             _loi = "Không kết nối được máy chủ API. Kiểm tra PhotocopyApi đã chạy chưa.";
@@ -491,7 +533,7 @@
             if (res.IsSuccessStatusCode)
             {
                 _thongBao = "Đã mở ca, giờ có thể tiếp nhận đơn và thu COD khi bàn giao.";
-                _tienDemDuoc = 0;
+                _tienDemDuoc = null;
                 _moCa = false;
             }
             else
@@ -512,18 +554,22 @@
     private async Task DongCaAsync()
     {
         if (_dangGui) return;
-        _loi = QuyTacNhap.LayLoi(new DongCaRequest { TongDoanhThuCuoiCa = _tienDemDuoc });
+        var request = new DongCaRequest { MaCa = _ca?.MaCa, TongDoanhThuCuoiCa = _tienDemDuoc, GhiChu = _ghiChuTongKet };
+        _loi = QuyTacNhap.LayLoi(request);
         if (_loi != null) return;
+        if (_ca != null && _tienDemDuoc != TienPhaiCo(_ca) && string.IsNullOrWhiteSpace(_ghiChuTongKet))
+        { _loi = "Vui lòng nhập lý do chênh lệch két."; return; }
         _thongBao = null;
         _dangGui = true;
         try
         {
-            var res = await Http.PostAsJsonAsync("api/ca/dong", new DongCaRequest { TongDoanhThuCuoiCa = _tienDemDuoc });
+            var res = await Http.PostAsJsonAsync("api/ca/dong", request);
             if (res.IsSuccessStatusCode)
             {
                 var ketQua = await res.Content.ReadFromJsonAsync<KetQuaDto>();
                 _thongBao = ketQua.Message;
-                _tienDemDuoc = 0;
+                _tienDemDuoc = null;
+                _ghiChuTongKet = null;
                 _moCa = false;
             }
             else
@@ -580,6 +626,7 @@
     private string TenTrangThaiCa(CaLamViecDto ca)
     {
         if (ca.TrangThai == "DANG_MO") return "Đang mở";
+        if (ca.TrangThai == "CHO_TONG_KET") return "Hết giờ · chờ tổng kết";
         if (ca.TrangThai == "CHO_XAC_NHAN") return "Chờ quản lý xác nhận";
         return string.IsNullOrWhiteSpace(ca.TenNguoiXacNhan) ? "Đã đóng" : "Đã xác nhận";
     }
@@ -587,6 +634,7 @@
     private string MauTrangThaiCa(string trangThai)
     {
         if (trangThai == "DANG_MO") return "nhan-accent";
+        if (trangThai == "CHO_TONG_KET") return "nhan-cam";
         if (trangThai == "CHO_XAC_NHAN") return "nhan-cam";
         return "nhan-xanh";
     }

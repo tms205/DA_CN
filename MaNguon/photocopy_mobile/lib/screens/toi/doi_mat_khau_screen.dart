@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../api.dart';
+import '../../phien.dart';
+import '../../realtime.dart';
+import '../xac_thuc/dang_nhap_screen.dart';
 import '../../theme.dart';
 import '../../widgets/icons.dart';
 import '../../widgets/widgets.dart';
@@ -62,8 +65,11 @@ class _DoiMatKhauScreenState extends State<DoiMatKhauScreen> {
       });
       return;
     }
-    hienThongBaoNhanh(context, '${kq.duLieu['message']} Lần đăng nhập sau dùng mật khẩu mới.');
-    Navigator.pop(context);
+    hienThongBaoNhanh(context, kq.duLieu['message']);
+    await Realtime.dung();
+    await Phien.dangXuat();
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const DangNhapScreen()), (_) => false);
   }
 
   @override

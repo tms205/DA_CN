@@ -7,4 +7,5 @@ public sealed class KetNoiBaoTri
     public void Add(HubCallerContext context) => _connections[context.ConnectionId] = context;
     public void Remove(string id) => _connections.TryRemove(id, out _);
     public void DisconnectAll() { foreach (var context in _connections.Values) context.Abort(); }
+    public void DisconnectWhere(Func<HubCallerContext,bool> predicate) { foreach(var context in _connections.Values) if(predicate(context))context.Abort(); }
 }

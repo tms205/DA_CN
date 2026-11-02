@@ -5,6 +5,35 @@ namespace PhotocopyAdmin;
 // Chỉ tổng hợp dữ liệu API báo cáo đã lọc quyền và đơn hoàn tất.
 public static class TongQuanBaoCao
 {
+    public static (DateTime TuNgay, DateTime DenNgay) KhoangThoiGian(DateTime homNay, string moc)
+    {
+        homNay = homNay.Date;
+        var dauThang = new DateTime(homNay.Year, homNay.Month, 1);
+        var dauTuan = DauKy(homNay, "tuan");
+        return moc switch
+        {
+            "ngay" => (homNay, homNay), "thang" => (dauThang, homNay),
+            "thang-truoc" => (dauThang.AddMonths(-1), dauThang.AddDays(-1)),
+            "tuan" => (dauTuan, homNay), "tuan-truoc" => (dauTuan.AddDays(-7), dauTuan.AddDays(-1)),
+            _ => throw new ArgumentException("Chọn một mốc thời gian hợp lệ.")
+        };
+    }
+
+    public static string KiemTraNgayNhap(string tu, string den, DateTime homNay, out DateTime tuNgay, out DateTime denNgay)
+    {
+        tuNgay = denNgay = default;
+        var culture = System.Globalization.CultureInfo.InvariantCulture;
+        if (!DateTime.TryParseExact(tu?.Trim(), "dd/MM/yyyy", culture, System.Globalization.DateTimeStyles.None, out tuNgay))
+            return "Từ ngày phải là ngày có thật, đúng định dạng dd/MM/yyyy.";
+        if (!DateTime.TryParseExact(den?.Trim(), "dd/MM/yyyy", culture, System.Globalization.DateTimeStyles.None, out denNgay))
+            return "Đến ngày phải là ngày có thật, đúng định dạng dd/MM/yyyy.";
+        if (tuNgay > denNgay) return "Từ ngày phải nhỏ hơn hoặc bằng Đến ngày.";
+        if (denNgay > homNay.Date) return "Không chọn ngày trong tương lai.";
+        try { KyTruoc(tuNgay, denNgay); }
+        catch (ArgumentException ex) { return ex.Message; }
+        return null;
+    }
+
     public static DateTime DauKy(DateTime ngay, string nhomTheo)
     {
         ngay = ngay.Date;

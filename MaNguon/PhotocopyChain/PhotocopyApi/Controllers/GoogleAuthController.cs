@@ -113,7 +113,7 @@ public partial class AuthController
                 new { tam.Google.Subject, MaNguoiDung = ma }, tx);
             await tx.CommitAsync();
             _cache.Remove("google-dang-ky:" + req.VeDangKy);
-            return Ok(TaoToken(await DocHoSo(conn, ma), false, req.GhiNho));
+            return Ok(TaoToken(await DocHoSo(conn, ma), false, req.GhiNho, null));
         }
         catch (SqlException ex) when (ex.Number is 2601 or 2627)
         {

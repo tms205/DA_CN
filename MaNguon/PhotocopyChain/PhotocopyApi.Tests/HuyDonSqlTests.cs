@@ -12,16 +12,16 @@ namespace PhotocopyApi.Tests;
 public class HuyDonSqlTests
 {
     [SqlHuyDon]
-    public async Task KhachHuyDonDaTiepNhanNhungChuaIn_DuocHuyVaGiuTienChoHoan()
+    public async Task KhachHuyDonChoTiepNhanCoBangChung_GiuTienChoHoan()
     {
         await using var db = KetNoi();
         await db.OpenAsync();
-        var ids = await TaoDuLieuTam(db, "DA_XAC_NHAN");
+        var ids = await TaoDuLieuTam(db, "CHO_XAC_NHAN");
         await ThucThi(db, "sp_HuyDonHang", new { MaDonHang = 1, MaNguoiHuy = ids.Khach, LyDo = "Không còn nhu cầu" });
         Assert.Equal("DA_HUY", await db.ExecuteScalarAsync<string>("SELECT TrangThai FROM #DonHang"));
         Assert.Null(await db.ExecuteScalarAsync<int?>("SELECT MaMayIn FROM #DonHang"));
         Assert.Equal("DA_THANH_TOAN", await db.ExecuteScalarAsync<string>("SELECT TrangThai FROM #ThanhToan"));
-        Assert.Equal(1, await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM #ThongBao"));
+        Assert.Equal(2, await db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM #ThongBao WHERE MaNguoiDung IN(@Khach,@Ceo)",ids));
         await ThucThi(db, "sp_HoanTien", new { MaDonHang = 1, MaNguoiDuyet = ids.Ceo });
         Assert.Equal("DA_HOAN_TIEN", await db.ExecuteScalarAsync<string>("SELECT TrangThai FROM #ThanhToan"));
         await Assert.ThrowsAsync<SqlException>(() => ThucThi(db, "sp_HoanTien", new { MaDonHang = 1, MaNguoiDuyet = ids.Ceo }));
@@ -83,10 +83,10 @@ public class HuyDonSqlTests
             (SELECT TOP(1) MaChiNhanh FROM dbo.ChiNhanh ORDER BY MaChiNhanh) AS Nhanh");
         Assert.True(ids.Khach > 0 && ids.Ceo > 0 && ids.Nhanh > 0);
         await db.ExecuteAsync(@"CREATE TABLE #DonHang(MaDonHang INT PRIMARY KEY,MaChiNhanh INT,MaKhachHang INT,
-                TrangThai VARCHAR(20) COLLATE DATABASE_DEFAULT,MaMayIn INT NULL,GhiChu NVARCHAR(255) COLLATE DATABASE_DEFAULT);
+                TrangThai VARCHAR(20) COLLATE DATABASE_DEFAULT,MaMayIn INT NULL,GhiChu NVARCHAR(255) COLLATE DATABASE_DEFAULT,NgayHenTra DATETIME NULL,BangChungHuyJson NVARCHAR(MAX) NULL);
             CREATE TABLE #ThanhToan(MaDonHang INT PRIMARY KEY,TrangThai VARCHAR(20) COLLATE DATABASE_DEFAULT,PhuongThuc VARCHAR(10) COLLATE DATABASE_DEFAULT,MaGiaoDich VARCHAR(50) COLLATE DATABASE_DEFAULT,NgayThanhToan DATETIME);
             CREATE TABLE #ThongBao(MaNguoiDung INT,MaDonHang INT,TieuDe NVARCHAR(255) COLLATE DATABASE_DEFAULT,NoiDung NVARCHAR(500) COLLATE DATABASE_DEFAULT);");
-        await db.ExecuteAsync(@"INSERT #DonHang VALUES(1,@Nhanh,@Khach,@state,123,NULL);
+        await db.ExecuteAsync(@"INSERT #DonHang VALUES(1,@Nhanh,@Khach,@state,123,NULL,DATEADD(HOUR,1,GETDATE()),NULL);
             INSERT #ThanhToan VALUES(1,'DA_THANH_TOAN','VIETQR',NULL,NULL);", new { ids.Nhanh, ids.Khach, state });
         return ids;
     }
@@ -98,7 +98,12 @@ public class HuyDonSqlTests
         sql = Regex.Replace(sql, @"^AS\s*", "");
         foreach (string table in new[] { "DonHang", "ThanhToan", "ThongBao" })
             sql = Regex.Replace(sql, @"\b(?:dbo\.)?" + table + @"\b", "#" + table);
-        return db.ExecuteAsync(sql, args);
+        var parameters=new DynamicParameters(args);
+        if(name=="sp_HuyDonHang") {
+            int actor=(int)args.GetType().GetProperty("MaNguoiHuy").GetValue(args);
+            parameters.Add("BangChungJson",System.Text.Json.JsonSerializer.Serialize(new{Loai="THU_CONG",MaDonHang=1,MaNguoiGui=actor,Anh=new[]{new{MaAnh="fixture"}}}));
+        }
+        return db.ExecuteAsync(sql, parameters);
     }
 
     private static string ThuTuc(string name)
@@ -107,10 +112,12 @@ public class HuyDonSqlTests
         var dir = new DirectoryInfo(root);
         while (dir != null && !File.Exists(Path.Combine(dir.FullName, "Database", "04_StoredProcedure.sql"))) dir = dir.Parent;
         Assert.NotNull(dir);
-        string source = File.ReadAllText(Path.Combine(dir.FullName, "Database", "04_StoredProcedure.sql"));
-        var match = Regex.Match(source, @"^CREATE PROCEDURE " + name + @"\b.*?(?=^GO\s*$)", RegexOptions.Multiline | RegexOptions.Singleline);
-        Assert.True(match.Success, "Không tìm thấy thủ tục " + name);
-        return match.Value;
+        foreach(string file in new[]{"018-BangChungHuyDon.sql","014-HuyDonTruocIn_HoanTien.sql","04_StoredProcedure.sql"}) {
+            string source=File.ReadAllText(Path.Combine(dir.FullName,"Database",file));
+            var match=Regex.Match(source,@"^CREATE(?: OR ALTER)?\s+PROCEDURE (?:dbo\.)?"+name+@"\b.*?(?=^GO\s*$)",RegexOptions.Multiline|RegexOptions.Singleline);
+            if(match.Success)return match.Value;
+        }
+        throw new InvalidDataException("Không tìm thấy thủ tục "+name);
     }
 
     private sealed class Ids { public int Khach { get; set; } public int Ceo { get; set; } public int Nhanh { get; set; } }

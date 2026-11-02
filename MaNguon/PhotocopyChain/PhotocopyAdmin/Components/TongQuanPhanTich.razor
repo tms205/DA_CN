@@ -1,7 +1,7 @@
 ﻿@inject HttpClient Http
 
 @if (_dangTai) { <div class="the bang-trong" role="status">Đang tải phân tích doanh thu…</div> }
-else if (_loi != null) { <div class="o-loi" role="alert">@_loi <button type="button" class="nut-nho" @onclick="TaiAsync">Thử lại phân tích</button></div> }
+else if (_loi != null) { <TrangThaiTaiDuLieu DangBaoTri="_baoTri" NoiDung="@_loi" ThuLai="TaiAsync" NhanThuLai="Thử lại phân tích" /> }
 else if (_ds != null)
 {
     <div class="tq-luoi-deu">
@@ -40,6 +40,7 @@ else if (_ds != null)
     private DateTime _tuDaTai, _denDaTai;
     private bool _dangTai;
     private string _loi;
+    private bool _baoTri;
     private TongQuanPhanTichDto _ds;
 
     protected override async Task OnParametersSetAsync()
@@ -52,14 +53,16 @@ else if (_ds != null)
     {
         _dangTai = true;
         _loi = null;
+        _baoTri = false;
         DateTime tu = TuNgay, den = DenNgay;
         try
         {
-            _ds = await Http.GetFromJsonAsync<TongQuanPhanTichDto>($"api/quan-tri/bao-cao/phan-tich?tuNgay={tu:yyyy-MM-dd}&denNgay={den:yyyy-MM-dd}");
+            _ds = await Http.DocJsonAsync<TongQuanPhanTichDto>($"api/quan-tri/bao-cao/phan-tich?tuNgay={tu:yyyy-MM-dd}&denNgay={den:yyyy-MM-dd}");
             if (_ds == null) throw new InvalidOperationException();
             _tuDaTai = tu;
             _denDaTai = den;
         }
+        catch (NgoaiLeBaoTri ex) { _ds = null; _baoTri = true; _loi = ex.Message; }
         catch { _ds = null; _loi = "Không tải được phân tích. Kiểm tra API và thử lại; báo cáo doanh thu vẫn xem được."; }
         finally { _dangTai = false; }
     }

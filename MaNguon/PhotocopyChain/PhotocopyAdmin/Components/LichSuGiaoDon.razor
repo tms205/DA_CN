@@ -1,0 +1,93 @@
+@using PhotocopyShared.Dtos.GiaoHang
+@inject HttpClient Http
+@implements IDisposable
+
+@if (_dangTai && _luot == null) { <p role="status">Đang tải lịch sử giao hàng…</p> }
+@if (_loi != null)
+{
+    <div class="o-loi" role="alert">@_loi</div>
+    <button type="button" class="nut-phu" disabled="@_dangTai" @onclick="Tai">Thử lại</button>
+}
+@if (_luot != null)
+{
+    <div class="ls-giao-tom-tat">
+        <div><strong>@($"DH{MaDonHang:D5}")</strong><span>@_luot.Count lượt giao · Xem bằng chứng và phản hồi theo từng lượt</span></div>
+        <span class="ls-giao-dem @(SoCho > 0 ? "ls-giao-cho" : "")" role="status">@SoCho phản hồi chờ đối chiếu</span>
+    </div>
+    @if (_luot.Count == 0) { <p>Đơn chưa có lượt giao nào.</p> }
+    else
+    {
+        <div class="ls-giao-luot" role="group" aria-label="Chọn lượt giao để xem bằng chứng và đối chiếu">
+            @foreach (var luot in _luot)
+            {
+                <button type="button" class="ls-giao-nut @(_maDaChon == luot.MaGiaoHang ? "ls-giao-chon" : "")"
+                        aria-pressed="@(_maDaChon == luot.MaGiaoHang ? "true" : "false")"
+                        aria-controls="@_idChiTiet" @onclick="() => _maDaChon = luot.MaGiaoHang">
+                    <b>Lượt @luot.LanGiao</b><span>@TenTrangThai(luot.TrangThai)</span>
+                    <span class="@(luot.TrangThaiDoiChieu == "CHO_DOI_CHIEU" ? "ls-giao-canh-bao" : "")">@TenDoiChieu(luot)</span>
+                </button>
+            }
+        </div>
+        @if (_luot.FirstOrDefault(x => x.MaGiaoHang == _maDaChon) is { } chon)
+        {
+            <section id="@_idChiTiet" class="ls-giao-chi-tiet" aria-label="Chi tiết lượt giao đang chọn">
+                <div class="ls-giao-thong-tin">
+                    <div><span>Shipper · Lượt @chon.LanGiao</span><b>@chon.TenShipper</b></div>
+                    <div><span>Nhận giao</span><b>@Gio(chon.NgayNhan)</b></div>
+                    <div><span>Kết quả giao</span><b>@Gio(chon.NgayGiao)</b></div>
+                </div>
+                @if (chon.TrangThai == "THAT_BAI")
+                {
+                    <BangChungGiaoHang @key="chon.MaGiaoHang" MaGiaoHang="chon.MaGiaoHang"
+                        MoPhanHoi="@(chon.TrangThaiDoiChieu != null)" DaDoiChieu="SauDoiChieu" />
+                }
+                else
+                {
+                    <p>@TenTrangThai(chon.TrangThai). Lượt này không có hồ sơ đối chiếu giao thất bại.</p>
+                }
+            </section>
+        }
+    }
+}
+
+@code {
+    [Parameter] public int MaDonHang { get; set; }
+    [Parameter] public EventCallback DaDoiChieu { get; set; }
+    private List<LuotLichSuGiaoDto> _luot;
+    private int? _maDaChon;
+    private string _loi;
+    private bool _dangTai;
+    private readonly string _idChiTiet = "ls-giao-" + Guid.NewGuid().ToString("N");
+    private readonly CancellationTokenSource _dung = new();
+    private int SoCho => _luot?.Count(x => x.TrangThaiDoiChieu == "CHO_DOI_CHIEU") ?? 0;
+
+    protected override Task OnInitializedAsync() => Tai();
+    private async Task Tai()
+    {
+        _dangTai = true; _loi = null;
+        try
+        {
+            using var response = await Http.GetAsync($"api/giao-hang/don/{MaDonHang}/lich-su", _dung.Token);
+            if (!response.IsSuccessStatusCode) { _loi = "Chưa tải được lịch sử giao hoặc bạn không có quyền xem đơn này."; return; }
+            _luot = (await response.Content.ReadFromJsonAsync<List<LuotLichSuGiaoDto>>(cancellationToken: _dung.Token) ?? new())
+                .OrderBy(x => x.LanGiao).ThenBy(x => x.MaGiaoHang).ToList();
+            if (!_luot.Any(x => x.MaGiaoHang == _maDaChon))
+                _maDaChon = (_luot.FirstOrDefault(x => x.TrangThaiDoiChieu == "CHO_DOI_CHIEU") ?? _luot.LastOrDefault())?.MaGiaoHang;
+        }
+        catch (OperationCanceledException) when (_dung.IsCancellationRequested) { }
+        catch { _loi = "Chưa tải được lịch sử giao hàng. Hãy thử lại."; }
+        finally { _dangTai = false; }
+    }
+    private async Task SauDoiChieu() { await Tai(); await DaDoiChieu.InvokeAsync(); }
+    private static string Gio(DateTime? value) => value?.ToString("dd/MM/yyyy HH:mm") ?? "Chưa ghi nhận";
+    private static string TenTrangThai(string value) => value switch
+    {
+        "THAT_BAI" => "Giao thất bại", "THANH_CONG" => "Giao thành công", "DANG_GIAO" => "Đang giao", _ => value
+    };
+    private static string TenDoiChieu(LuotLichSuGiaoDto luot) => luot.TrangThaiDoiChieu switch
+    {
+        "CHO_DOI_CHIEU" => "Chờ đối chiếu", "DA_XU_LY" => "Đã đối chiếu",
+        _ => luot.TrangThai == "THAT_BAI" ? "Khách chưa gửi phản hồi" : "Không có đối chiếu"
+    };
+    public void Dispose() { _dung.Cancel(); _dung.Dispose(); }
+}

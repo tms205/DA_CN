@@ -1,3 +1,6 @@
+import 'package:photocopy_mobile/api.dart';
+import 'dart:io';
+import 'bang_chung_giao_test.dart' show AnhThu;
 import 'dart:async';
 import 'dart:convert';
 
@@ -16,6 +19,20 @@ http.Response tra(Object data, [int status = 200]) => http.Response(
   headers: {'content-type': 'application/json; charset=utf-8'},
 );
 
+Future<KetQuaApi> uploadGia(int id, List<Map<String, String>> images) async {
+  expect(id, 15);
+  expect(images, isNotEmpty);
+  return KetQuaApi()
+    ..thanhCong = true
+    ..duLieu = {'maBangChung': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'};
+}
+
+Future<T?> chayThat<T>(WidgetTester tester, Future<T> Function() task) {
+  final client =
+      http.Client(); // Giữ HTTP fixture khi Flutter chuyển sang event loop thật để đọc file.
+  return tester.runAsync(() => http.runWithClient(task, () => client));
+}
+
 Map<String, dynamic> don(String trangThai) => {
   'maDonHang': 15,
   'maDonHangHienThi': 'DH00015',
@@ -33,7 +50,19 @@ Map<String, dynamic> don(String trangThai) => {
 };
 
 void main() {
-  setUp(() => AppTheme.dungGoogleFonts = false);
+  late Directory imageDir;
+  late String imagePath;
+  setUp(() {
+    AppTheme.dungGoogleFonts = false;
+    imageDir = Directory.systemTemp.createTempSync('huy-bang-chung-');
+    imagePath = '${imageDir.path}/proof.png';
+    File(imagePath).writeAsBytesSync(
+      base64Decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=',
+      ),
+    );
+  });
+  tearDown(() => imageDir.deleteSync(recursive: true));
 
   testWidgets('Hủy đơn đã trả tiền bắt buộc ngân hàng và số tài khoản', (
     tester,
@@ -45,7 +74,13 @@ void main() {
           MaterialApp(
             home: Scaffold(
               body: NutHuyDon(
+                guiAnh: uploadGia,
                 maDonHang: 15,
+                thongTinHoanTien: {
+                  'anhBangChung': [
+                    {'path': imagePath, 'name': 'proof.png'},
+                  ],
+                },
                 daThanhToan: true,
                 daHuy: () async {},
               ),
@@ -59,7 +94,16 @@ void main() {
           find.widgetWithText(TextFormField, 'Số tài khoản ngân hàng'),
           findsOneWidget,
         );
-        await tester.tap(find.text('Xác nhận hủy'));
+        await chayThat(tester, () async {
+          await tester.tap(find.text('Xác nhận hủy'));
+          await Future<void>.delayed(const Duration(milliseconds: 150));
+        });
+        await tester.pump();
+        await chayThat(
+          tester,
+          () => Future<void>.delayed(const Duration(milliseconds: 200)),
+        );
+        await tester.pump();
         await tester.pumpAndSettle();
         expect(calls, 0);
         await tester.enterText(
@@ -70,12 +114,31 @@ void main() {
           find.byKey(const ValueKey('hoan-so-tai-khoan')),
           '001234567890',
         );
-        await tester.tap(find.text('Xác nhận hủy'));
+        await chayThat(tester, () async {
+          await tester.tap(find.text('Xác nhận hủy'));
+          await Future<void>.delayed(const Duration(milliseconds: 150));
+        });
+        await tester.pump();
+        await chayThat(
+          tester,
+          () => Future<void>.delayed(const Duration(milliseconds: 200)),
+        );
+        await tester.pump();
         await tester.pumpAndSettle();
-        expect(calls, 1);
+        expect(
+          calls,
+          1,
+          reason: tester
+              .widgetList<Text>(find.byType(Text))
+              .map((x) => x.data)
+              .join(' | '),
+        );
         await tester.pumpWidget(const SizedBox());
       },
       () => MockClient((req) async {
+        if (req.url.path.endsWith('/bang-chung-huy') && req.method == 'POST') {
+          return tra({'maBangChung': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'});
+        }
         final body = jsonDecode(req.body);
         expectSync(body['nganHang'], 'Vietcombank');
         expectSync(body['soTaiKhoan'], '001234567890');
@@ -160,6 +223,9 @@ void main() {
         await tester.pumpWidget(const SizedBox());
       },
       () => MockClient((req) async {
+        if (req.url.path.endsWith('/bang-chung-huy') && req.method == 'POST') {
+          return tra({'maBangChung': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'});
+        }
         if (req.method == 'POST') {
           expectSync(req.url.path, '/api/don-hang/15/thong-tin-hoan-tien');
           info = Map<String, dynamic>.from(jsonDecode(req.body));
@@ -210,7 +276,13 @@ void main() {
           MaterialApp(
             home: Scaffold(
               body: NutHuyDon(
+                guiAnh: uploadGia,
                 maDonHang: 15,
+                thongTinHoanTien: {
+                  'anhBangChung': [
+                    {'path': imagePath, 'name': 'proof.png'},
+                  ],
+                },
                 daHuy: () async {
                   completed++;
                 },
@@ -226,7 +298,16 @@ void main() {
         await tester.tap(find.text('Hủy đơn'));
         await tester.pumpAndSettle();
         await tester.enterText(find.byType(TextFormField), '   ');
-        await tester.tap(find.text('Xác nhận hủy'));
+        await chayThat(tester, () async {
+          await tester.tap(find.text('Xác nhận hủy'));
+          await Future<void>.delayed(const Duration(milliseconds: 150));
+        });
+        await tester.pump();
+        await chayThat(
+          tester,
+          () => Future<void>.delayed(const Duration(milliseconds: 200)),
+        );
+        await tester.pump();
         await tester.pumpAndSettle();
         expect(find.text('Vui lòng nhập lý do hủy.'), findsOneWidget);
         expect(calls, 0);
@@ -236,6 +317,9 @@ void main() {
         await tester.pumpWidget(const SizedBox());
       },
       () => MockClient((req) async {
+        if (req.url.path.endsWith('/bang-chung-huy') && req.method == 'POST') {
+          return tra({'maBangChung': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'});
+        }
         calls++;
         return tra({'message': 'Đã hủy đơn.'});
       }),
@@ -253,7 +337,13 @@ void main() {
           MaterialApp(
             home: Scaffold(
               body: NutHuyDon(
+                guiAnh: uploadGia,
                 maDonHang: 15,
+                thongTinHoanTien: {
+                  'anhBangChung': [
+                    {'path': imagePath, 'name': 'proof.png'},
+                  ],
+                },
                 daHuy: () async {
                   completed++;
                 },
@@ -267,19 +357,45 @@ void main() {
           find.byType(TextFormField),
           '  Không cần in nữa  ',
         );
-        await tester.tap(find.text('Xác nhận hủy'));
+        await chayThat(tester, () async {
+          await tester.tap(find.text('Xác nhận hủy'));
+          await Future<void>.delayed(const Duration(milliseconds: 150));
+        });
+        await tester.pump();
+        await chayThat(
+          tester,
+          () => Future<void>.delayed(const Duration(milliseconds: 200)),
+        );
+        await tester.pump();
         await tester.pump(const Duration(milliseconds: 400));
-        expect(calls, 1);
+        expect(
+          calls,
+          1,
+          reason: tester
+              .widgetList<Text>(find.byType(Text))
+              .map((x) => x.data)
+              .join(' | '),
+        );
         expect(completed, 0);
         await tester.tap(find.text('Đang xử lý…'));
         await tester.pump();
-        expect(calls, 1);
+        expect(
+          calls,
+          1,
+          reason: tester
+              .widgetList<Text>(find.byType(Text))
+              .map((x) => x.data)
+              .join(' | '),
+        );
         cho.complete();
         await tester.pumpAndSettle();
         expect(completed, 1);
         await tester.pumpWidget(const SizedBox());
       },
       () => MockClient((req) async {
+        if (req.url.path.endsWith('/bang-chung-huy') && req.method == 'POST') {
+          return tra({'maBangChung': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'});
+        }
         expectSync(req.method, 'POST');
         expectSync(req.url.path, '/api/don-hang/15/huy');
         expectSync(jsonDecode(req.body)['lyDo'], 'Không cần in nữa');
@@ -300,7 +416,13 @@ void main() {
           MaterialApp(
             home: Scaffold(
               body: NutHuyDon(
+                guiAnh: uploadGia,
                 maDonHang: 15,
+                thongTinHoanTien: {
+                  'anhBangChung': [
+                    {'path': imagePath, 'name': 'proof.png'},
+                  ],
+                },
                 daHuy: () async {
                   completed++;
                 },
@@ -310,7 +432,16 @@ void main() {
         );
         await tester.tap(find.text('Hủy đơn'));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Xác nhận hủy'));
+        await chayThat(tester, () async {
+          await tester.tap(find.text('Xác nhận hủy'));
+          await Future<void>.delayed(const Duration(milliseconds: 150));
+        });
+        await tester.pump();
+        await chayThat(
+          tester,
+          () => Future<void>.delayed(const Duration(milliseconds: 200)),
+        );
+        await tester.pump();
         await tester.pumpAndSettle();
         expect(find.text('Đơn đã được tiếp nhận.'), findsOneWidget);
         expect(find.text('Hủy đơn'), findsOneWidget);
@@ -318,7 +449,9 @@ void main() {
         await tester.pumpWidget(const SizedBox());
       },
       () => MockClient(
-        (req) async => tra({'message': 'Đơn đã được tiếp nhận.'}, 400),
+        (req) async => req.url.path.endsWith('/bang-chung-huy')
+            ? tra({'maBangChung': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'})
+            : tra({'message': 'Đơn đã được tiếp nhận.'}, 400),
       ),
     );
   });
@@ -343,11 +476,9 @@ void main() {
         await tester.pumpAndSettle();
         expect(
           find.byType(NutHuyDon),
-          ['CHO_XAC_NHAN', 'DA_XAC_NHAN'].contains(status)
-              ? findsOneWidget
-              : findsNothing,
+          status == 'CHO_XAC_NHAN' ? findsOneWidget : findsNothing,
         );
-        if (['CHO_XAC_NHAN', 'DA_XAC_NHAN'].contains(status)) {
+        if (status == 'CHO_XAC_NHAN') {
           expect(
             tester.getTopLeft(find.text('Hủy đơn')).dy,
             lessThan(tester.getTopLeft(find.text('Tiến trình xử lý')).dy),
@@ -392,13 +523,33 @@ void main() {
     await http.runWithClient(
       () async {
         await tester.pumpWidget(
-          const MaterialApp(home: ThanhToanScreen(maDonHang: 15)),
+          MaterialApp(
+            home: ThanhToanScreen(
+              maDonHang: 15,
+              chonAnhHuy: () async => AnhThu('proof.png', imagePath),
+              guiAnhHuy: uploadGia,
+            ),
+          ),
         );
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 200));
         await tester.tap(find.text('Hủy đơn'));
         await tester.pump(const Duration(milliseconds: 400));
-        await tester.tap(find.text('Xác nhận hủy'));
+        await chayThat(tester, () async {
+          await tester.tap(find.text('Thêm ảnh (0/3)'));
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+        });
+        await tester.pump();
+        await chayThat(tester, () async {
+          await tester.tap(find.text('Xác nhận hủy'));
+          await Future<void>.delayed(const Duration(milliseconds: 150));
+        });
+        await tester.pump();
+        await chayThat(
+          tester,
+          () => Future<void>.delayed(const Duration(milliseconds: 200)),
+        );
+        await tester.pump();
         await tester.pumpAndSettle();
         expect(cancellations, 1);
         expect(find.byType(TienDoScreen), findsOneWidget);
@@ -408,6 +559,9 @@ void main() {
         await tester.pumpWidget(const SizedBox());
       },
       () => MockClient((req) async {
+        if (req.url.path.endsWith('/bang-chung-huy') && req.method == 'POST') {
+          return tra({'maBangChung': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'});
+        }
         if (req.url.path == '/api/thanh-toan/15') {
           return tra({
             'maDonHang': 15,

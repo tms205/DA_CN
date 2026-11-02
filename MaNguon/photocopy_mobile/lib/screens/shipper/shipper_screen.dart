@@ -2,17 +2,26 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../api.dart';
+import '../../dich_vu_vi_tri.dart';
 import '../../dinh_dang.dart';
 import '../../giao_hang.dart';
 import '../../phien.dart';
 import '../../realtime.dart';
 import '../../theme.dart';
 import '../../widgets/widgets.dart';
+import 'bao_giao_that_bai_screen.dart';
+import 'bang_chung_giao_screen.dart';
 
 class ShipperScreen extends StatefulWidget {
-  const ShipperScreen({super.key, this.taiDanhSach, this.guiThaoTac});
+  const ShipperScreen({
+    super.key,
+    this.taiDanhSach,
+    this.guiThaoTac,
+    this.layGps,
+  });
   final Future<KetQuaApi> Function(String)? taiDanhSach;
   final Future<KetQuaApi> Function(String, Map<String, dynamic>)? guiThaoTac;
+  final Future<DiemGps> Function()? layGps;
   @override
   State<ShipperScreen> createState() => _ShipperScreenState();
 }
@@ -127,68 +136,44 @@ class _ShipperScreenState extends State<ShipperScreen>
   }
 
   Future<void> _ketQua(DonGiao don, bool thanhCong) async {
-    final lyDo = TextEditingController();
-    String? loiNhap;
-    final hop = DialogRoute<String>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, doi) => AlertDialog(
-          title: Text(
-            thanhCong ? 'Xác nhận giao thành công' : 'Ghi nhận giao thất bại',
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  thanhCong
-                      ? 'Bạn đã giao đúng tài liệu ${don.maHienThi} cho người nhận? Không thu thêm tiền. Đơn sẽ chuyển sang Hoàn tất.'
-                      : 'Ghi rõ lý do để cửa hàng và khách biết cách xử lý. Không tự hủy đơn hoặc hoàn tiền.',
-                ),
-                if (!thanhCong) ...[
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: lyDo,
-                    maxLength: 255,
-                    minLines: 2,
-                    maxLines: 4,
-                    decoration: InputDecoration(
-                      labelText: 'Lý do giao thất bại',
-                      errorText: loiNhap,
-                      border: const OutlineInputBorder(),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Hủy'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (!thanhCong && lyDo.text.trim().length < 5) {
-                  doi(() => loiNhap = 'Nhập lý do ít nhất 5 ký tự.');
-                  return;
-                }
-                Navigator.pop(ctx, lyDo.text.trim());
-              },
-              child: const Text('Xác nhận'),
-            ),
-          ],
+    if (!thanhCong) {
+      final daGui = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => BaoGiaoThatBaiScreen(don: don, layGps: widget.layGps),
         ),
+      );
+      if (mounted && daGui == true) {
+        hienThongBaoNhanh(
+          context,
+          'Đã lưu báo cáo và bằng chứng giao thất bại.',
+        );
+        await _tai();
+      }
+      return;
+    }
+    final dongY = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Xác nhận giao thành công'),
+        content: Text(
+          'Bạn đã giao đúng tài liệu ${don.maHienThi} cho người nhận? Không thu thêm tiền. Đơn sẽ chuyển sang Hoàn tất.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Hủy'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Xác nhận'),
+          ),
+        ],
       ),
     );
-    String? ketQua = await Navigator.of(context).push(hop);
-    // Chờ route thực sự tháo khỏi cây; không đoán thời gian animation.
-    await hop.completed;
-    lyDo.dispose();
-    if (ketQua != null && mounted && !_dangGui && don.maGiaoHang != null) {
+    if (dongY == true && mounted && !_dangGui && don.maGiaoHang != null) {
       await _gui('/api/giao-hang/luot/${don.maGiaoHang}/ket-qua', {
-        'thanhCong': thanhCong,
-        'lyDo': thanhCong ? null : ketQua,
+        'thanhCong': true,
       });
     }
   }
@@ -245,7 +230,7 @@ class _ShipperScreenState extends State<ShipperScreen>
                 loai: LoaiThongBao.canhBao,
               ),
             ),
-          if (_nhom == 'LICH_SU')
+          if (_nhom == 'LICH_SU' || _nhom == 'THAT_BAI' || _nhom == 'THANH_CONG')
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
@@ -253,6 +238,19 @@ class _ShipperScreenState extends State<ShipperScreen>
                     ? 'Đã giao thành công'
                     : 'Giao thất bại',
               ),
+            ),
+          if ((_nhom == 'LICH_SU' || _nhom == 'THAT_BAI') &&
+              don.trangThaiGiao == 'THAT_BAI' &&
+              don.maGiaoHang != null)
+            OutlinedButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => BangChungGiaoScreen(maGiao: don.maGiaoHang!),
+                ),
+              ),
+              icon: const Icon(Icons.fact_check_outlined),
+              label: const Text('Xem bằng chứng'),
             ),
           const SizedBox(height: 10),
           Wrap(
@@ -279,7 +277,7 @@ class _ShipperScreenState extends State<ShipperScreen>
               ),
             ],
           ),
-          if (_nhom == 'CHO_GIAO') ...[
+          if (_nhom == 'CHO_GIAO' || _nhom == 'THAT_BAI') ...[
             const SizedBox(height: 8),
             if (don.soLan >= 3)
               const HopThongBao(
@@ -343,6 +341,8 @@ class _ShipperScreenState extends State<ShipperScreen>
               for (final nhom in {
                 'CHO_GIAO': 'Chờ giao',
                 'DANG_GIAO': 'Đang giao',
+                'THAT_BAI': 'Giao thất bại',
+                'THANH_CONG': 'Giao thành công',
                 'LICH_SU': 'Lịch sử',
               }.entries)
                 ChoiceChip(

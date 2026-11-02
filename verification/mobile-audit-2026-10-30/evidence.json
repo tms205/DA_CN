@@ -1,0 +1,208 @@
+{
+  "Date": "2026-10-30",
+  "Scope": "Review only; no application or database mutation",
+  "DartFiles": 43,
+  "ScreenFiles": 25,
+  "ExistingTestFiles": 23,
+  "Analyze": {
+    "ExitCode": 0,
+    "ElapsedSeconds": 46.6,
+    "Result": "No issues found"
+  },
+  "ExistingTests": {
+    "Failed": 0,
+    "ExitCode": 0,
+    "Passed": 153
+  },
+  "Reproductions": {
+    "ExitCode": 0,
+    "Reproduced": 6,
+    "Purpose": "Assertions reproduce current defects/limitations, not fixed regressions"
+  },
+  "AndroidDebugBuild": {
+    "AssembleSeconds": 46.9,
+    "ExitCode": 0,
+    "Result": "Success"
+  },
+  "LiveApi": "Connection refused on localhost:5268 for maintenance status/session and swagger",
+  "AndroidDevices": 0,
+  "Sources": [
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\api.dart",
+      "Sha256": "6B92A602DC87F46B7721F0FF6C96850EBE7C1FE89137BA34AA14555E2EE6515C"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\dich_vu_vi_tri.dart",
+      "Sha256": "6DDE74AB5CBF5C1F80187D1F282D2438EA38EAA1224343E0D3980411BCF6881E"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\dinh_dang.dart",
+      "Sha256": "B60ED7ABC343286A16C9565ABE25D1BE58B78FF78366FACF44CA7597DA2F8CF8"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\giao_hang.dart",
+      "Sha256": "41784B34EBA4FA16A495B2AC6DA149C54B78B7C8F527613CDF8D0DB9FC2CC7D6"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\google_auth.dart",
+      "Sha256": "1E3BD8583C850DB5E9CE33A73C51AE421892D0B4D51782FBA93B559FF4014249"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\kiem_tra_du_lieu.dart",
+      "Sha256": "A8752B3260FE4641D2BD7E68A2EC560C345CA663D1F8B15CB628A176DBA309AF"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\main.dart",
+      "Sha256": "B4AACB8B31FEDC0DA6F2810DBF0CDD6FB782714B89B13810FBD5DD3CADB390EE"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\models.dart",
+      "Sha256": "7D068E266453A08F5FAAFD901D46691750C551E331B0258E78DC7FF765E13B6B"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\phien.dart",
+      "Sha256": "63E870A7141C95322AFB05A1698B6131BE65913B61FDD83151A22C9F537EF3B6"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\quy_cach_anh_the.dart",
+      "Sha256": "A880747C9E926E1769FDE0E0BB09476F0FEDFC3CF4E24AF78CF995C1E3185008"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\quy_cach_in.dart",
+      "Sha256": "CE0DC4A52F0B66A6B2E075F9CF5D147CAC92D9A5ABD1BA4D01EA08D3AA45DB0D"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\realtime.dart",
+      "Sha256": "9FCB79B0FC05EB269B1E2136119D406EE57463AC87A4F1886E84B2721024BEF3"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\theme.dart",
+      "Sha256": "A6B95CEF2814D61265B90DF5C7FA5A07382917A86871CFADECB1ED27080D9F6E"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\screens\\trang_chinh_screen.dart",
+      "Sha256": "0CD9AFA84E872C7DD936F50FBA95D96DCE750A5117B85813038779A7FC8E566A"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\screens\\dat_in\\cat_anh_ocr_screen.dart",
+      "Sha256": "11056EEBD466C36FD70F608A3901BA114C09A0AF5800DEDA59A8306F6175BDFC"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\screens\\dat_in\\cau_hinh_in_screen.dart",
+      "Sha256": "45DB91060E6569A198CD59F39FB91016D8A27D0798A861E0378FF9DEBC06A72F"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\screens\\dat_in\\chon_chi_nhanh_screen.dart",
+      "Sha256": "841B218C51FA6E5F73515A72003A91C2F8FE7210E546C64C547587C9BD8E9E7A"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\screens\\dat_in\\chon_file_screen.dart",
+      "Sha256": "22F63440CD5FA56623FF6EFFA5277DC3CA03D3BBBA6195AA6A83A042E2D8C0B7"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\screens\\dat_in\\nhan_dang_chu_screen.dart",
+      "Sha256": "48A8BE9FAF8F9934C5059AF3AC4984EC6DB9083322D91C79E4FFD5D644AAA515"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\screens\\dat_in\\thanh_toan_screen.dart",
+      "Sha256": "C259B9EB5E7CC36BB102969CF19F1667D1DF4FA83C8A646D8445D69893E53537"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\screens\\dat_in\\xem_mau_don_screen.dart",
+      "Sha256": "55274DB7F905E00E8AF7B19DCB591CF93ABDA5052DBDBADADA72F5673AB8DA15"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\screens\\don_hang\\don_hang_screen.dart",
+      "Sha256": "9D9DB9063121F9546A94FB9CE3DBFE6FFEDCE742EA5857DED78957C53C253E4B"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\screens\\don_hang\\tien_do_screen.dart",
+      "Sha256": "0DDF1220E680DEE4DF634B5F38EFF45B1D04D389309E9C6C5C6BC515CB289480"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\screens\\shipper\\shipper_screen.dart",
+      "Sha256": "68BFC6EE0281205B7549043AD436A03BA6E74C8FA5696A87B835F429BE659827"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\screens\\thong_bao\\thong_bao_screen.dart",
+      "Sha256": "12B9F2C7D021B8DBB43BBE182F71FEBDDDCD5EE900997E6BD89399161BD6B886"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\screens\\toi\\cai_dat_screen.dart",
+      "Sha256": "9CCF1D0B43157FCC278B29E3BE2454CD2550E71A39D7076A534C389269C4887F"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\screens\\toi\\dia_chi_screen.dart",
+      "Sha256": "E72B4F86835535E23DB6B405DD749D2F8F973B5CF139D170BD24419572E98F3E"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\screens\\toi\\dieu_khoan_screen.dart",
+      "Sha256": "4A70C46ECEC7105F4A93C16A1796A3CA79A62D1650FA0EB74269B9067395C1ED"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\screens\\toi\\doi_mat_khau_screen.dart",
+      "Sha256": "A420B924DD07B14CA33E49952515B463C38773CE0812D74D99895FC300B12E2D"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\screens\\toi\\ho_so_screen.dart",
+      "Sha256": "74DBCE4D94E668A431279F44998B2F343DF352D7FD7E41F0DD998FD7FB37A27A"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\screens\\toi\\ho_tro_screen.dart",
+      "Sha256": "5C5478F886F8651C308E4211143CC4C2DE6199AEF42EBD08AF6619B6AD56F132"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\screens\\toi\\toi_screen.dart",
+      "Sha256": "729D0B7A4192C64CBC07602BFB7C707FA48D3B082F2571AC99C1CC82CDDFA5B7"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\screens\\xac_thuc\\bo_sung_google_screen.dart",
+      "Sha256": "590B1C75E6815EEC25FF2ECD1A9B0F8D332673176427D37321A0CE6219A7B49A"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\screens\\xac_thuc\\dang_ky_screen.dart",
+      "Sha256": "F3985AD997E636389FDEED2539289AB9FCF6CB75B7123F8AF0822E7DC93ADE35"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\screens\\xac_thuc\\dang_nhap_screen.dart",
+      "Sha256": "0ECEDDC9015ACBB291892CE2B64E53A619F6DA4B437378AC505ECE2CB6A802E7"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\screens\\xac_thuc\\nut_google.dart",
+      "Sha256": "3D6012595EBDB4BE2A091065EC453714FBC484CC4A6E2D70F7BE847D55F20867"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\screens\\xac_thuc\\quen_mat_khau_screen.dart",
+      "Sha256": "2AE7B4FE9E9C034334EB36CEC82FA341047A16783A390C22FDC4034E732CB045"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\screens\\xac_thuc\\xac_thuc_otp_screen.dart",
+      "Sha256": "281656D5F094C9C4C3FCEBE6A4CDFE21E0A08AA41C567F722855E1E7233012D6"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\widgets\\dia_chi_giao.dart",
+      "Sha256": "584BF906DD112D4DCB182363BAE957C4A9773F46F7BB2D424F6287BC88FD5A2F"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\widgets\\gio_in_xong.dart",
+      "Sha256": "F2D660DB1C126E01424D85E20DC580B85AA933A2AE2E504AA728B7CCC0942370"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\widgets\\huy_don.dart",
+      "Sha256": "493BAEF54480E02D55C98F1624409125510B0FB91C2DAB1604D39CCA689835CB"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\widgets\\icons.dart",
+      "Sha256": "9AB0C7D517D84934EA692680F19127D6E30E7A675D197C1C80209FF14FA2AE94"
+    },
+    {
+      "Path": "MaNguon\\photocopy_mobile\\lib\\widgets\\widgets.dart",
+      "Sha256": "C2D90B24A85A1280ED5EAF635E1618B39FBFA1D88B2D26F75F45CF489087A361"
+    }
+  ],
+  "Apk": {
+    "Path": "MaNguon\\photocopy_mobile\\build\\app\\outputs\\flutter-apk\\app-debug.apk",
+    "Bytes": 185951820,
+    "Sha256": "F51C425C3BECC35DD41B21F80BC39B79CF7947130DBD0CE4C9A37845CBB9ABA8"
+  }
+}

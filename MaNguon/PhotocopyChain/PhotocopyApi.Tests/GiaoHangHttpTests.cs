@@ -21,6 +21,21 @@ public class GiaoHangHttpTests
 {
     [Theory]
     [InlineData(null, "GET", "/api/giao-hang", HttpStatusCode.Unauthorized)]
+    [InlineData(null,"GET","/api/giao-hang/phan-bo",HttpStatusCode.Unauthorized)]
+    [InlineData("CUSTOMER","GET","/api/giao-hang/phan-bo",HttpStatusCode.Forbidden)]
+    [InlineData("SHIPPER","GET","/api/giao-hang/phan-bo",HttpStatusCode.Forbidden)]
+    [InlineData("BRANCH_ADMIN","GET","/api/giao-hang/phan-bo",HttpStatusCode.Forbidden)]
+    [InlineData(null,"GET","/api/giao-hang/don/79/lich-su",HttpStatusCode.Unauthorized)]
+    [InlineData("CUSTOMER","GET","/api/giao-hang/don/79/lich-su",HttpStatusCode.Forbidden)]
+    [InlineData("SHIPPER","GET","/api/giao-hang/don/79/lich-su",HttpStatusCode.Forbidden)]
+    [InlineData("STAFF","GET","/api/giao-hang/don/79/lich-su",HttpStatusCode.Forbidden)]
+    [InlineData("BRANCH_ADMIN","GET","/api/giao-hang/don/79/lich-su",HttpStatusCode.Forbidden)]
+    [InlineData(null,"POST","/api/don-hang/1/huy",HttpStatusCode.Unauthorized)]
+    [InlineData("CUSTOMER","POST","/api/don-hang/1/huy",HttpStatusCode.BadRequest)]
+    [InlineData("CUSTOMER","POST","/api/don-hang/1/bang-chung-huy",HttpStatusCode.BadRequest)]
+    [InlineData("STAFF","POST","/api/don-hang/1/huy",HttpStatusCode.Forbidden)]
+    [InlineData("SHIPPER","GET","/api/don-hang/1/bang-chung-huy",HttpStatusCode.Forbidden)]
+    [InlineData("STAFF","GET","/api/don-hang/1/bang-chung-huy/anh/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",HttpStatusCode.Forbidden)]
     [InlineData("CUSTOMER", "GET", "/api/giao-hang", HttpStatusCode.Forbidden)]
     [InlineData("STAFF", "POST", "/api/giao-hang/luot/1/ket-qua", HttpStatusCode.Forbidden)]
     [InlineData("SHIPPER", "POST", "/api/giao-hang/1/phan-cong", HttpStatusCode.Forbidden)]
@@ -28,6 +43,21 @@ public class GiaoHangHttpTests
     [InlineData("BRANCH_ADMIN", "GET", "/api/giao-hang", HttpStatusCode.Forbidden)]
     [InlineData("CUSTOMER", "POST", "/api/giao-hang/dia-chi", HttpStatusCode.BadRequest)]
     [InlineData("SHIPPER", "POST", "/api/giao-hang/luot/1/ket-qua", HttpStatusCode.BadRequest)]
+    [InlineData("CUSTOMER", "GET", "/api/giao-hang/luot/1/bang-chung", HttpStatusCode.Forbidden)]
+    [InlineData("STAFF", "GET", "/api/giao-hang/luot/1/bang-chung/anh/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", HttpStatusCode.Forbidden)]
+    [InlineData("STAFF", "POST", "/api/giao-hang/luot/1/giao-that-bai", HttpStatusCode.Forbidden)]
+    [InlineData("SHIPPER", "POST", "/api/giao-hang/vi-tri-shipper", HttpStatusCode.BadRequest)]
+    [InlineData(null, "POST", "/api/giao-hang/luot/1/giao-that-bai", HttpStatusCode.Unauthorized)]
+    [InlineData(null, "POST", "/api/giao-hang/vi-tri-shipper", HttpStatusCode.Unauthorized)]
+    [InlineData(null, "GET", "/api/giao-hang/luot/1/bang-chung", HttpStatusCode.Unauthorized)]
+    [InlineData(null,"GET","/api/giao-hang/don/1/doi-chieu",HttpStatusCode.Unauthorized)]
+    [InlineData("SHIPPER","GET","/api/giao-hang/don/1/doi-chieu",HttpStatusCode.Forbidden)]
+    [InlineData("STAFF","GET","/api/giao-hang/luot/1/doi-chieu",HttpStatusCode.Forbidden)]
+    [InlineData("SHIPPER","GET","/api/giao-hang/luot/1/doi-chieu/anh/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",HttpStatusCode.Forbidden)]
+    [InlineData("STAFF","POST","/api/giao-hang/luot/1/doi-chieu",HttpStatusCode.Forbidden)]
+    [InlineData("CUSTOMER","PUT","/api/giao-hang/luot/1/doi-chieu/xu-ly",HttpStatusCode.Forbidden)]
+    [InlineData("SHIPPER","PUT","/api/giao-hang/luot/1/doi-chieu/xu-ly",HttpStatusCode.Forbidden)]
+    [InlineData("BRANCH_ADMIN","PUT","/api/giao-hang/luot/1/doi-chieu/xu-ly",HttpStatusCode.BadRequest)]
     public async Task Middleware_ChanSaiQuyenVaDuLieuTruocKhiGoiDatabase(string role, string method, string path, HttpStatusCode status)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
@@ -47,7 +77,10 @@ public class GiaoHangHttpTests
             using var http = new HttpClient { BaseAddress = new Uri(address) };
             if (role != null) http.DefaultRequestHeaders.Add("X-Fixture-Role", role);
             using var req = new HttpRequestMessage(new HttpMethod(method), path);
-            if (method == "POST") req.Content = JsonContent.Create(new { });
+            if(path.EndsWith("/bang-chung-huy") && method=="POST")req.Content=new MultipartFormDataContent();
+            else if (method is "POST" or "PUT") req.Content = path.EndsWith("/ket-qua")
+                ? JsonContent.Create(new { thanhCong = false, lyDo = "Khách không nghe máy" })
+                : JsonContent.Create(new { });
             using var res = await http.SendAsync(req);
             Assert.Equal(status, res.StatusCode);
         }

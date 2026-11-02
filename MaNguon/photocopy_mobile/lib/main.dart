@@ -45,7 +45,7 @@ class _ManHinhChoState extends State<ManHinhCho> {
   Future<void> _kiemTraPhien() async {
     bool daDangNhap = await Phien.docTuMay();
     if (daDangNhap) {
-      final status = await Api.get('/api/bao-tri/trang-thai');
+      final status = await Api.get('/api/bao-tri/trang-thai?nenTang=app');
       var invalid = status.thanhCong && status.duLieu['dangBaoTri'] == true;
       if (!invalid) { final session = await Api.get('/api/bao-tri/phien'); invalid = session.maHttp == 401; }
       if (invalid) {

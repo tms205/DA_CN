@@ -69,11 +69,13 @@
                                 <td class="cot-hanh-dong" data-nhan="Trạng thái / Thao tác">
                                     @if (d.TrangThai == "HIEN")
                                     {
-                                        <button class="nut-nho" disabled="@_dangGui" title="Ẩn đánh giá này khỏi hiển thị công khai" @onclick="() => AnAsync(d)">Ẩn đánh giá</button>
+                                        <span class="nhan-mau nhan-xanh">Đang hiển thị</span>
+                                        <button class="nut-nho" disabled="@_dangGui" title="Ẩn đánh giá này khỏi hiển thị công khai" @onclick="() => DoiHienThiAsync(d)">Ẩn đánh giá</button>
                                     }
                                     else
                                     {
                                         <span class="nhan-mau nhan-xam">Đã ẩn</span>
+                                        <button class="nut-nho" disabled="@_dangGui" @onclick="() => DoiHienThiAsync(d)">Hiện đánh giá</button>
                                     }
                                 </td>
                             </tr>
@@ -91,13 +93,16 @@
     private List<DanhGiaDto> _ds;private string _loi;
     protected override async Task OnInitializedAsync()=>await TaiAsync();
     private async Task TaiAsync(){try{_ds=await Http.GetFromJsonAsync<List<DanhGiaDto>>("api/don-hang/danh-gia")??new();}catch{_loi="Không tải được đánh giá.";_ds=new();}}
-    private async Task AnAsync(DanhGiaDto d)
+    private async Task DoiHienThiAsync(DanhGiaDto d)
     {
-        if (_dangGui || !await _xacNhan.HoiAsync("Ẩn đánh giá của “" + d.TenKhachHang + "” cho đơn " + d.MaDonHangHienThi + " khỏi hiển thị công khai?", "Ẩn đánh giá", "Ẩn đánh giá", true)) return;
+        bool hien = d.TrangThai != "HIEN";
+        string action = hien ? "Hiện đánh giá" : "Ẩn đánh giá";
+        string message = hien ? "Hiển thị lại phản hồi này cho khách hàng và tính vào điểm chi nhánh?" : "Ẩn phản hồi này khỏi trang khách hàng và điểm chi nhánh? Dữ liệu vẫn được giữ để quản lý.";
+        if (_dangGui || !await _xacNhan.HoiAsync(message, action, action, !hien)) return;
         _dangGui = true; _loi = null;
-        try { using var r = await Http.PutAsync($"api/don-hang/danh-gia/{d.MaDanhGia}/an", null); if (r.IsSuccessStatusCode) await TaiAsync(); else _loi = await DocLoiApi.TuPhanHoiAsync(r, "Không ẩn được đánh giá."); }
+        try { using var r = await Http.PutAsync($"api/don-hang/danh-gia/{d.MaDanhGia}/{(hien ? "hien" : "an")}", null); if (r.IsSuccessStatusCode) await TaiAsync(); else _loi = await DocLoiApi.TuPhanHoiAsync(r, "Không cập nhật được đánh giá."); }
         catch (HttpRequestException) { _loi = "Mất kết nối API. Làm mới trang để kiểm tra kết quả."; }
         finally { _dangGui = false; }
     }
-    private string Sao(int n)=>new string('★',n)+new string('☆',5-n);
+    private string Sao(int n)=>new string('★',Math.Clamp(n,0,5))+new string('☆',5-Math.Clamp(n,0,5));
 }

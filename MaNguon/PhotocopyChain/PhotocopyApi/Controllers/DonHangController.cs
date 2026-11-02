@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.Data;
 using PhotocopyApi.GiaoHang;
 using System.Text.Json;
@@ -29,7 +29,7 @@ namespace PhotocopyApi.Controllers;
 // Mỗi action làm đúng 4 bước: lấy người gọi từ token → kiểm tra → gọi SQL / thủ tục → trả kết quả.
 [ApiController]
 [Route("api/don-hang")]
-public class DonHangController : ControllerBase
+public partial class DonHangController : ControllerBase
 {
     private readonly string _chuoiKetNoi;
     private readonly GeoapifyService _giaoHang;
@@ -37,11 +37,13 @@ public class DonHangController : ControllerBase
     private readonly TrangThaiMayInAoStore _trangThaiMay;
     private readonly YeuCauInCodStore _yeuCauCod;
     private readonly PhatHienMayInStore _phatHienMay;
+    private readonly PhotocopyApi.HuyDon.BangChungHuyStore _bangChungHuy;
 
     public DonHangController(IConfiguration config, IMemoryCache boNhoTam, IHubContext<CapNhatHub> hub, GeoapifyService giaoHang = null,
         TrangThaiMayInAoStore trangThaiMay = null, YeuCauInCodStore yeuCauCod = null, PhatHienMayInStore phatHienMay = null)
     {
         _giaoHang = giaoHang ?? new GeoapifyService(config, boNhoTam);
+        _bangChungHuy = new(config);
         _hub = hub;
         _chuoiKetNoi = config.GetConnectionString("PhotocopyChain");
         _trangThaiMay = trangThaiMay ?? new TrangThaiMayInAoStore();
@@ -383,6 +385,8 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
 
         ChiNhanh chiNhanh = await conn.QueryFirstOrDefaultAsync<ChiNhanh>(
             "SELECT * FROM ChiNhanh WHERE MaChiNhanh = @MaChiNhanh AND TrangThai = N'HOAT_DONG'", new { MaChiNhanh = maChiNhanh });
+        if (chiNhanh == null)
+            return BadRequest(new { message = "Chi nhánh không tồn tại hoặc hiện không nhận đơn mới." });
         YeuCauMayIn yeuCau = await DocYeuCauMayIn(conn, dsMaDichVu);
         if (yeuCau == null)
             return BadRequest(new { message = "Cấu hình in không có trong bảng giá." });
@@ -686,6 +690,7 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
 
     private sealed class DonPhucHoiFile
     {
+        public bool ChoHuyKhach {get;set;}
         public string HinhThucNhan { get; set; }
         public int? MaMayIn { get; set; }
         public int MaChiNhanh { get; set; }
@@ -953,18 +958,24 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
         await using var giaoDich = await conn.BeginTransactionAsync();
         var don = await conn.QueryFirstOrDefaultAsync<DonPhucHoiFile>(
             @"SELECT dh.MaChiNhanh, dh.MaKhachHang, dh.TrangThai, tt.PhuongThuc,
-                     tt.TrangThai AS TrangThaiThanhToan FROM DonHang dh WITH (UPDLOCK, HOLDLOCK)
+                     tt.TrangThai AS TrangThaiThanhToan,
+                     CAST(CASE WHEN dh.TrangThai='CHO_XAC_NHAN' AND (dh.NgayHenTra IS NULL OR dh.NgayHenTra>DATEADD(MINUTE,15,GETDATE())) THEN 1 ELSE 0 END AS BIT) AS ChoHuyKhach
+              FROM DonHang dh WITH (UPDLOCK, HOLDLOCK)
               JOIN ThanhToan tt ON tt.MaDonHang=dh.MaDonHang WHERE dh.MaDonHang=@MaDonHang",
             new { MaDonHang = maDonHang }, giaoDich);
         if (don == null) return NotFound(new { message = "Không tìm thấy đơn hàng." });
         if (User.IsInRole(VaiTro.Customer))
         {
             if (don.MaKhachHang != maNguoiHuy) return NotFound(new { message = "Không tìm thấy đơn hàng." });
+            if(!don.ChoHuyKhach)return BadRequest(new {message="Khách chỉ được hủy khi đơn chưa tiếp nhận và còn hơn 15 phút trước giờ hẹn."});
         }
         else if (!DuocLamViecVoiChiNhanh(don.MaChiNhanh))
             return StatusCode(403, new { message = "Đơn không thuộc phạm vi chi nhánh đang chọn." });
         if (!TrangThaiDonHang.ChoPhepHuy(don.TrangThai))
             return BadRequest(new { message = "Chỉ được hủy đơn đang chờ tiếp nhận hoặc chờ in. Từ khi bắt đầu in, đơn không được hủy hoặc hoàn tiền qua luồng này." });
+        PhotocopyApi.HuyDon.HoSoHuyDon proof;
+        try {proof=_bangChungHuy.Doc(maDonHang,maNguoiHuy,req.MaBangChung);}
+        catch(ArgumentException ex){return BadRequest(new {message=ex.Message});}
         string ghiChu = req.LyDo.Trim().Replace('\r', ' ').Replace('\n', ' ');
         bool coThongTinHoan = !string.IsNullOrWhiteSpace(req.NganHang) || !string.IsNullOrWhiteSpace(req.SoTaiKhoan);
         if (coThongTinHoan || (User.IsInRole(VaiTro.Customer) && don.TrangThaiThanhToan == "DA_THANH_TOAN"))
@@ -982,7 +993,8 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
             {
                 MaDonHang = maDonHang,
                 MaNguoiHuy = maNguoiHuy,
-                LyDo = ghiChu
+                LyDo = ghiChu,
+                BangChungJson = JsonSerializer.Serialize(proof)
             }, transaction: giaoDich, commandType: CommandType.StoredProcedure);
             await giaoDich.CommitAsync();
         }
@@ -995,7 +1007,8 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
             "SELECT CAST(CASE WHEN EXISTS (SELECT 1 FROM ThanhToan WHERE MaDonHang = @MaDonHang AND TrangThai = 'DA_THANH_TOAN') THEN 1 ELSE 0 END AS BIT)",
             new { MaDonHang = maDonHang });
         await XoaFileCuaDonDaKetThuc(conn, maDonHang);
-        await BaoDonDoiTrangThai(conn, maDonHang, "Đơn đã bị hủy");
+        try {await BaoDonDoiTrangThai(conn,maDonHang,"Đơn đã bị hủy");}
+        catch(Exception ex) when(ex is not OperationCanceledException) {HttpContext.RequestServices?.GetService<ILogger<DonHangController>>()?.LogWarning("Đơn {MaDonHang} đã hủy, cập nhật realtime chưa gửi được.",maDonHang);}
         return Ok(new
         {
             message = canHoanTien
@@ -1108,8 +1121,8 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
     [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN")]
     public async Task<IActionResult> DanhSachDanhGia()
     {
-        int? maChiNhanh = User.FindFirst(TenClaim.MaChiNhanh) == null
-            ? null : int.Parse(User.FindFirst(TenClaim.MaChiNhanh).Value);
+        int? maChiNhanh = int.TryParse(User.FindFirst(TenClaim.MaChiNhanh)?.Value, out int branch) && branch > 0 ? branch : null;
+        if (!User.IsInRole(VaiTro.SuperAdmin) && maChiNhanh == null) return Forbid();
         using var conn = new SqlConnection(_chuoiKetNoi);
         var danhSach = await conn.QueryAsync<DanhGiaDto>(
             @"SELECT dg.MaDanhGia, dg.MaDonHang,
@@ -1127,19 +1140,24 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
 
     [HttpPut("danh-gia/{maDanhGia}/an")]
     [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN")]
-    public async Task<IActionResult> AnDanhGia([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maDanhGia)
+    public Task<IActionResult> AnDanhGia([Range(1, int.MaxValue)] int maDanhGia) => DoiHienThiDanhGia(maDanhGia, "AN");
+
+    [HttpPut("danh-gia/{maDanhGia}/hien")]
+    [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN")]
+    public Task<IActionResult> HienDanhGia([Range(1, int.MaxValue)] int maDanhGia) => DoiHienThiDanhGia(maDanhGia, "HIEN");
+
+    private async Task<IActionResult> DoiHienThiDanhGia(int maDanhGia, string trangThai)
     {
-        int? maChiNhanh = User.FindFirst(TenClaim.MaChiNhanh) == null
-            ? null : int.Parse(User.FindFirst(TenClaim.MaChiNhanh).Value);
+        int? maChiNhanh = int.TryParse(User.FindFirst(TenClaim.MaChiNhanh)?.Value, out int branch) && branch > 0 ? branch : null;
+        if (!User.IsInRole(VaiTro.SuperAdmin) && maChiNhanh == null) return Forbid();
         using var conn = new SqlConnection(_chuoiKetNoi);
         int soDong = await conn.ExecuteAsync(
-            @"UPDATE dg SET TrangThai = N'AN'
+            @"UPDATE dg SET TrangThai = @TrangThai
               FROM DanhGia dg JOIN DonHang dh ON dh.MaDonHang = dg.MaDonHang
               WHERE dg.MaDanhGia = @MaDanhGia AND (@MaChiNhanh IS NULL OR dh.MaChiNhanh = @MaChiNhanh)",
-            new { MaDanhGia = maDanhGia, MaChiNhanh = maChiNhanh });
-        if (soDong == 0)
-            return NotFound(new { message = "Không tìm thấy đánh giá trong phạm vi quản lý." });
-        return Ok(new KetQuaDto { Message = "Đã ẩn đánh giá." });
+            new { MaDanhGia = maDanhGia, MaChiNhanh = maChiNhanh, TrangThai = trangThai });
+        if (soDong == 0) return NotFound(new { message = "Không tìm thấy đánh giá trong phạm vi quản lý." });
+        return Ok(new KetQuaDto { Message = trangThai == "HIEN" ? "Đã hiển thị lại đánh giá." : "Đã ẩn đánh giá." });
     }
 
     private async Task<NguonPhatSinh> DocNguonPhatSinh(SqlConnection conn, int maDonHang, int maChiTiet)

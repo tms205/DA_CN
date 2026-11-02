@@ -104,7 +104,7 @@ void main() {
   test('Nhóm lọc đơn hàng theo trạng thái', () {
     expect(donCoTrangThai('CHO_XAC_NHAN').nhom, 'DANG_XU_LY');
     expect(donCoTrangThai('DA_IN').nhom, 'DANG_XU_LY');
-    expect(donCoTrangThai('GIAO_THAT_BAI').nhom, 'DANG_GIAO');
+    expect(donCoTrangThai('GIAO_THAT_BAI').nhom, 'GIAO_THAT_BAI');
     expect(donCoTrangThai('DA_GIAO').nhom, 'HOAN_TAT');
     expect(donCoTrangThai('DA_HUY').nhom, 'DA_HUY');
   });

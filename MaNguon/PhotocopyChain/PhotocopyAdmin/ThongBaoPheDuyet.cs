@@ -7,20 +7,23 @@ namespace PhotocopyAdmin;
 public sealed class ThongBaoPheDuyet(HttpClient http)
 {
     public int? SoCho { get; private set; }
+    public bool DangBaoTri { get; private set; }
     public event Action ThayDoi;
     private int _lanTai;
 
-    public void CapNhat(int? soCho) { ++_lanTai; SoCho = soCho; ThayDoi?.Invoke(); }
+    public void CapNhat(int? soCho) { ++_lanTai; SoCho = soCho; DangBaoTri = false; ThayDoi?.Invoke(); }
+    public void TamDungBaoTri() { ++_lanTai; SoCho = null; DangBaoTri = true; ThayDoi?.Invoke(); }
 
     public async Task TaiAsync()
     {
         int lanTai = ++_lanTai;
         try
         {
-            var ds = await http.GetFromJsonAsync<TongQuanHienTaiDto>("api/quan-tri/bao-cao/hien-tai");
+            var ds = await http.DocJsonAsync<TongQuanHienTaiDto>("api/quan-tri/bao-cao/hien-tai");
             if (lanTai == _lanTai)
                 CapNhat(ds == null ? null : ds.SoPhieuChoDuyet + ds.SoHoanTienChoDuyet);
         }
+        catch (NgoaiLeBaoTri) { if (lanTai == _lanTai) TamDungBaoTri(); }
         catch { if (lanTai == _lanTai) CapNhat(null); }
     }
 }

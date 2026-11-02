@@ -43,8 +43,9 @@ public class CanCotThaoTacWebTests
     {
         string html = await Render<DanhGia>();
         Assert.Contains("class=\"bang bang-thao-tac-giua\"", html);
-        Assert.Contains("class=\"cot-hanh-dong\">Trạng thái / Thao tác</th>", html);
+        Assert.Matches("class=\"cot-hanh-dong\"[^>]*>Trạng thái / Thao tác</th>", html);
         Assert.Contains("Ẩn đánh giá</button>", html);
+        Assert.Contains("Hiện đánh giá</button>", html);
     }
 
     [Fact]
@@ -80,7 +81,7 @@ public class CanCotThaoTacWebTests
                 "/api/danh-muc/chi-nhanh" => Array.Empty<ChiNhanhDto>(),
                 "/api/quan-tri/danh-muc-dich-vu" => new[] { new DichVuQuanTriDto { MaDichVu = 1, TenDichVu = "In thử", LoaiDichVu = "IN_AN", TrangThai = "HIEN" } },
                 "/api/quan-tri/danh-muc-vat-tu" => Array.Empty<VatTuDanhMucDto>(),
-                "/api/don-hang/danh-gia" => new[] { new DanhGiaDto { MaDanhGia = 1, TenKhachHang = "Khách thử", SoSao = 5, TrangThai = "HIEN" } },
+                "/api/don-hang/danh-gia" => new[] { new DanhGiaDto { MaDanhGia = 1, TenKhachHang = "Khách thử", SoSao = 5, TrangThai = "HIEN" }, new DanhGiaDto { MaDanhGia = 2, TenKhachHang = "Khách ẩn", SoSao = 3, TrangThai = "AN" } },
                 "/api/quan-tri/mau-don" => Array.Empty<PhotocopyShared.Dtos.DatIn.MauDonDto>(),
                 _ => throw new InvalidOperationException("API ngoài dự kiến: " + req.RequestUri.AbsolutePath)
             };

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/services.dart';
 
 import '../api.dart';
@@ -16,6 +18,8 @@ class NutHuyDon extends StatefulWidget {
     this.daThanhToan = false,
     this.capNhatHoanTien = false,
     this.thongTinHoanTien,
+    this.chonAnh,
+    this.guiAnh,
   });
 
   final int maDonHang;
@@ -23,6 +27,8 @@ class NutHuyDon extends StatefulWidget {
   final bool daThanhToan;
   final bool capNhatHoanTien;
   final Map<String, dynamic>? thongTinHoanTien;
+  final Future<PlatformFile?> Function()? chonAnh;
+  final Future<KetQuaApi> Function(int, List<Map<String, String>>)? guiAnh;
 
   @override
   State<NutHuyDon> createState() => _NutHuyDonState();
@@ -30,6 +36,7 @@ class NutHuyDon extends StatefulWidget {
 
 class _NutHuyDonState extends State<NutHuyDon> {
   bool _dangXuLy = false;
+  Map<String, dynamic>? _banNhap;
 
   Future<void> _huy() async {
     if (_dangXuLy) return;
@@ -40,21 +47,41 @@ class _NutHuyDonState extends State<NutHuyDon> {
         builder: (_) => _HoiHuyDon(
           daThanhToan: widget.daThanhToan || widget.capNhatHoanTien,
           capNhatHoanTien: widget.capNhatHoanTien,
-          thongTinHoanTien: widget.thongTinHoanTien,
+          thongTinHoanTien: _banNhap ?? widget.thongTinHoanTien,
+          chonAnh: widget.chonAnh,
         ),
       );
       if (thongTin == null || !mounted) return;
+      _banNhap = Map<String, dynamic>.from(thongTin);
+      final body = Map<String, dynamic>.from(thongTin);
+      final anh = (body.remove('anhBangChung') as List? ?? [])
+          .map((a) => Map<String, String>.from(a))
+          .toList();
+      if (!widget.capNhatHoanTien) {
+        final uploaded =
+            await (widget.guiAnh?.call(widget.maDonHang, anh) ??
+                Api.guiBangChungHuy(widget.maDonHang, anh));
+        if (!mounted) return;
+        if (!uploaded.thanhCong) {
+          hienThongBaoNhanh(context, uploaded.loi);
+          return;
+        }
+        body['maBangChung'] = uploaded.duLieu['maBangChung'];
+      }
       final thaoTac = widget.capNhatHoanTien ? 'thong-tin-hoan-tien' : 'huy';
       final kq = await Api.post(
         '/api/don-hang/${widget.maDonHang}/$thaoTac',
-        thongTin,
+        body,
       );
       if (!mounted) return;
       final thongBao = kq.thanhCong && kq.duLieu is Map
           ? kq.duLieu['message']?.toString() ?? 'Đã hủy đơn.'
           : kq.loi;
       hienThongBaoNhanh(context, thongBao);
-      if (kq.thanhCong) await widget.daHuy();
+      if (kq.thanhCong) {
+        _banNhap = null;
+        await widget.daHuy();
+      }
     } finally {
       if (mounted) setState(() => _dangXuLy = false);
     }
@@ -79,10 +106,12 @@ class _HoiHuyDon extends StatefulWidget {
     required this.daThanhToan,
     required this.capNhatHoanTien,
     this.thongTinHoanTien,
+    this.chonAnh,
   });
   final bool daThanhToan;
   final bool capNhatHoanTien;
   final Map<String, dynamic>? thongTinHoanTien;
+  final Future<PlatformFile?> Function()? chonAnh;
 
   @override
   State<_HoiHuyDon> createState() => _HoiHuyDonState();
@@ -94,11 +123,46 @@ class _HoiHuyDonState extends State<_HoiHuyDon> {
   late final TextEditingController _nganHang;
   late final TextEditingController _soTaiKhoan;
   bool _daXacNhan = false;
+  final List<Map<String, String>> _anh = [];
+  String? _loiAnh;
+  Future<void> _chonAnh() async {
+    if (_anh.length >= 3) return;
+    try {
+      final file =
+          await (widget.chonAnh?.call() ??
+              FilePicker.pickFile(
+                type: FileType.custom,
+                allowedExtensions: ['jpg', 'jpeg', 'png'],
+              ));
+      if (file?.path == null || !mounted) return;
+      final size = await File(file!.path!).length();
+      if (!mounted) return;
+      if (size <= 0 || size > 5 * 1024 * 1024) {
+        throw StateError('Mỗi ảnh tối đa 5 MB.');
+      }
+      if (_anh.any((a) => a['path'] == file.path)) return;
+      setState(() {
+        _anh.add({'path': file.path!, 'name': file.name});
+        _loiAnh = null;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _loiAnh = 'Không đọc được ảnh. Chọn JPG/PNG tối đa 5 MB.',
+        );
+      }
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     final info = widget.thongTinHoanTien;
+    _anh.addAll(
+      (info?['anhBangChung'] as List? ?? []).map(
+        (a) => Map<String, String>.from(a),
+      ),
+    );
     _lyDo = TextEditingController(
       text:
           info?['lyDo']?.toString() ??
@@ -122,10 +186,16 @@ class _HoiHuyDonState extends State<_HoiHuyDon> {
 
   void _xacNhan() {
     if (_daXacNhan) return;
-    if (_form.currentState!.validate()) {
+    final valid = _form.currentState!.validate();
+    if (!widget.capNhatHoanTien && _anh.isEmpty) {
+      setState(() => _loiAnh = 'Vui lòng chọn ảnh bằng chứng hủy đơn.');
+      return;
+    }
+    if (valid) {
       _daXacNhan = true;
       Navigator.pop(context, {
         'lyDo': _lyDo.text.trim(),
+        if (!widget.capNhatHoanTien) 'anhBangChung': _anh,
         if (widget.daThanhToan) ...{
           'nganHang': _nganHang.text.trim(),
           'soTaiKhoan': _soTaiKhoan.text.trim(),
@@ -149,7 +219,7 @@ class _HoiHuyDonState extends State<_HoiHuyDon> {
             Text(
               widget.daThanhToan
                   ? 'Đơn hủy trước khi in sẽ được hoàn đủ tiền sau khi CEO xác nhận đã chuyển hoàn.'
-                  : 'Chỉ hủy được trước khi bắt đầu in. Nếu tiền đã chuyển được ghi nhận sau khi hủy, cửa hàng sẽ xử lý hoàn tiền.',
+                  : 'Chỉ hủy khi chưa tiếp nhận và còn hơn 15 phút trước giờ hẹn. Tiền đến sau khi hủy sẽ được cửa hàng đối soát.',
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -197,6 +267,37 @@ class _HoiHuyDonState extends State<_HoiHuyDon> {
               const Text(
                 'Kiểm tra đúng ngân hàng và số tài khoản trước khi gửi. CEO sẽ dùng thông tin này để chuyển hoàn.',
               ),
+            ],
+            if (!widget.capNhatHoanTien) ...[
+              const SizedBox(height: 16),
+              const Text(
+                'Bằng chứng yêu cầu hủy *',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const Text(
+                '1–3 ảnh trao đổi/yêu cầu hủy, JPG/PNG, tối đa 5 MB mỗi ảnh.',
+              ),
+              for (int i = 0; i < _anh.length; i++)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    _anh[i]['name']!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: IconButton(
+                    tooltip: 'Bỏ ảnh ${i + 1}',
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: () => setState(() => _anh.removeAt(i)),
+                  ),
+                ),
+              OutlinedButton.icon(
+                onPressed: _anh.length >= 3 ? null : _chonAnh,
+                icon: const Icon(Icons.add_photo_alternate_outlined),
+                label: Text('Thêm ảnh (${_anh.length}/3)'),
+              ),
+              if (_loiAnh != null)
+                Text(_loiAnh!, style: const TextStyle(color: Colors.red)),
             ],
           ],
         ),

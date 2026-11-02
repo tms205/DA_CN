@@ -24,6 +24,8 @@
             <div class="o-loi">@((MarkupString)Svg.ChamThan())<span>@_loi</span></div>
         }
 
+        @if (MatKhauDaDoi == 1) { <div class="o-thanh-cong" role="status">Đã đổi mật khẩu. Vui lòng đăng nhập bằng mật khẩu mới.</div> }
+
         <EditForm Model="_form" OnValidSubmit="DangNhapAsync" OnInvalidSubmit="DangNhapKhongHopLe" class="dn-form">
             <DataAnnotationsValidator />
 
@@ -116,6 +118,7 @@
     private string _loi;              // câu lỗi hiện trong hộp đỏ
     private bool _dangGui = false;    // đang chờ API trả lời thì khóa nút
     private bool _hienMatKhau = false;
+    [SupplyParameterFromQuery(Name = "mat-khau-da-doi")] public int? MatKhauDaDoi { get; set; }
     private TrangThaiBaoTriWeb _baoTri;
     private bool _daTaiBaoTri, _moThongBaoBaoTri;
     private sealed class TrangThaiBaoTriWeb { public bool DangBaoTri { get; set; } public string LoiNhan { get; set; } }
@@ -163,7 +166,7 @@
 
     private async Task TaiTrangThaiBaoTriAsync()
     {
-        try { _baoTri = await Http.GetFromJsonAsync<TrangThaiBaoTriWeb>("api/bao-tri/trang-thai"); }
+        try { _baoTri = await Http.GetFromJsonAsync<TrangThaiBaoTriWeb>("api/bao-tri/trang-thai?nenTang=web"); }
         catch { /* Giữ trạng thái gần nhất nếu mạng tạm lỗi. */ }
     }
 

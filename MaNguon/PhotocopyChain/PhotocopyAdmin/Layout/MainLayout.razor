@@ -6,6 +6,7 @@
 @inject ThongBaoPheDuyet ThongBao
 @inject IJSRuntime JS
 @implements IDisposable
+@using PhotocopyShared.Dtos.DonHang
 
 @* AppShell dùng chung: sidebar desktop, sidebar thu gọn và drawer trên màn hình nhỏ. *@
 <div class="@LopKhung">
@@ -104,7 +105,7 @@
                     {
                         <NavLink class="tb-muc" href="khach-hang" title="Khách hàng" @onclick="DongMenu">@((MarkupString)Svg.NguoiMot(18)) <span>Khách hàng</span></NavLink>
                         <NavLink class="tb-muc" href="mau-don" title="Quản lý mẫu đơn in sẵn" @onclick="DongMenu">@((MarkupString)Svg.BieuMau()) <span>Mẫu đơn in sẵn</span></NavLink>
-                        <NavLink class="tb-muc" href="phe-duyet" title="Phê duyệt phiếu nhập và hoàn tiền" @onclick="DongMenu">@((MarkupString)Svg.DuyetHoSo(18)) <span>Phê duyệt</span>@if (ThongBao.SoCho != 0) { <span class="tb-badge" aria-label="@(ThongBao.SoCho == null ? "Số yêu cầu chờ duyệt chưa tải được" : $"{ThongBao.SoCho} yêu cầu chờ duyệt")">@(ThongBao.SoCho?.ToString() ?? "?")</span> }</NavLink>
+                        <NavLink class="tb-muc" href="phe-duyet" title="Phê duyệt phiếu nhập và hoàn tiền" @onclick="DongMenu">@((MarkupString)Svg.DuyetHoSo(18)) <span>Phê duyệt</span>@if (!ThongBao.DangBaoTri && ThongBao.SoCho != 0) { <span class="tb-badge" aria-label="@(ThongBao.SoCho == null ? "Số yêu cầu chờ duyệt chưa tải được" : $"{ThongBao.SoCho} yêu cầu chờ duyệt")">@(ThongBao.SoCho?.ToString() ?? "?")</span> }</NavLink>
                     }
                 </div>
             </section>
@@ -177,7 +178,12 @@
                 {
                     <div class="layout-bao-tri" role="status"><div><strong>Đang bảo trì</strong><span>Các chức năng nghiệp vụ đã tạm khóa. CEO chỉ có thể quản lý chế độ bảo trì.</span></div><NavLink href="bao-tri">Quản lý bảo trì →</NavLink></div>
                 }
-                @if (_daKhoiTao) { @Body }
+                @if (_daKhoiTao && TrangDangBaoTri) { <TrangThaiTaiDuLieu DangBaoTri="true" NoiDung="@_baoTriHienTai?.LoiNhan" /> }
+                @if (_daKhoiTao)
+                {
+                    <KhungBanNhapTacVu @key="KhoaBanNhap" DuongDan="@Nav.ToBaseRelativePath(Nav.Uri)"
+                        VaiTro="@ND?.TenVaiTro" BiKhoa="@TrangDangBaoTri" NoiDung="@Body" />
+                }
                 else { <div class="the" role="status">Đang chuẩn bị phiên làm việc…</div> }
             </div>
         </main>
@@ -217,14 +223,39 @@
     <p role="status">@_ketQuaSaoChep</p>
 </dialog>
 
+<HopThoaiQuanTri Mo="@(_caHetGio != null && _caDaNhac != _caHetGio.MaCa && !DangXemCa())" TieuDe="Ca làm việc đã hết giờ" Dong="DeTongKetSau">
+    <NoiDung>
+        @if (_caHetGio != null)
+        {
+            <p>Ca <b>#@_caHetGio.MaCa</b> tại <b>@_caHetGio.TenChiNhanh</b> đã ngừng nhận giao dịch lúc <b>@_caHetGio.GioDongCa?.ToString("HH:mm dd/MM/yyyy")</b>.</p>
+            <p>Vui lòng nhập tiền thực đếm và lý do chênh lệch, sau đó gửi quản lý đối soát. Hệ thống chưa tự xác nhận tiền trong két.</p>
+        }
+    </NoiDung>
+    <Chan><button type="button" class="nut-phu" @onclick="DeTongKetSau">Để sau</button><button type="button" class="nut-chinh" @onclick="MoTongKetCa">Tổng kết ca</button></Chan>
+</HopThoaiQuanTri>
+
 @code {
+    private CaLamViecDto _caHetGio;
+    private int? _caDaNhac;
+    private bool DangXemCa() => Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].Trim('/') == "ca-lam-viec";
+    private void DeTongKetSau() => _caDaNhac = _caHetGio?.MaCa;
+    private async Task MoTongKetCa()
+    {
+        if (_caHetGio != null && VaiTroLa(VaiTro.SuperAdmin)) await PhamVi.ChonAsync(_caHetGio.MaChiNhanh);
+        _caDaNhac = _caHetGio?.MaCa;
+        Nav.NavigateTo("ca-lam-viec");
+    }
     // Nhận trạng thái đăng nhập từ Blazor: sửa hồ sơ xong thì layout tự vẽ lại → tên ở sidebar đổi ngay
     [CascadingParameter] private Task<AuthenticationState> TrangThaiDangNhap { get; set; }
 
     // Người đang đăng nhập
     private NguoiDungDto ND => Phien.NguoiDung;
+    private string KhoaBanNhap => $"{ND?.MaNguoiDung}|{ND?.TenVaiTro}|{PhamVi.MaChiNhanh ?? ND?.MaChiNhanh}";
     private bool _daKhoiTao;
     private bool _dangBaoTriCeo;
+    private TrangThaiBaoTriWeb _baoTriHienTai;
+    private bool TrangDangBaoTri => (_baoTriHienTai?.DangBaoTri == true && Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].Trim('/') != "bao-tri") ||
+        _baoTriHienTai?.TinhNangKhoa?.Contains(DocDuLieuApi.ChucNangTrang(Nav.ToBaseRelativePath(Nav.Uri))) == true;
     private readonly CancellationTokenSource _baoTriDung = new();
     private List<ChiNhanhDto> _dsChiNhanh = new();
     private ElementReference _hopLienHe;
@@ -287,6 +318,8 @@
         MoNhomCuaTrang();
         await PhamVi.KhoiTaoAsync();
         await TrangThaiDangNhap;
+        try { _baoTriHienTai = await Http.GetFromJsonAsync<TrangThaiBaoTriWeb>("api/bao-tri/trang-thai?nenTang=web", _baoTriDung.Token); }
+        catch { /* Lỗi kết nối vẫn do trang nghiệp vụ thông báo; không tự coi là đang bảo trì. */ }
         _ = TheoDoiBaoTriAsync(_baoTriDung.Token);
         Nav.LocationChanged += DoiTrang;
         if (!VaiTroLa(VaiTro.SuperAdmin)) { _daKhoiTao = true; return; }
@@ -315,14 +348,31 @@
             do {
                 try {
                     if (ND != null) {
-                        var state = await Http.GetFromJsonAsync<TrangThaiBaoTriWeb>("api/bao-tri/trang-thai", token);
+                        using var session = await Http.GetAsync("api/bao-tri/phien", token);
+                        if (session.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                        {
+                            await InvokeAsync(async () => { await Phien.DangXuat(); Nav.NavigateTo("dang-nhap", replace: true); }); return;
+                        }
+                        var state = await Http.GetFromJsonAsync<TrangThaiBaoTriWeb>("api/bao-tri/trang-thai?nenTang=web", token);
+                        if (_baoTriHienTai?.LoiNhan != state?.LoiNhan ||
+                            _baoTriHienTai?.DangBaoTri != state?.DangBaoTri ||
+                            !(_baoTriHienTai?.TinhNangKhoa ?? Array.Empty<string>()).SequenceEqual(state?.TinhNangKhoa ?? Array.Empty<string>()))
+                            await InvokeAsync(() => { _baoTriHienTai = state; StateHasChanged(); });
+                        if (state?.DangBaoTri != true)
+                        {
+                            using var responseCa = await Http.GetAsync("api/ca/cho-tong-ket", token);
+                            if (responseCa.StatusCode == System.Net.HttpStatusCode.OK || responseCa.StatusCode == System.Net.HttpStatusCode.NoContent)
+                            {
+                                var ca = responseCa.StatusCode == System.Net.HttpStatusCode.OK ? await responseCa.Content.ReadFromJsonAsync<CaLamViecDto>(cancellationToken: token) : null;
+                                if (_caHetGio?.MaCa != ca?.MaCa) await InvokeAsync(() => { _caHetGio = ca; StateHasChanged(); });
+                            }
+                        }
                         if (VaiTroLa(VaiTro.SuperAdmin)) {
                             bool active = state?.DangBaoTri == true;
                             if (_dangBaoTriCeo != active) await InvokeAsync(() => { _dangBaoTriCeo = active; StateHasChanged(); });
                             if (active) await InvokeAsync(GiuTrongTrangBaoTri);
                         } else {
                             var invalid = state?.DangBaoTri == true;
-                            if (!invalid) { using var session = await Http.GetAsync("api/bao-tri/phien", token); invalid = session.StatusCode == System.Net.HttpStatusCode.Unauthorized; }
                             if (invalid) {
                                 await InvokeAsync(async () => { await Phien.DangXuat(); Nav.NavigateTo("dang-nhap", replace: true); }); return;
                             }
@@ -333,7 +383,7 @@
             } while (await timer.WaitForNextTickAsync(token));
         } catch (OperationCanceledException) { }
     }
-    private sealed class TrangThaiBaoTriWeb { public bool DangBaoTri { get; set; } }
+    private sealed class TrangThaiBaoTriWeb { public bool DangBaoTri { get; set; } public string LoiNhan { get; set; } public string[] TinhNangKhoa { get; set; } }
 
     private bool VaiTroLa(string vaiTro)
     {

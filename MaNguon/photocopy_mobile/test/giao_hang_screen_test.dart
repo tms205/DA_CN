@@ -27,8 +27,26 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: ShipperScreen()));
     expect(find.text('Chờ giao'), findsOneWidget);
     expect(find.text('Đang giao'), findsOneWidget);
+    expect(find.text('Giao thất bại'), findsOneWidget);
+    expect(find.text('Giao thành công'), findsOneWidget);
     expect(find.text('Lịch sử'), findsOneWidget);
     expect(find.textContaining('Không thu COD'), findsWidgets);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('Tab thất bại và thành công tải đúng nhóm; giao lại chỉ khi còn lượt', (tester) async {
+    final paths=<String>[];
+    await tester.pumpWidget(MaterialApp(home:ShipperScreen(taiDanhSach:(path) async {
+      paths.add(path);
+      return thanhCong(path.contains('THAT_BAI')?[{...don(trangThai:'GIAO_THAT_BAI',soLan:2),'trangThaiGiao':'THAT_BAI'}]:[]);
+    })));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ChoiceChip,'Giao thất bại'));await tester.pumpAndSettle();
+    expect(paths.last,'/api/giao-hang?nhom=THAT_BAI');
+    expect(find.text('Nhận tài liệu đi giao'),findsOneWidget);
+    await tester.tap(find.widgetWithText(ChoiceChip,'Giao thành công'));await tester.pumpAndSettle();
+    expect(paths.last,'/api/giao-hang?nhom=THANH_CONG');
+    expect(find.text('Nhận tài liệu đi giao'),findsNothing);
     await tester.pumpWidget(const SizedBox());
   });
 
@@ -93,6 +111,7 @@ void main() {
                   ? [don(trangThai: 'DANG_GIAO', soLan: 1)]
                   : [],
             ),
+            layGps: () async => throw StateError('Chưa cấp quyền GPS'),
             guiThaoTac: (_, body) async {
               bodies.add(body);
               return KetQuaApi()..loi = 'Mất kết nối, chưa xác nhận kết quả.';
@@ -105,23 +124,21 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Không giao được'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Xác nhận'));
-      await tester.pumpAndSettle();
-      expect(find.text('Nhập lý do ít nhất 5 ký tự.'), findsOneWidget);
-      expect(bodies, isEmpty);
-      await tester.enterText(find.byType(TextField), 'Khách không nghe máy');
-      await tester.tap(find.text('Xác nhận'));
-      await tester.pump(const Duration(milliseconds: 400));
-      await tester.pumpAndSettle();
-      expect(bodies.single, {
-        'thanhCong': false,
-        'lyDo': 'Khách không nghe máy',
-      });
-      expect(find.text('Mất kết nối, chưa xác nhận kết quả.'), findsOneWidget);
+      expect(find.text('Báo giao thất bại'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Gửi báo cáo giao thất bại'),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(
-        find.text('Đã giao thành công'),
-        findsOneWidget,
-      ); // Nút còn, chưa chuyển sang lịch sử.
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Gửi báo cáo giao thất bại'),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(bodies, isEmpty); // Không được đi đường API JSON cũ chỉ với lý do.
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
     },

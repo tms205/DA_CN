@@ -69,9 +69,10 @@ Color mauNenTrangThai(String trangThai) {
 // Tab "Đơn hàng" của khách (F-12): lọc theo nhóm trạng thái, kéo xuống để tải lại.
 // Figma chưa vẽ màn này nên dựng cùng phong cách màn Cấu hình in.
 class DonHangScreen extends StatefulWidget {
-  const DonHangScreen({super.key, this.nhomBanDau = 'TAT_CA', this.moDatIn});
+  const DonHangScreen({super.key, this.nhomBanDau = 'TAT_CA', this.moDatIn, this.taiDanhSach});
 
   final String nhomBanDau; // bộ lọc mở sẵn (màn Tôi truyền sang)
+  final Future<KetQuaApi> Function()? taiDanhSach;
   final VoidCallback?
   moDatIn; // bấm "Đặt in ngay" khi chưa có đơn → trang chính chuyển sang tab Đặt in
 
@@ -84,6 +85,7 @@ class _DonHangScreenState extends State<DonHangScreen> {
     'TAT_CA',
     'DANG_XU_LY',
     'DANG_GIAO',
+    'GIAO_THAT_BAI',
     'HOAN_TAT',
     'DA_HUY',
   ];
@@ -114,7 +116,7 @@ class _DonHangScreenState extends State<DonHangScreen> {
 
   // GET /api/don-hang/cua-toi
   Future<void> _taiDanhSach() async {
-    KetQuaApi kq = await Api.get('/api/don-hang/cua-toi');
+    KetQuaApi kq = await (widget.taiDanhSach?.call() ?? Api.get('/api/don-hang/cua-toi'));
     if (!mounted) return;
 
     if (!kq.thanhCong) {
@@ -419,11 +421,15 @@ class _DonHangScreenState extends State<DonHangScreen> {
                 crossAxisAlignment: CrossAxisAlignment.baseline,
                 textBaseline: TextBaseline.alphabetic,
                 children: [
-                  Text(
-                    '${thoiGianTuongDoi(d.ngayDat)} · ${d.tongSoTrang} trang in',
-                    style: AppTheme.font(size: 11, color: AppColors.chuPhu),
+                  Expanded(
+                    child: Text(
+                      '${thoiGianTuongDoi(d.ngayDat)} · ${d.tongSoTrang} trang in',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTheme.font(size: 11, color: AppColors.chuPhu),
+                    ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 12),
                   Text(
                     tien(d.tongTien),
                     style: AppTheme.mono(

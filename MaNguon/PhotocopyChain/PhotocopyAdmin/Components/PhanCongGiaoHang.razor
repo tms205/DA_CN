@@ -1,0 +1,50 @@
+@using PhotocopyShared.Dtos.GiaoHang
+@inject HttpClient Http
+
+<HopThoaiQuanTri Mo="Mo" TieuDe="Phân công giao hàng" Loi="@_loi" DangLuu="@_busy" Dong="Dong">
+    <NoiDung>
+        <p>Bàn giao đơn <b>@($"DH{MaDonHang:D5}")</b> cho shipper thuộc chi nhánh của đơn.</p>
+        @if (_ds == null) { <p role="status">Đang tải shipper…</p> }
+        else if (_ds.Count == 0) { <p>Chi nhánh chưa có shipper đang hoạt động.</p> }
+        else {
+            <label class="nhan" for="pc-giao-shipper">Shipper nhận tài liệu</label>
+            <select id="pc-giao-shipper" class="ca-o-loc" @bind="_chon" disabled="@_busy">
+                <option value="0">Chọn shipper</option>
+                @foreach (var sp in _ds) { <option value="@sp.MaShipper">@sp.HoTen · @sp.SoDienThoai</option> }
+            </select>
+        }
+        <p class="goi-y">Chỉ xác nhận khi đã giao đúng tài liệu cho shipper. Đơn sẽ chuyển sang Đang giao; không thu COD.</p>
+    </NoiDung>
+    <Chan><button type="button" class="nut-phu" disabled="@_busy" @onclick="Dong">Để sau</button><button type="button" class="nut-chinh" disabled="@(_busy || _chon==0)" @onclick="Luu">@(_busy?"Đang bàn giao…":"Xác nhận bàn giao")</button></Chan>
+</HopThoaiQuanTri>
+@code {
+    [Parameter] public bool Mo {get;set;}
+    [Parameter] public int MaDonHang {get;set;}
+    [Parameter] public int MaChiNhanh {get;set;}
+    [Parameter] public EventCallback Dong {get;set;}
+    [Parameter] public EventCallback DaGiao {get;set;}
+    private List<ShipperDto> _ds;
+    private int _chon,_donDaTai;
+    private bool _busy;
+    private string _loi;
+    protected override async Task OnParametersSetAsync() {
+        if(!Mo) {_donDaTai=0;return;}
+        if(_donDaTai==MaDonHang)return;
+        _donDaTai=MaDonHang;_ds=null;_chon=0;_loi=null;
+        try {
+            using var res=await Http.GetAsync("api/giao-hang/shipper");
+            if(!res.IsSuccessStatusCode){_loi="Chưa tải được shipper. Đóng rồi mở lại để thử lại.";_ds=new();return;}
+            _ds=(await res.Content.ReadFromJsonAsync<List<ShipperDto>>()??new()).Where(x=>x.MaChiNhanh==MaChiNhanh).ToList();
+        }catch{_loi="Chưa kết nối được máy chủ.";_ds=new();}
+    }
+    private async Task Luu() {
+        if(_busy || _chon==0)return;
+        _busy=true;_loi=null;
+        try {
+            using var res=await Http.PostAsJsonAsync($"api/giao-hang/{MaDonHang}/phan-cong",new PhanCongGiaoRequest{MaShipper=_chon});
+            if(!res.IsSuccessStatusCode){_loi=(await res.Content.ReadFromJsonAsync<ApiError>())?.Message??"Chưa bàn giao được đơn.";return;}
+            await DaGiao.InvokeAsync();await Dong.InvokeAsync();
+        }catch{_loi="Chưa xác nhận được bàn giao. Tải lại đơn để kiểm tra trước khi gửi lại.";}
+        finally{_busy=false;}
+    }
+}

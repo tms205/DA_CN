@@ -9,12 +9,19 @@ public static class OcrWord
 {
     public const string Mime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
     public static byte[] Create(string text)
+        => CreatePages(new[] { text });
+    public static byte[] CreatePages(IReadOnlyList<string> pages)
     {
-        if (string.IsNullOrWhiteSpace(text) || text.Length > 100000) throw new ArgumentException("Nội dung Word phải có từ 1 đến 100.000 ký tự.");
+        if (pages == null || pages.Count is < 1 or > 10 || pages.Any(string.IsNullOrWhiteSpace) || pages.Sum(p => (long)p.Length) > 100000)
+            throw new ArgumentException("Cần 1–10 trang kết quả, mỗi trang có nội dung; tổng tối đa 100.000 ký tự.");
+        string text = string.Join("\n", pages);
         try { XmlConvert.VerifyXmlChars(text); } catch (XmlException) { throw new ArgumentException("Văn bản chứa ký tự không hợp lệ. Hãy xóa ký tự đặc biệt và thử lại."); }
         XNamespace w = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
         var body = new XElement(w + "body");
-        foreach (var line in text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n'))
+        for (int page = 0; page < pages.Count; page++)
+        {
+        bool firstLine = true;
+        foreach (var line in pages[page].Replace("\r\n", "\n").Replace('\r', '\n').Split('\n'))
         {
             var run = new XElement(w + "r", new XElement(w + "rPr",
                 new XElement(w + "rFonts", new XAttribute(w + "ascii", "Times New Roman"), new XAttribute(w + "hAnsi", "Times New Roman")),
@@ -24,7 +31,11 @@ public static class OcrWord
                 if (i > 0) run.Add(new XElement(w + "tab"));
                 run.Add(new XElement(w + "t", new XAttribute(XNamespace.Xml + "space", "preserve"), parts[i]));
             }
-            body.Add(new XElement(w + "p", new XElement(w + "pPr", new XElement(w + "spacing", new XAttribute(w + "after", "0"), new XAttribute(w + "line", "360"), new XAttribute(w + "lineRule", "auto"))), run));
+            body.Add(new XElement(w + "p", new XElement(w + "pPr",
+                page > 0 && firstLine ? new XElement(w + "pageBreakBefore") : null,
+                new XElement(w + "spacing", new XAttribute(w + "after", "0"), new XAttribute(w + "line", "360"), new XAttribute(w + "lineRule", "auto"))), run));
+            firstLine = false;
+        }
         }
         body.Add(new XElement(w + "sectPr", new XElement(w + "pgSz", new XAttribute(w + "w", "11906"), new XAttribute(w + "h", "16838")),
             new XElement(w + "pgMar", new XAttribute(w + "top", "1440"), new XAttribute(w + "bottom", "1440"), new XAttribute(w + "left", "1440"), new XAttribute(w + "right", "1440"))));

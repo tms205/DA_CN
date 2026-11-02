@@ -1,3 +1,4 @@
+import '../../widgets/bang_chung_huy_don.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 
@@ -9,6 +10,7 @@ import '../../theme.dart';
 import '../../widgets/icons.dart';
 import '../../widgets/huy_don.dart';
 import '../../widgets/gio_in_xong.dart';
+import '../../widgets/doi_chieu_giao_hang.dart';
 import '../../widgets/widgets.dart';
 import 'don_hang_screen.dart';
 
@@ -120,6 +122,8 @@ class _TienDoScreenState extends State<TienDoScreen> {
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 26),
           children: [
             _theDon(),
+            if (_don!.trangThaiDonHang == 'DA_HUY')
+              BangChungHuyDon(maDonHang: widget.maDonHang),
             if (_don!.choPhepHuy) ...[
               const SizedBox(height: 12),
               NutHuyDon(
@@ -129,7 +133,7 @@ class _TienDoScreenState extends State<TienDoScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Bạn có thể hủy trước khi bắt đầu in. Khi đơn chuyển sang Đang in, chức năng hủy sẽ không còn khả dụng.',
+                'Chỉ hủy khi chưa tiếp nhận và còn hơn 15 phút trước giờ hẹn. Yêu cầu cần lý do và ảnh bằng chứng.',
                 style: AppTheme.font(size: 11.5, color: AppColors.chuPhu),
               ),
             ],
@@ -157,6 +161,10 @@ class _TienDoScreenState extends State<TienDoScreen> {
             ],
             const SizedBox(height: 14),
             _khoiTienDo(),
+            if (_don!.laGiaoTanNoi) ...[
+              const SizedBox(height: 14),
+              DoiChieuGiaoHang(maDonHang: widget.maDonHang),
+            ],
             const SizedBox(height: 14),
             _khoiTaiLieu(),
             const SizedBox(height: 14),

@@ -1,0 +1,40 @@
+@* Chỉ giữ hai quy trình đang nhập. Không giữ các trang báo cáo/danh mục hoặc lưu file vào localStorage. *@
+@if (CoQuyen)
+{
+    @if (_daMoLapDon)
+    {
+        <section class="ban-nhap-tac-vu" hidden="@(!MoLapDon)" aria-label="Bản nháp lập đơn tại quầy">
+            <PhotocopyAdmin.Pages.LapDonTaiQuay TrangDangMo="@MoLapDon" />
+        </section>
+    }
+    @if (_daMoOcr)
+    {
+        <section class="ban-nhap-tac-vu" hidden="@(!MoOcr)" aria-label="Bản nháp nhận dạng chữ">
+            <PhotocopyAdmin.Pages.NhanDangChu TrangDangMo="@MoOcr" />
+        </section>
+    }
+}
+@if (!BiKhoa && (!CoQuyen || (_duongDan != "lap-don-tai-quay" && _duongDan != "nhan-dang-chu")))
+{
+    @NoiDung
+}
+
+@code {
+    [Parameter] public string DuongDan { get; set; } = "";
+    [Parameter] public string VaiTro { get; set; }
+    [Parameter] public bool BiKhoa { get; set; }
+    [Parameter] public RenderFragment NoiDung { get; set; }
+    private bool _daMoLapDon, _daMoOcr;
+    private string _duongDan = "";
+    private bool CoQuyen => VaiTro is "SUPER_ADMIN" or "BRANCH_ADMIN" or "STAFF";
+    private bool MoLapDon => !BiKhoa && _duongDan == "lap-don-tai-quay";
+    private bool MoOcr => !BiKhoa && _duongDan == "nhan-dang-chu";
+    protected override void OnParametersSet()
+    {
+        _duongDan = (DuongDan ?? "").Split('?', '#')[0].Trim('/').ToLowerInvariant();
+        if (!CoQuyen) { _daMoLapDon = false; _daMoOcr = false; return; }
+        if (BiKhoa) return;
+        _daMoLapDon |= MoLapDon;
+        _daMoOcr |= MoOcr;
+    }
+}

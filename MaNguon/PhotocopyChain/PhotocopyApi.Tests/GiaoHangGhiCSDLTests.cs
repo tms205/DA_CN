@@ -27,6 +27,9 @@ public class GiaoHangGhiCSDLTests
         var values = (Dictionary<string, string>)doc.GetMethod("Doc").Invoke(null,
             new object[] { Environment.GetEnvironmentVariable("PHOTOCOPY_DELIVERY_ENV_FILE") });
         var config = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+        string evidenceRoot = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "PhotocopyEvidenceTests", Guid.NewGuid().ToString("N")));
+        config["GiaoHang:ThuMucBangChung"] = evidenceRoot;
+        config["GiaoHang:GeoapifyApiKey"] = null; // Test giao hàng không gọi dịch vụ ngoài.
         using var cache = new MemoryCache(new MemoryCacheOptions());
         using var conn = new SqlConnection(config.GetConnectionString("PhotocopyChain"));
         await conn.OpenAsync();
@@ -73,6 +76,15 @@ public class GiaoHangGhiCSDLTests
             return await conn.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM " + table + " WHERE MaDonHang=@id", new { id });
         }
         async Task<string> TrangThai(int id) => await conn.ExecuteScalarAsync<string>("SELECT TrangThai FROM DonHang WHERE MaDonHang=@id", new { id });
+        BaoGiaoThatBaiRequest BangChung()
+        {
+            if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException();
+            using var bitmap = new System.Drawing.Bitmap(8, 8);
+            using var bytes = new MemoryStream(); bitmap.Save(bytes, System.Drawing.Imaging.ImageFormat.Png);
+            var data = bytes.ToArray();
+            return new() { LyDo="TEST: khách không nghe máy", ViDo="10.7",KinhDo="106.7",DoChinhXac="12",ThoiDiemGps=DateTimeOffset.UtcNow.ToString("O"),
+                Anh=new() { new FormFile(new MemoryStream(data),0,data.Length,"Anh","test.png") } };
+        }
         try
         {
             int unpaid = await Tao(false);
@@ -110,10 +122,21 @@ public class GiaoHangGhiCSDLTests
             for (int n=1; n<=3; n++) {
                 Assert.IsType<OkObjectResult>(await shipApi.NhanDon(failed));
                 int a = await Luot(failed);
-                Assert.IsType<OkObjectResult>(await shipApi.BaoKetQua(a, new KetQuaGiaoRequest { ThanhCong=false, LyDo="TEST: khách không nghe máy" }));
+                Assert.IsType<BadRequestObjectResult>(await shipApi.BaoKetQua(a, new KetQuaGiaoRequest { ThanhCong=false, LyDo="TEST: khách không nghe máy" }));
+                Assert.Equal("DANG_GIAO",await TrangThai(failed));
+                Assert.IsType<OkObjectResult>(await shipApi.BaoGiaoThatBai(a, BangChung()));
                 Assert.Equal("GIAO_THAT_BAI", await TrangThai(failed));
+                string proof = await conn.ExecuteScalarAsync<string>("SELECT AnhBangChungJson FROM GiaoHang WHERE MaGiaoHang=@a",new { a });
+                var view = Assert.IsType<OkObjectResult>(await shipApi.XemBangChung(a));
+                var saved = Assert.IsType<BangChungGiaoDto>(view.Value);
+                Assert.Single(saved.Anh); Assert.Equal(10.7m,saved.ViDo);
+                Assert.Null(saved.DiaChi); // Geoapify lỗi vẫn lưu GPS/bằng chứng.
+                var image = Assert.IsType<FileStreamResult>(await shipApi.XemAnhBangChung(a,saved.Anh[0].MaAnh));
+                await image.FileStream.DisposeAsync();
+                Assert.IsType<NotFoundObjectResult>(await Api(VaiTro.BranchAdmin,ceo,otherBranch).XemBangChung(a));
                 int before = await Dem("ThongBao", failed);
-                Assert.IsType<OkObjectResult>(await shipApi.BaoKetQua(a, new KetQuaGiaoRequest { ThanhCong=false, LyDo="TEST: khách không nghe máy" }));
+                Assert.IsType<OkObjectResult>(await shipApi.BaoGiaoThatBai(a, BangChung()));
+                Assert.Equal(proof,await conn.ExecuteScalarAsync<string>("SELECT AnhBangChungJson FROM GiaoHang WHERE MaGiaoHang=@a",new { a }));
                 Assert.Equal(before, await Dem("ThongBao", failed));
                 Assert.Equal(n, await Dem("GiaoHang", failed));
             }
@@ -141,6 +164,8 @@ public class GiaoHangGhiCSDLTests
                 Assert.Equal(0, await conn.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM DonHang WHERE GhiChu=@marker", new { marker }));
                 _output.WriteLine("Đã dọn đúng các ID test đã ghi nhận và xác nhận không còn đơn test. Không reset identity.");
             }
+            Assert.StartsWith(Path.GetFullPath(Path.Combine(Path.GetTempPath(),"PhotocopyEvidenceTests")) + Path.DirectorySeparatorChar,evidenceRoot);
+            if (Directory.Exists(evidenceRoot)) Directory.Delete(evidenceRoot,true);
         }
     }
     private sealed class NguoiGiao {

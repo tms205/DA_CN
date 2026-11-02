@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using PhotocopyApi.DuLieu;
+using PhotocopyApi.CaLamViec;
 using PhotocopyShared.Constants;
 using PhotocopyShared.Dtos;
 using PhotocopyShared.Dtos.DonHang;
@@ -13,7 +14,7 @@ using PhotocopyShared.Dtos.Tuan3;
 namespace PhotocopyApi.Controllers;
 
 // F-24B: ca làm việc và két tiền.
-// Tiệm chạy 3 ca liền, mỗi ca 4 tiếng (09:00–13:00, 13:00–17:00, 17:00–21:00) nhưng hệ thống KHÔNG ép giờ:
+// Ba ca: 07:30–12:30, 12:30–17:30, 17:30–21:30. Hết giờ ngừng ghi giao dịch, chờ nhập tổng kết.
 // STAFF/BRANCH_ADMIN đăng nhập tự mở ca riêng 200.000đ; CEO chọn chi nhánh rồi mở ca thủ công trên Web.
 // Hết ca thì kiểm đếm và đóng ca; không tự đóng khi chuyển phạm vi chi nhánh.
 // Phải có ca đang mở thì nhân viên mới được tiếp nhận, xử lý đơn và thu COD của khách.
@@ -24,9 +25,11 @@ namespace PhotocopyApi.Controllers;
 public class CaController : ControllerBase
 {
     private readonly string _chuoiKetNoi;
+    private readonly LichCaService _lich;
 
-    public CaController(IConfiguration config)
+    public CaController(IConfiguration config, LichCaService lich = null)
     {
+        _lich = lich;
         _chuoiKetNoi = config.GetConnectionString("PhotocopyChain");
     }
 
@@ -36,6 +39,7 @@ public class CaController : ControllerBase
     public async Task<IActionResult> CaDangMo()
     {
         int maNhanVien = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
+        if (_lich != null) await _lich.ChotHetGioAsync(maNhanVien, HttpContext.RequestAborted);
         int? maChiNhanh = User.FindFirst(TenClaim.MaChiNhanh) == null
             ? null
             : int.Parse(User.FindFirst(TenClaim.MaChiNhanh).Value);
@@ -51,6 +55,18 @@ public class CaController : ControllerBase
     }
 
     // GET api/ca/chua-ket-thuc — giữ endpoint cũ, trả ca đang mở của chính người đăng nhập.
+    [HttpGet("cho-tong-ket")]
+    public async Task<IActionResult> CaChoTongKet()
+    {
+        int id = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
+        int? branch = !User.IsInRole(VaiTro.SuperAdmin) && int.TryParse(User.FindFirst(TenClaim.MaChiNhanh)?.Value, out int b) ? b : null;
+        if (_lich != null) await _lich.ChotHetGioAsync(id, HttpContext.RequestAborted);
+        using var conn = new SqlConnection(_chuoiKetNoi);
+        var ca = await conn.QueryFirstOrDefaultAsync<CaLamViecDto>(TruyVanSql.CaLamViec.ChoTongKetCuaNhanVien,
+            new { MaNhanVien = id, MaChiNhanh = branch });
+        return ca == null ? NoContent() : Ok(ca);
+    }
+
     // Chỉ xem ca đang mở của chính mình; không khóa bởi ca của nhân viên khác.
     [HttpGet("chua-ket-thuc")]
     [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
@@ -158,6 +174,14 @@ public class CaController : ControllerBase
     public async Task<IActionResult> MoCa(MoCaRequest req)
     {
         int maNhanVien = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
+        if (_lich != null)
+        {
+            await _lich.ChotHetGioAsync(maNhanVien, HttpContext.RequestAborted);
+            if (await _lich.ConCaChuaTongKetAsync(maNhanVien, HttpContext.RequestAborted))
+                return Conflict(new { message = "Bạn còn ca hết giờ chưa tổng kết. Hãy nhập tiền thực đếm trước khi mở ca mới." });
+        }
+        if (!LichCa.TrongGio(LichCa.BayGio(TimeProvider.System)))
+            return Conflict(new { message = "Chỉ mở ca trong giờ làm việc 07:30–21:30." });
         var claimChiNhanh = User.FindFirst(TenClaim.MaChiNhanh);
         if (claimChiNhanh == null)
             return BadRequest(new { message = "Vui lòng chọn một chi nhánh trước khi mở ca." });
@@ -195,7 +219,7 @@ public class CaController : ControllerBase
         return Ok(ca);
     }
 
-    // POST api/ca/dong — STAFF chờ xác nhận; BRANCH_ADMIN đóng ca xong ngay.
+    // Gửi tiền thực đếm; tất cả vai trò đều chờ người quản lý khác đối soát.
     [HttpPost("dong")]
     [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
     public async Task<IActionResult> DongCa(DongCaRequest req)
@@ -203,15 +227,17 @@ public class CaController : ControllerBase
         int maNhanVien = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
         string vaiTro = User.FindFirst(TenClaim.VaiTro).Value;
 
-        if (req.TongDoanhThuCuoiCa < 0)
+        if (req.TongDoanhThuCuoiCa == null || req.TongDoanhThuCuoiCa < 0)
             return BadRequest(new { message = "Số tiền đếm được không hợp lệ." });
 
         using var conn = new SqlConnection(_chuoiKetNoi);
 
         int? maCa = await conn.ExecuteScalarAsync<int?>(
-            @"SELECT MaCa FROM CaLamViec WHERE MaNhanVien=@MaNhanVien AND TrangThai='DANG_MO'
-              AND (@MaChiNhanh IS NULL OR MaChiNhanh=@MaChiNhanh)",
+            @"SELECT TOP 1 MaCa FROM CaLamViec WHERE MaNhanVien=@MaNhanVien AND TrangThai IN ('DANG_MO','CHO_TONG_KET')
+              AND (@MaCa IS NULL OR MaCa=@MaCa) AND (@MaChiNhanh IS NULL OR MaChiNhanh=@MaChiNhanh)
+              ORDER BY CASE WHEN TrangThai='CHO_TONG_KET' THEN 0 ELSE 1 END,GioMoCa",
             new { MaNhanVien = maNhanVien,
+                req.MaCa,
                 MaChiNhanh = User.FindFirst(TenClaim.MaChiNhanh)?.Value });
         if (maCa == null)
             return BadRequest(new { message = "Bạn chưa mở ca nào." });
@@ -219,7 +245,7 @@ public class CaController : ControllerBase
         try
         {
             await conn.ExecuteAsync("sp_DongCa",
-                new { MaCa = maCa.Value, TongDoanhThuCuoiCa = req.TongDoanhThuCuoiCa },
+                new { MaCa = maCa.Value, TongDoanhThuCuoiCa = req.TongDoanhThuCuoiCa.Value, GhiChu = req.GhiChu?.Trim() },
                 commandType: CommandType.StoredProcedure);
         }
         catch (SqlException ex)
@@ -229,9 +255,7 @@ public class CaController : ControllerBase
 
         return Ok(new KetQuaDto
         {
-            Message = vaiTro == "BRANCH_ADMIN"
-                ? "Đã đóng ca quản lý. Ca đã hoàn tất, không cần xác nhận thêm."
-                : "Đã đóng ca, chờ quản lý kiểm đếm và xác nhận."
+            Message = "Đã gửi tổng kết ca, chờ quản lý khác kiểm đếm và xác nhận."
         });
     }
 

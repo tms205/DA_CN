@@ -2,6 +2,7 @@
 @using System.ComponentModel.DataAnnotations
 @inject HttpClient Http
 @inject PhienDangNhap Phien
+@inject NavigationManager Nav
 
 <PageTitle>Thông tin cá nhân · PhotocopyChain</PageTitle>
 
@@ -261,9 +262,11 @@
             if (res.IsSuccessStatusCode)
             {
                 var kq = await res.Content.ReadFromJsonAsync<KetQuaDto>();
-                _tbMk = kq.Message + " Lần đăng nhập sau dùng mật khẩu mới.";
+                _tbMk = kq.Message;
                 _mk = new DoiMatKhauForm();   // xóa trắng 3 ô
                 _moMatKhau = false; _hienMk = _hienMkCu = _hienMkLai = false;
+                await Phien.DangXuat();
+                Nav.NavigateTo("dang-nhap?mat-khau-da-doi=1", replace: true);
             }
             else
             {

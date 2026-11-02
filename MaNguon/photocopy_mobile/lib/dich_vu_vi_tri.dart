@@ -1,10 +1,11 @@
 import 'package:geolocator/geolocator.dart';
 
 class DiemGps {
-  const DiemGps(this.viDo, this.kinhDo, this.doChinhXac);
+  const DiemGps(this.viDo, this.kinhDo, this.doChinhXac, {this.thoiDiem});
   final double viDo;
   final double kinhDo;
   final double doChinhXac;
+  final DateTime? thoiDiem;
 }
 
 // Không gọi lúc khởi động app. Khách chủ động bấm dùng vị trí mới hỏi quyền.
@@ -37,5 +38,10 @@ Future<DiemGps> layViTriHienTai() async {
       'Chưa lấy được vị trí hợp lệ. Hãy bật vị trí chính xác và thử lại.',
     );
   }
-  return DiemGps(viTri.latitude, viTri.longitude, viTri.accuracy);
+  return DiemGps(
+    viTri.latitude,
+    viTri.longitude,
+    viTri.accuracy,
+    thoiDiem: viTri.timestamp.toUtc(),
+  );
 }

@@ -122,6 +122,7 @@ public class KhachHangMatKhauWebTests
         var services = new ServiceCollection().AddLogging();
         services.AddSingleton(http);
         services.AddSingleton<IJSRuntime, JsKhongChay>();
+        services.AddSingleton<NavigationManager, NavThu>();
         services.AddSingleton(new PhienDangNhap(null, http, new PhamViChiNhanh(null, http)));
         await using var sp = services.BuildServiceProvider();
         await using var renderer = new HtmlRenderer(sp, sp.GetRequiredService<ILoggerFactory>());
@@ -153,6 +154,12 @@ public class KhachHangMatKhauWebTests
             }
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(data) };
         }
+    }
+
+    private sealed class NavThu : NavigationManager
+    {
+        public NavThu() => Initialize("http://test.local/", "http://test.local/thong-tin-ca-nhan");
+        protected override void NavigateToCore(string uri, bool forceLoad) => Uri = ToAbsoluteUri(uri).ToString();
     }
 
     private sealed class JsKhongChay : IJSRuntime

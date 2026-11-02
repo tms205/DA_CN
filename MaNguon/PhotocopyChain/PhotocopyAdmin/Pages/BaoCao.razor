@@ -4,7 +4,7 @@
 
 <PageTitle>Báo cáo doanh thu · PhotocopyChain</PageTitle>
 
-<TieuDeTrang TieuDe="Báo cáo doanh thu" MoTa="Thống kê doanh thu thực tế ghi nhận từ các đơn hàng đã hoàn tất" />
+<TieuDeTrang TieuDe="Báo cáo doanh thu" MoTa="Tra cứu mọi trạng thái đơn và đối soát doanh thu đã ghi nhận" />
 
 <div class="than-trang khoi-doc">
     <div class="the ca-bo-loc">
@@ -39,6 +39,13 @@
                     <option value="nam">Theo năm</option>
                 </select>
             </div>
+            <div class="truong">
+                <label class="nhan" for="bc-trang-thai">Trạng thái đơn</label>
+                <select id="bc-trang-thai" class="ca-o-loc" @bind="_trangThai">
+                    <option value="">Tất cả trạng thái</option>
+                    @foreach (var tt in DsTrangThai) { <option value="@tt">@TrangThaiDonHang.TenHienThi(tt)</option> }
+                </select>
+            </div>
             <div class="truong" style="align-self: flex-end;">
                 <button class="nut-chinh" style="width: 100%;" disabled="@_dangTai" @onclick="TaiAsync">
                     @(_dangTai ? "Đang tải dữ liệu…" : "Xem báo cáo")
@@ -49,10 +56,7 @@
 
     @if (_loi != null)
     {
-        <div class="o-loi">
-            @((MarkupString)Svg.ChamThan())
-            <span>@_loi</span>
-        </div>
+        <TrangThaiTaiDuLieu DangBaoTri="_baoTri" NoiDung="@_loi" ThuLai="TaiAsync" />
     }
 
     @if (_ds != null)
@@ -64,13 +68,13 @@
                 <div class="nv-phu" style="margin-top: 4px;">Toàn bộ đơn hoàn thành trong kỳ</div>
             </div>
             <div class="ca-o">
-                <div class="ca-o-nhan">Số đơn hoàn thành</div>
+                <div class="ca-o-nhan">Số đơn trong kết quả</div>
                 <div class="ca-o-so mono">@_ds.Sum(x => x.SoDon)</div>
-                <div class="nv-phu" style="margin-top: 4px;">Đơn hàng đã bàn giao thành công</div>
+                <div class="nv-phu" style="margin-top: 4px;">Bao gồm trạng thái đang lọc</div>
             </div>
             <div class="ca-o">
                 <div class="ca-o-nhan">Doanh thu bình quân / đơn</div>
-                <div class="ca-o-so mono">@Tien(_ds.Sum(x => x.SoDon) == 0 ? 0 : _ds.Sum(x => x.DoanhThu) / _ds.Sum(x => x.SoDon))</div>
+                <div class="ca-o-so mono">@Tien(_ds.Sum(x => x.SoDonDoanhThu) == 0 ? 0 : _ds.Sum(x => x.DoanhThu) / _ds.Sum(x => x.SoDonDoanhThu))</div>
                 <div class="nv-phu" style="margin-top: 4px;">Giá trị trung bình mỗi đơn</div>
             </div>
         </div>
@@ -79,13 +83,13 @@
             <div class="bang-tieu-de">
                 <div>
                     <h2>Chi tiết doanh thu theo kỳ đối chiếu</h2>
-                    <p class="bang-mo-ta">Đối chiếu số đơn và số tiền theo từng kỳ báo cáo.</p>
+                    <p class="bang-mo-ta">Đơn hoàn tất theo ngày hoàn thành; trạng thái khác theo ngày đặt. Đơn hủy không tính vào doanh thu.</p>
                 </div>
                 <span class="bang-dem">@_ds.Count dòng</span>
             </div>
             @if (_ds.Count == 0)
             {
-                <div class="bang-trong">Không có đơn hàng nào hoàn thành trong khoảng thời gian đã chọn.</div>
+                <div class="bang-trong">Không có đơn phù hợp với bộ lọc đã chọn.</div>
             }
             else
             {
@@ -95,7 +99,9 @@
                             <tr>
                                 <th scope="col">@TieuDeCotKy()</th>
                                 <th scope="col">Chi nhánh</th>
+                                <th scope="col">Trạng thái đơn</th>
                                 <th scope="col">Số lượng đơn</th>
+                                <th scope="col">Giá trị đơn</th>
                                 <th scope="col">Doanh thu ghi nhận</th>
                             </tr>
                         </thead>
@@ -105,7 +111,9 @@
                                 <tr>
                                     <td data-nhan="@TieuDeCotKy()"><b>@NhanKy(x.Ngay)</b></td>
                                     <td data-nhan="Chi nhánh">@x.TenChiNhanh</td>
+                                    <td data-nhan="Trạng thái">@TrangThaiDonHang.TenHienThi(x.TrangThai)</td>
                                     <td class="mono" data-nhan="Số lượng đơn"><b>@x.SoDon</b> đơn</td>
+                                    <td class="mono" data-nhan="Giá trị đơn">@Tien(x.GiaTriDon)</td>
                                     <td class="mono hd-tong" data-nhan="Doanh thu ghi nhận">@Tien(x.DoanhThu)</td>
                                 </tr>
                             }
@@ -119,10 +127,13 @@
 @code {
     private string _khoangBaoCao = "thang";
     private string _nhomTheo = "ngay";
+    private string _trangThai = "";
+    private static readonly string[] DsTrangThai = {"CHO_XAC_NHAN","DA_XAC_NHAN","DANG_IN","DA_IN","DANG_GIAO","DA_GIAO","GIAO_THAT_BAI","HOAN_THANH","DA_HUY"};
     private DateTime _tuNgay = new(DateTime.Today.Year, DateTime.Today.Month, 1);
     private DateTime _denNgay = DateTime.Today;
     private List<BaoCaoDoanhThuDto> _ds;
     private string _loi;
+    private bool _baoTri;
     private bool _dangTai;
 
     protected override async Task OnInitializedAsync() => await TaiAsync();
@@ -164,18 +175,20 @@
     private async Task TaiAsync()
     {
         _loi = null;
+        _baoTri = false;
         _dangTai = true;
         try
         {
-            string url = $"api/quan-tri/bao-cao/doanh-thu?tuNgay={_tuNgay:yyyy-MM-dd}&denNgay={_denNgay:yyyy-MM-dd}&nhomTheo={_nhomTheo}";
-            var res = await Http.GetAsync(url);
-            if (res.IsSuccessStatusCode)
-                _ds = await res.Content.ReadFromJsonAsync<List<BaoCaoDoanhThuDto>>() ?? new();
-            else
-                _loi = (await res.Content.ReadFromJsonAsync<ApiError>()).Message;
+            string url = $"api/quan-tri/bao-cao/doanh-thu?tuNgay={_tuNgay:yyyy-MM-dd}&denNgay={_denNgay:yyyy-MM-dd}&nhomTheo={_nhomTheo}&trangThai={_trangThai}";
+            using var res = await Http.GetAsync(url);
+            await DocDuLieuApi.KiemTraBaoTriAsync(res);
+            if (res.IsSuccessStatusCode) _ds = await res.Content.ReadFromJsonAsync<List<BaoCaoDoanhThuDto>>() ?? new();
+            else { _ds = null; _loi = (await res.Content.ReadFromJsonAsync<ApiError>())?.Message ?? "Không tải được báo cáo."; }
         }
+        catch (NgoaiLeBaoTri ex) { _ds = null; _baoTri = true; _loi = ex.Message; }
         catch
         {
+            _ds = null;
             _loi = "Không tải được báo cáo.";
         }
         _dangTai = false;

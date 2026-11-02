@@ -6,9 +6,12 @@ Chức năng nhận dạng ảnh JPG/PNG bằng Qwen3-VL 2B hoặc 4B trên máy
 
 1. Chạy `MaNguon\scripts\chay_web.cmd`. Cần chạy bản API và web đã build từ mã mới. Ứng dụng mobile cần build/cài lại bản mới.
 2. Đăng nhập. Trên web mở **Vận hành → Nhận dạng chữ**; trên mobile mở **Đặt in → Nhận dạng chữ viết tay từ ảnh**.
-3. Chọn ảnh JPG/PNG tối đa 10 MB và 20 megapixel. Cửa sổ cắt mở ra: kéo chuột/ngón tay khoanh phần chữ rồi bấm **Dùng vùng đã chọn**. Có thể chọn toàn ảnh, cắt lại hoặc dùng lại ảnh gốc. Giữ đủ dấu tiếng Việt và dòng chữ.
-4. Chọn 2B (nhẹ, nhanh hơn) hoặc 4B (nặng hơn), nhấn **Nhận dạng chữ**. Lần nạp model có thể mất vài phút. Mỗi lúc chỉ xử lý một yêu cầu, người khác sẽ nhận thông báo thử lại sau.
-5. Đọc đối chiếu ảnh, sửa văn bản rồi bấm **Sao chép văn bản** hoặc **Xuất file Word**. Web tải xuống `.docx`; mobile mở hộp chọn vị trí lưu. File Word lấy đúng nội dung trong ô kết quả lúc bấm xuất, giữ tiếng Việt, xuống dòng và dòng trống; có thể mở bằng Word để sửa tiếp. Giới hạn 100.000 ký tự. Tính năng không tự tạo đơn hoặc tự in; kết quả và ảnh không được lưu vào database. Ảnh và log tạm được xóa sau khi xử lý bình thường.
+3. Thêm tối đa 10 ảnh JPG/PNG (10 MB/ảnh, tổng 50 MB). Đổi thứ tự, xóa ảnh hoặc chọn từng ảnh để cắt vùng chữ.
+4. Chọn Qwen 2B/4B rồi nhận dạng. Hệ thống xử lý từng ảnh; yêu cầu từ web/app khác được xếp hàng chung. Giao diện hiển thị ảnh đang chạy hoặc thứ tự chờ. Có thể dừng và thử lại riêng ảnh lỗi.
+5. Đối chiếu từng ảnh, chỉnh sửa rồi xuất tất cả ra một file Word. Mỗi ảnh bắt đầu ở trang mới; chữ dài có thể tràn trang. Xuất bị chặn nếu còn ảnh lỗi/chưa chạy/đổi vùng chưa nhận dạng lại. Tổng nội dung tối đa 100.000 ký tự.
+6. Muốn đặt in: lưu Word, kiểm tra rồi tải file lên quy trình Đặt in/Lập đơn tại quầy đang có. OCR không tự tạo đơn, thu tiền hay gửi in.
+
+Không thêm bảng/cột hoặc lịch sử OCR. Ảnh máy chủ được dọn khi tác vụ kết thúc; kết quả tác vụ chỉ giữ tạm tối đa 15 phút (có giới hạn bộ nhớ). Bản người dùng sửa nằm trên giao diện: tải Word trước khi rời màn hình. API khởi động lại làm mất hàng chờ tạm; cần gửi lại ảnh. Chi tiết: `../../docs/HUONG_DAN_OCR_NHIEU_ANH.md`.
 
 AI có thể đoán sai, bỏ dấu, thiếu dòng hoặc trả kết quả chưa đầy đủ. Nếu nhận thông báo bị cắt thì nên tách ảnh thành nhiều phần và thử lại. Không coi kết quả là bản chép chính xác khi chưa kiểm tra.
 

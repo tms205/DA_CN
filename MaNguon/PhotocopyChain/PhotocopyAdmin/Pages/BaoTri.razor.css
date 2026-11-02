@@ -1,4 +1,9 @@
 .bt-page { max-width: 1320px; }
+.bt-pham-vi {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:20px 0;}
+.bt-pham-vi fieldset {border:1px solid #dce5ee;border-radius:8px;padding:16px;min-width:0;}
+.bt-pham-vi legend {font-weight:700;padding:0 6px;}
+.bt-pham-vi label {display:flex;align-items:flex-start;gap:8px;margin:12px 0;line-height:1.5;}
+@media(max-width:600px){.bt-pham-vi{grid-template-columns:1fr;}}
 .bt-card { background: #fff; border: 1px solid #dce5ee; border-radius: 12px; box-shadow: 0 3px 12px rgba(28, 58, 85, .04); }
 .bt-status { display: flex; gap: 16px; align-items: center; padding: 22px 24px; margin-bottom: 18px; }
 .bt-status-icon { width: 48px; height: 48px; flex: none; display: grid; place-items: center; border-radius: 13px; }

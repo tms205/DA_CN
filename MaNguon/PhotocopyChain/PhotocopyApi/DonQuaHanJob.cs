@@ -30,11 +30,13 @@ public class DonQuaHanJob : BackgroundService
         {
             try
             {
-                if (_baoTri?.Read().DangBaoTri == true) { await Task.Delay(TimeSpan.FromMinutes(1), dungLai); continue; }
+                if (BaoTriStore.KhoaTacVuNen(_baoTri?.Read(),"DON_HANG")) { await Task.Delay(TimeSpan.FromMinutes(1), dungLai); continue; }
                 using var conn = new SqlConnection(_chuoiKetNoi);
                 await conn.ExecuteAsync("sp_HuyDonQuaHan", commandType: System.Data.CommandType.StoredProcedure);
-                await XoaFileCuaDonDaKetThuc(conn);
-                await XoaFileTaiLenBiBoDo(conn);
+                if(!BaoTriStore.KhoaTacVuNen(_baoTri?.Read(),"FILE_IN")) {
+                    await XoaFileCuaDonDaKetThuc(conn);
+                    await XoaFileTaiLenBiBoDo(conn);
+                }
             }
             catch (Exception ex)
             {

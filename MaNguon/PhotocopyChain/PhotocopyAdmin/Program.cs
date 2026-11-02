@@ -10,7 +10,10 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 
 // Web chỉ gọi API, không bao giờ kết nối thẳng CSDL. Địa chỉ API ghi trong wwwroot/appsettings.json.
 string diaChiApi = builder.Configuration["ApiBaseUrl"];
-builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(diaChiApi) });
+builder.Services.AddScoped(sp => {
+    var client=new HttpClient {BaseAddress=new Uri(diaChiApi)};
+    client.DefaultRequestHeaders.Add("X-Photocopy-Platform","web");return client;
+});
 
 // Thư viện giao diện MudBlazor
 builder.Services.AddMudServices();

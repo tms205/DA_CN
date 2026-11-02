@@ -41,6 +41,9 @@ public sealed class DatDonTaiQuayRequest
 
 public sealed class HuyDonRequest
 {
+    [Required(ErrorMessage="Vui lòng tải ảnh bằng chứng hủy đơn.")]
+    [RegularExpression("^[a-f0-9]{32}$",ErrorMessage="Mã bằng chứng không hợp lệ.")]
+    public string MaBangChung {get;set;}="";
     [Required(ErrorMessage = "Vui lòng nhập lý do hủy.")]
     [MaxLength(255, ErrorMessage = "Lý do tối đa 255 ký tự.")]
     public string LyDo { get; set; } = "";
@@ -229,7 +232,7 @@ public sealed partial class ChiNhanhQuanTriDto
     [Range(typeof(decimal), "0", "999.99", ParseLimitsInInvariantCulture = true, ConvertValueInInvariantCulture = true, ErrorMessage = "Bán kính giao phải từ 0 đến 999,99 km.")]
     public decimal BanKinhGiao { get; set; }
     [Required(ErrorMessage = "Vui lòng nhập giá trị.")]
-    [RegularExpression(@"^(HOAT_DONG|TAM_NGUNG)$", ErrorMessage = "Lựa chọn không hợp lệ.")]
+    [RegularExpression(@"^(HOAT_DONG|TAM_NGUNG|DONG_CUA)$", ErrorMessage = "Trạng thái chi nhánh không hợp lệ.")]
     public string TrangThai { get; set; } = "";
 }
 
@@ -371,6 +374,9 @@ public sealed class BaoCaoDoanhThuDto
     public string TenChiNhanh { get; set; } = "";
     public int SoDon { get; set; }
     public decimal DoanhThu { get; set; }
+    public string TrangThai { get; set; } = "HOAN_THANH";
+    public decimal GiaTriDon { get; set; }
+    public int SoDonDoanhThu {get;set;}
 }
 
 public sealed class DoiSoatMayInDto
