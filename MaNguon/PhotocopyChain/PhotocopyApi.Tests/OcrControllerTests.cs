@@ -55,7 +55,16 @@ public class OcrControllerTests
         if (string.IsNullOrEmpty(image) || string.IsNullOrEmpty(root)) return;
         await using var stream = File.OpenRead(image);
         var file = new FormFile(stream, 0, stream.Length, "file", Path.GetFileName(image));
-        var result = await Create(root).NhanDang(file, "2b", CancellationToken.None);
+        var processor = new PhotocopyApi.Ocr.OcrPython(new EnvironmentStub { ContentRootPath = root }, NullLogger<PhotocopyApi.Ocr.OcrPython>.Instance);
+        using var queue = new PhotocopyApi.Ocr.OcrQueue(processor, NullLogger<PhotocopyApi.Ocr.OcrQueue>.Instance);
+        var controller = new OcrController(new EnvironmentStub { ContentRootPath = root }, NullLogger<OcrController>.Instance, processor, queue) {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new System.Security.Claims.ClaimsPrincipal(
+                new System.Security.Claims.ClaimsIdentity(new[]{new System.Security.Claims.Claim(PhotocopyShared.Constants.TenClaim.MaNguoiDung,"1")},"test")) } }
+        };
+        await queue.StartAsync(default);
+        IActionResult result;
+        try { result = await controller.NhanDang(file, "2b", CancellationToken.None); }
+        finally { await queue.StopAsync(default); }
         var ok = Assert.IsType<OkObjectResult>(result);
         Assert.False(string.IsNullOrWhiteSpace((string)ok.Value.GetType().GetProperty("text")!.GetValue(ok.Value)!));
     }

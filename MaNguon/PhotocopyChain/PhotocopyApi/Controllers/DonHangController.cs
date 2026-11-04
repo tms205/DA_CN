@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.Data;
 using PhotocopyApi.GiaoHang;
 using System.Text.Json;
@@ -22,6 +22,7 @@ using PhotocopyShared.Dtos.Tuan3;
 using PhotocopyShared.MayInAo;
 using PhotocopyShared.KiemTraDuLieu;
 using PhotocopyShared.QuyCachIn;
+using PhotocopyApi.DichVu;
 
 namespace PhotocopyApi.Controllers;
 
@@ -31,6 +32,8 @@ namespace PhotocopyApi.Controllers;
 [Route("api/don-hang")]
 public partial class DonHangController : ControllerBase
 {
+    private readonly TaoDonHangService _taoDon = new();
+    private readonly FileInLifecycleService _fileLifecycle;
     // Gọi trong transaction tạo đơn con hoặc bàn giao; khóa đơn gốc tới khi thao tác hoàn tất.
     public const string KiemTraDonGocPhatSinhSql = @"
         DECLARE @MaGoc INT;
@@ -56,6 +59,7 @@ public partial class DonHangController : ControllerBase
         TrangThaiMayInAoStore trangThaiMay = null, YeuCauInCodStore yeuCauCod = null, PhatHienMayInStore phatHienMay = null)
     {
         _giaoHang = giaoHang ?? new GeoapifyService(config, boNhoTam);
+        _fileLifecycle = new FileInLifecycleService(config);
         _bangChungHuy = new(config);
         _khoBienLai = new(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string> {
             ["HuyDon:ThuMucBangChung"] = config["HoanTien:ThuMucBienLai"] ?? Path.Combine(
@@ -149,6 +153,11 @@ public partial class DonHangController : ControllerBase
         using var conn = new SqlConnection(_chuoiKetNoi);
 
         // ---- Bước 1: chi nhánh phải đang hoạt động
+        string dauYeuCau = TaoDonHangService.DauYeuCau(maKhachHang,"APP",req.MaChiNhanh,req);
+        try {
+            var daTao=await _taoDon.Tim(conn,req.MaYeuCauTao,dauYeuCau);
+            if(daTao!=null)return Ok(daTao);
+        } catch(YeuCauTaoDonTrungException ex){return Conflict(new {message=ex.Message});}
         ChiNhanh chiNhanh = await conn.QueryFirstOrDefaultAsync<ChiNhanh>(
             "SELECT * FROM ChiNhanh WHERE MaChiNhanh = @MaChiNhanh AND TrangThai = N'HOAT_DONG'",
             new { MaChiNhanh = req.MaChiNhanh });
@@ -256,32 +265,14 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
         thamSo.Add("@HuongGiayJson", JsonSerializer.Serialize(req.FileIn.Select(x => new { maFile = x.MaFileIn, huongGiay = x.HuongGiay })));
         thamSo.Add("@MaDonHang", dbType: DbType.Int32, direction: ParameterDirection.Output);
 
-        try
-        {
-            await conn.ExecuteAsync("sp_TaoDonHang", thamSo, commandType: CommandType.StoredProcedure);
-        }
-        catch (SqlException ex)
-        {
-            // Thủ tục báo lỗi bằng câu tiếng Việt (vd "Địa chỉ giao hàng nằm ngoài bán kính...")
-            return BadRequest(new { message = ex.Message });
-        }
-
-        int maDonHang = thamSo.Get<int>("@MaDonHang");
-
-        // Ghi chú cho thợ in nhập ở bước 2, thủ tục không nhận nên cập nhật thêm ở đây
-        if (!string.IsNullOrWhiteSpace(req.GhiChu))
-            await conn.ExecuteAsync("UPDATE DonHang SET GhiChu = @GhiChu WHERE MaDonHang = @MaDonHang",
-                new { GhiChu = req.GhiChu.Trim(), MaDonHang = maDonHang });
-
-        // ---- Bước 6: đọc lại đơn vừa tạo để trả về + báo real-time cho quầy
-        var don = await conn.QueryFirstAsync<DonHangTomTatDto>(
-            @"SELECT MaDonHang, 'DH' + RIGHT('00000' + CAST(MaDonHang AS VARCHAR(10)), 5) AS MaDonHangHienThi,
-                     MaChiNhanh, TongTien
-              FROM DonHang WHERE MaDonHang = @MaDonHang", new { MaDonHang = maDonHang });
-
-        // Đơn COD vào hàng đợi ngay; đơn VietQR phải chuyển khoản xong quầy mới tiếp nhận được,
-        // nhưng vẫn báo để quầy nhìn thấy đơn đang chờ thanh toán.
-        await CapNhatHub.GuiChoChiNhanh(_hub, req.MaChiNhanh, HubEvents.OrderCreated, new TinCapNhat
+        KetQuaTaoDon tao;
+        try {tao=await _taoDon.Tao(conn,thamSo,req.MaYeuCauTao,dauYeuCau,maKhachHang,
+            req.FileIn.Select(x=>x.MaFileIn),req.GhiChu?.Trim(),HttpContext.RequestAborted);}
+        catch(YeuCauTaoDonTrungException ex){return Conflict(new {message=ex.Message});}
+        catch(InvalidOperationException ex){return Conflict(new {message=ex.Message});}
+        catch(SqlException ex){return BadRequest(new {message=ex.Message});}
+        var don=tao.Don;int maDonHang=don.MaDonHang;
+        if(tao.TaoMoi) await BaoTaoDonAnToan(req.MaChiNhanh, new TinCapNhat
         {
             MaDonHang = maDonHang,
             MaDonHangHienThi = don.MaDonHangHienThi,
@@ -363,6 +354,11 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
             return BadRequest(new { message = "Hướng giấy phải là giấy đứng hoặc giấy ngang." });
 
         using var conn = new SqlConnection(_chuoiKetNoi);
+        string dauYeuCau=TaoDonHangService.DauYeuCau(maNhanVien,"TAI_QUAY",maChiNhanh,req);
+        try {
+            var daTao=await _taoDon.Tim(conn,req.MaYeuCauTao,dauYeuCau);
+            if(daTao!=null)return Ok(daTao);
+        }catch(YeuCauTaoDonTrungException ex){return Conflict(new {message=ex.Message});}
         int? maCa = await LayCaDangMo(conn, maNhanVien, maChiNhanh);
         if (maCa == null)
             return BadRequest(new { message = "Bạn chưa mở ca làm việc. Hãy mở ca trước khi lập đơn tại quầy." });
@@ -432,29 +428,19 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
         thamSo.Add("@HuongGiayJson", JsonSerializer.Serialize(req.FileIn.Select(x => new { maFile = x.MaFileIn, huongGiay = x.HuongGiay })));
         thamSo.Add("@MaDonHang", dbType: DbType.Int32, direction: ParameterDirection.Output);
 
-        try
-        {
-            await conn.ExecuteAsync("sp_TaoDonHang", thamSo, commandType: CommandType.StoredProcedure);
-        }
-        catch (SqlException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-
-        int maDonHang = thamSo.Get<int>("@MaDonHang");
         string ghiChu = phuongThucThanhToan == "VIETQR"
             ? "Đơn VietQR lập tại quầy"
             : "Đơn COD lập tại quầy";
         if (!string.IsNullOrWhiteSpace(req.GhiChu)) ghiChu += " · " + req.GhiChu.Trim();
-        await conn.ExecuteAsync(
-            "UPDATE DonHang SET GhiChu = @GhiChu WHERE MaDonHang = @MaDonHang",
-            new { GhiChu = ghiChu, MaDonHang = maDonHang });
-
-        var don = await conn.QueryFirstAsync<DonHangTomTatDto>(
-            @"SELECT MaDonHang, 'DH' + RIGHT('00000' + CAST(MaDonHang AS VARCHAR(10)), 5) AS MaDonHangHienThi,
-                     MaChiNhanh, TongTien FROM DonHang WHERE MaDonHang = @MaDonHang", new { MaDonHang = maDonHang });
-
-        await CapNhatHub.GuiChoChiNhanh(_hub, maChiNhanh, HubEvents.OrderCreated, new TinCapNhat
+        if (ghiChu.Length > 255) ghiChu = ghiChu[..255];
+        KetQuaTaoDon tao;
+        try {tao=await _taoDon.Tao(conn,thamSo,req.MaYeuCauTao,dauYeuCau,req.MaKhachHang,
+            req.FileIn.Select(x=>x.MaFileIn),ghiChu,HttpContext.RequestAborted);}
+        catch(YeuCauTaoDonTrungException ex){return Conflict(new {message=ex.Message});}
+        catch(InvalidOperationException ex){return Conflict(new {message=ex.Message});}
+        catch(SqlException ex){return BadRequest(new {message=ex.Message});}
+        var don=tao.Don;int maDonHang=don.MaDonHang;
+        if(tao.TaoMoi) await BaoTaoDonAnToan(maChiNhanh,new TinCapNhat
         {
             MaDonHang = maDonHang,
             MaDonHangHienThi = don.MaDonHangHienThi,
@@ -659,7 +645,9 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
         if (req.MaFileIn <= 0) return BadRequest(new { message = "Mã file mới không hợp lệ." });
         using var conn = new SqlConnection(_chuoiKetNoi);
         await conn.OpenAsync();
-        await using var giaoDich = await conn.BeginTransactionAsync();
+        await using var giaoDich = (SqlTransaction)await conn.BeginTransactionAsync();
+        // Cùng thứ tự file -> đơn với tạo đơn/cleanup, tránh file mới bị dọn giữa lúc phục hồi.
+        await KhoaGiaoDichSql.File(conn,giaoDich,req.MaFileIn);
         var don = await conn.QueryFirstOrDefaultAsync<DonPhucHoiFile>(
             @"SELECT dh.MaChiNhanh, dh.MaKhachHang, dh.TrangThai,
                      dh.KenhDatDon, tt.PhuongThuc, tt.TrangThai AS TrangThaiThanhToan
@@ -702,7 +690,11 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
               VALUES (@MaNguoiDung, @MaDonHang, N'Nhật ký phục hồi file in', @GhiChu)",
             new { MaNguoiDung = maNguoiDung, GhiChu = ghiChu, MaDonHang = maDonHang }, giaoDich);
         await giaoDich.CommitAsync();
-        await tuDongIn.XepInSauThanhToan(maDonHang);
+        try { await tuDongIn.XepInSauThanhToan(maDonHang); }
+        catch (Exception ex) {
+            HttpContext?.RequestServices?.GetService<ILogger<DonHangController>>()?.LogWarning(
+                "Đơn {MaDonHang} đã phục hồi file; chưa xếp in lại ({LoaiLoi}).",maDonHang,ex.GetType().Name);
+        }
         await BaoDonDoiTrangThai(conn, maDonHang, "Đã phục hồi file in, giữ nguyên tiền và quy cách của đơn");
         return Ok(new KetQuaDto { Message = "Đã phục hồi file; hệ thống tự xếp in khi đủ file, máy và vật tư." });
     }
@@ -1323,6 +1315,12 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
         await using var giaoDich = (SqlTransaction)await conn.BeginTransactionAsync();
         try
         {
+            await KhoaGiaoDichSql.File(conn, giaoDich, nguon.MaFile);
+            var fileCon = await conn.QuerySingleOrDefaultAsync<string>(
+                "SELECT DuongDan FROM FileIn WITH(UPDLOCK,HOLDLOCK) WHERE MaFile=@Id AND TrangThai=N'SAN_SANG'",
+                new { Id = nguon.MaFile }, giaoDich);
+            if (string.IsNullOrWhiteSpace(fileCon) || !System.IO.File.Exists(fileCon))
+                throw new InvalidOperationException("File gốc không còn sẵn sàng để lập đơn phát sinh.");
             await conn.ExecuteAsync(KiemTraDonGocPhatSinhSql,
                 new { MaDonHangGoc = nguon.MaDonHang, LoaiPhatSinh = loaiPhatSinh }, giaoDich);
             await conn.ExecuteAsync("sp_TaoDonHang", thamSo, giaoDich, commandType: CommandType.StoredProcedure);
@@ -1654,9 +1652,21 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
         return 0;
     }
 
-    // Sau khi đổi trạng thái đơn: báo real-time cho quầy và cho đúng khách hàng chủ đơn
+    private async Task BaoTaoDonAnToan(int branch,TinCapNhat tin)
+    {
+        if(_hub==null)return;
+        try {await CapNhatHub.GuiChoChiNhanh(_hub,branch,HubEvents.OrderCreated,tin);}
+        catch(Exception ex) {
+            HttpContext?.RequestServices?.GetService<ILogger<DonHangController>>()?.LogWarning(
+                "Đơn {MaDonHang} đã lưu; chưa gửi được realtime ({LoaiLoi}).",tin.MaDonHang,ex.GetType().Name);
+        }
+    }
+
+    // Lưu nghiệp vụ đã hoàn tất trước bước này; lỗi thông báo không biến thành lỗi thao tác.
     private async Task BaoDonDoiTrangThai(SqlConnection conn, int maDonHang, string noiDung)
     {
+        if(_hub==null)return;
+        try {
         var don = await conn.QueryFirstAsync<TinCapNhat>(
             @"SELECT MaDonHang, 'DH' + RIGHT('00000' + CAST(MaDonHang AS VARCHAR(10)), 5) AS MaDonHangHienThi,
                      MaChiNhanh, TrangThai
@@ -1668,50 +1678,15 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
 
         await CapNhatHub.GuiChoChiNhanh(_hub, don.MaChiNhanh, HubEvents.OrderStatusChanged, don);
         await CapNhatHub.GuiChoNguoiDung(_hub, maKhachHang, HubEvents.OrderStatusChanged, don);
-    }
-
-    // Xóa file thật trên ổ đĩa. Nếu file đang bị chương trình khác giữ thì để job nền thử lại.
-    private void XoaFile(string duongDan)
-    {
-        try
-        {
-            if (System.IO.File.Exists(duongDan))
-                System.IO.File.Delete(duongDan);
-        }
-        catch { }
-    }
-
-    // Xóa file của một đơn đã HOAN_THANH / DA_HUY rồi cập nhật FileIn.
-    // Job nền vẫn quét lại mỗi phút để xử lý các nhánh kết thúc khác (giao hàng, hủy quá hạn...).
-    private async Task XoaFileCuaDonDaKetThuc(SqlConnection conn, int maDonHang)
-    {
-        string trangThai = await conn.ExecuteScalarAsync<string>(
-            "SELECT TrangThai FROM DonHang WHERE MaDonHang = @MaDonHang", new { MaDonHang = maDonHang });
-        if (trangThai != "HOAN_THANH" && trangThai != "DA_HUY") return;
-
-        var dsFile = await conn.QueryAsync<FileCanXoa>(
-            TruyVanSql.DonHang.FileCoTheXoa,
-            new { MaDonHang = maDonHang });
-
-        foreach (FileCanXoa file in dsFile)
-        {
-            XoaFile(file.DuongDan);
-            if (!System.IO.File.Exists(file.DuongDan))
-            {
-                await conn.ExecuteAsync(
-                    "UPDATE FileIn SET TrangThai = N'DA_XOA', DuongDan = NULL WHERE MaFile = @MaFile",
-                    new { file.MaFile });
-            }
+        } catch(Exception ex) {
+            HttpContext?.RequestServices?.GetService<ILogger<DonHangController>>()?.LogWarning(
+                "Đơn {MaDonHang} đã lưu; chưa đồng bộ realtime ({LoaiLoi}).",maDonHang,ex.GetType().Name);
         }
     }
 
-    private class FileCanXoa
-    {
-        public int MaFile { get; set; }
-        public string DuongDan { get; set; }
-    }
-
-
+    // File được giữ/đánh dấu trong transaction của service; lỗi dọn không đổi kết quả đơn đã lưu.
+    private Task XoaFileCuaDonDaKetThuc(SqlConnection conn,int maDonHang) =>
+        _fileLifecycle.DonTheoDon(maDonHang);
     // "  12 Lê   Lợi, Q.1 " → "12 le loi, q.1" (để 2 lần nhập hơi khác nhau vẫn dùng chung kết quả đã nhớ)
     public static string ChuanHoaDiaChi(string diaChi)
     {

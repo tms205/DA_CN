@@ -24,6 +24,7 @@ public sealed class KhachTaiQuayDto
 
 public sealed class DatDonTaiQuayRequest
 {
+    public Guid? MaYeuCauTao { get; set; }
     [Range(1, int.MaxValue, ErrorMessage = "Mã khách hàng phải là số nguyên dương.")]
     public int MaKhachHang { get; set; }
     /// <summary>VIETQR hoặc COD — khách tại quầy tự chọn trả trước hay trả khi nhận.</summary>

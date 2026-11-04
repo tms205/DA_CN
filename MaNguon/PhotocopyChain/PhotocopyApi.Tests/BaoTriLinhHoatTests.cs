@@ -15,7 +15,7 @@ public class BaoTriLinhHoatTests
  public async Task BaoTriThanhToanRiengVanNhanCallbackDangCo(string path) {
   string dir=Path.Combine(Path.GetTempPath(),"PhotocopyMaintenance-"+Guid.NewGuid().ToString("N"));
   try{var store=new BaoTriStore(Path.Combine(dir,"state.json"));store.Set(true,"Thanh toán Web",new(false,false,new[]{"THANH_TOAN"},Array.Empty<string>(),1));
-   var ctx=new DefaultHttpContext();ctx.Request.Path=path;ctx.Response.Body=new MemoryStream();bool called=false;
+   var ctx=new DefaultHttpContext();ctx.Request.Path=path;ctx.Request.Method=path.EndsWith("webhook")?"POST":"GET";ctx.Response.Body=new MemoryStream();bool called=false;
    await new BaoTriMiddleware(_=>{called=true;return Task.CompletedTask;}).InvokeAsync(ctx,store);Assert.True(called);
   }finally{if(Directory.Exists(dir))Directory.Delete(dir,true);}
  }

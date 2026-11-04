@@ -38,13 +38,14 @@ void main() {
               ),
             );
             await t.pumpAndSettle();
-            if (canceled)
+            if (canceled) {
               expect(
                 find.text(
                   'Cửa hàng đã chuyển hoàn, bạn vui lòng kiểm tra tài khoản.',
                 ),
                 findsOneWidget,
               );
+            }
             await t.ensureVisible(find.text('Xem biên lai chuyển khoản'));
             await t.tap(find.text('Xem biên lai chuyển khoản'));
             await t.pumpAndSettle();

@@ -5,6 +5,8 @@ using PhotocopyShared.Dtos.GiaoHang;
 
 namespace PhotocopyApi.GiaoHang;
 
+public enum NguonAnhGiaoHang { Shipper, KhachHang }
+
 // File riêng tư: chỉ controller đã kiểm quyền mới được đọc. Không dùng tên/path do client gửi.
 public sealed class BangChungGiaoHangStore
 {
@@ -38,7 +40,7 @@ public sealed class BangChungGiaoHangStore
                 throw new ArgumentException("Chỉ nhận ảnh JPG/PNG, mỗi ảnh tối đa 5 MB.");
     }
 
-    public async Task<List<AnhBangChungDto>> Luu(int maGiao, IReadOnlyList<IFormFile> files, CancellationToken ct)
+    public async Task<List<AnhBangChungDto>> Luu(int maGiao, IReadOnlyList<IFormFile> files, CancellationToken ct, NguonAnhGiaoHang? nguon = null)
     {
         KiemTraDanhSach(files);
         var saved = new List<AnhBangChungDto>();
@@ -59,14 +61,15 @@ public sealed class BangChungGiaoHangStore
                 string mime = KiemTraAnh(data);
                 var item = new AnhBangChungDto { MaAnh = Guid.NewGuid().ToString("N"), LoaiNoiDung = mime,
                     KichThuoc = data.LongLength, Sha256 = Convert.ToHexString(SHA256.HashData(data)) };
-                Directory.CreateDirectory(Path.Combine(_root, maGiao.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+                string path = Tep(maGiao, item, nguon);
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
                 saved.Add(item); // Kể cả write dở cũng chỉ dọn file do chính request này tạo.
-                await using var output = new FileStream(DuongDan(maGiao, item), FileMode.CreateNew, FileAccess.Write, FileShare.None);
+                await using var output = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
                 await output.WriteAsync(data, ct);
             }
             return saved;
         }
-        catch { XoaTepCuaYeuCau(maGiao, saved); throw; }
+        catch { XoaTepCuaYeuCau(maGiao, saved, nguon); throw; }
     }
 
     public static string KiemTraAnh(byte[] data)
@@ -91,18 +94,30 @@ public sealed class BangChungGiaoHangStore
         { throw new ArgumentException("Ảnh hỏng hoặc không đọc được. Chọn lại ảnh JPG/PNG."); }
     }
 
-    public string DuongDan(int maGiao, AnhBangChungDto anh)
+    public string DuongDan(int maGiao, AnhBangChungDto anh, NguonAnhGiaoHang? nguon = null)
+    {
+        string path = Tep(maGiao, anh, nguon);
+        // Ảnh cũ nằm trực tiếp trong thư mục lượt giao; không tìm sang nguồn của bên kia.
+        return nguon.HasValue && !File.Exists(path) ? Tep(maGiao, anh, null) : path;
+    }
+
+    private string Tep(int maGiao, AnhBangChungDto anh, NguonAnhGiaoHang? nguon)
     {
         if (maGiao <= 0 || !Guid.TryParseExact(anh?.MaAnh, "N", out _) || anh.LoaiNoiDung is not ("image/png" or "image/jpeg"))
             throw new ArgumentException("Mã ảnh không hợp lệ.");
-        return Path.Combine(_root, maGiao.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            anh.MaAnh + (anh.LoaiNoiDung == "image/png" ? ".png" : ".jpg"));
+        string folder = Path.Combine(_root, maGiao.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        if (nguon.HasValue) folder = Path.Combine(folder, nguon.Value switch {
+            NguonAnhGiaoHang.Shipper => "Shipper", NguonAnhGiaoHang.KhachHang => "KhachHang",
+            _ => throw new ArgumentException("Nguồn ảnh giao hàng không hợp lệ.")
+        });
+        return Path.Combine(folder, anh.MaAnh + (anh.LoaiNoiDung == "image/png" ? ".png" : ".jpg"));
     }
 
-    public void XoaTepCuaYeuCau(int maGiao, IEnumerable<AnhBangChungDto> files)
+    public void XoaTepCuaYeuCau(int maGiao, IEnumerable<AnhBangChungDto> files, NguonAnhGiaoHang? nguon = null)
     {
         foreach (var file in files)
-            try { File.Delete(DuongDan(maGiao, file)); }
+            // Chỉ dọn đúng nơi request đã ghi, không dùng đường dẫn fallback của ảnh lịch sử.
+            try { File.Delete(Tep(maGiao, file, nguon)); }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* Giữ orphan thay vì đụng file khác. */ }
     }
 }

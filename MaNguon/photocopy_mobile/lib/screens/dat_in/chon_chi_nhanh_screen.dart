@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../api.dart';
+import '../../yeu_cau_tao_don.dart';
 import '../../dinh_dang.dart';
 import '../../models.dart';
 import '../../giao_hang.dart';
@@ -68,6 +69,7 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
   Timer? _hen;
   int _lanGoi = 0;
 
+  final _yeuCauTao = YeuCauTaoDon();
   bool _dangDatDon = false;
   bool _dangXemChinhSach = false;
   String? _loiDatDon;
@@ -210,8 +212,9 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
 
   // POST /api/don-hang — F-09: tạo đơn thật
   Future<void> _datDon() async {
-    if (_baoGia == null || _dangTinh || _dangDatDon || _dangXemChinhSach)
+    if (_baoGia == null || _dangTinh || _dangDatDon || _dangXemChinhSach) {
       return;
+    }
     _dangXemChinhSach = true;
     bool? dongY;
     try {
@@ -245,29 +248,32 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
       _loiDatDon = null;
     });
 
-    KetQuaApi kq = await _post('/api/don-hang', {
-      'maChiNhanh': _maChiNhanh,
-      'hinhThucNhan': _hinhThucNhan,
-      if (_hinhThucNhan == 'GIAO_HANG') ..._diaChiNhan.duLieu,
-      'sdtNhan': _oSdt.text.trim().isEmpty ? null : _oSdt.text.trim(),
-      'maBaoGiaGiao': _hinhThucNhan == 'GIAO_HANG'
-          ? _baoGia!.maBaoGiaGiao
-          : null,
-      'inGap': widget.hoaToc,
-      'maCodeKhuyenMai': _oMaGiam.text.trim().isEmpty
-          ? null
-          : _oMaGiam.text.trim(),
-      'ghiChu': widget.ghiChu,
-      'fileIn': [
-        {
-          'maFileIn': widget.file.maFileIn,
-          'maDichVu': widget.maDichVu,
-          'soBanIn': widget.soBan,
-          'huongGiay': widget.huongGiay,
-          'dsGiaCong': widget.dsGiaCong,
-        },
-      ],
-    });
+    KetQuaApi kq = await _post(
+      '/api/don-hang',
+      _yeuCauTao.ganMa({
+        'maChiNhanh': _maChiNhanh,
+        'hinhThucNhan': _hinhThucNhan,
+        if (_hinhThucNhan == 'GIAO_HANG') ..._diaChiNhan.duLieu,
+        'sdtNhan': _oSdt.text.trim().isEmpty ? null : _oSdt.text.trim(),
+        'maBaoGiaGiao': _hinhThucNhan == 'GIAO_HANG'
+            ? _baoGia!.maBaoGiaGiao
+            : null,
+        'inGap': widget.hoaToc,
+        'maCodeKhuyenMai': _oMaGiam.text.trim().isEmpty
+            ? null
+            : _oMaGiam.text.trim(),
+        'ghiChu': widget.ghiChu,
+        'fileIn': [
+          {
+            'maFileIn': widget.file.maFileIn,
+            'maDichVu': widget.maDichVu,
+            'soBanIn': widget.soBan,
+            'huongGiay': widget.huongGiay,
+            'dsGiaCong': widget.dsGiaCong,
+          },
+        ],
+      }),
+    );
     if (!mounted) return;
 
     if (!kq.thanhCong) {

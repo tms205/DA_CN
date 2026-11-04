@@ -95,6 +95,47 @@ public class CaTuDongWebTests
         Assert.Equal((2, 200000m), Assert.Single(thu.DaMo));
     }
 
+    [Fact]
+    public async Task CeoDongCa_GiaiThichDung_VaGuiMotLan_KhongGoiXacNhanRieng()
+    {
+        await using var thu=await PhienThu.Tao("SUPER_ADMIN",1);
+        thu.CaDangMo=new() {MaCa=50,MaNhanVien=10,MaChiNhanh=1,TenNhanVien="CEO thử",TienDauCa=200000,DoanhThuTrongCa=100000,GioMoCa=DateTime.Today.AddHours(8),TrangThai="DANG_MO"};
+        string form=await thu.RenderDongCa(false);
+        Assert.Contains("Ca của CEO được chốt ngay",form);
+        Assert.DoesNotContain("Quản lý sẽ trừ khoản",form);
+        Assert.Contains("Ghi rõ lý do thiếu tiền",form);
+        string result=await thu.RenderDongCa(true);
+        Assert.Equal("/api/ca/dong",Assert.Single(thu.DaThaoTac));
+        Assert.Contains("Ca của CEO không cần người khác xác nhận",result);
+        Assert.Contains("Đã đóng",result);
+        Assert.Contains("Ghi chú: CEO ghi nguyên nhân thiếu tiền.",result);
+        Assert.Null(thu.CaDangMo);
+    }
+
+    [Fact]
+    public async Task QuanLyVanHienHuongDanDoiSoat()
+    {
+        await using var thu=await PhienThu.Tao("BRANCH_ADMIN",1);
+        thu.CaDangMo=new() {MaCa=50,MaNhanVien=10,MaChiNhanh=1,TienDauCa=200000,DoanhThuTrongCa=100000,GioMoCa=DateTime.Today.AddHours(8),TrangThai="DANG_MO"};
+        string form=await thu.RenderDongCa(false);
+        Assert.DoesNotContain("Ca của CEO được chốt ngay",form);
+        Assert.Contains("Quản lý sẽ trừ khoản",form);
+    }
+
+    private sealed class NhapDongCa : TrangCa
+    {
+        [Parameter] public bool Luu {get;set;}
+        protected override async Task OnInitializedAsync()
+        {
+            await base.OnInitializedAsync();
+            const BindingFlags flags=BindingFlags.NonPublic|BindingFlags.Instance;
+            typeof(TrangCa).GetMethod("MoHopCa",flags).Invoke(this,null);
+            typeof(TrangCa).GetField("_tienDemDuoc",flags).SetValue(this,299000m);
+            typeof(TrangCa).GetField("_ghiChuTongKet",flags).SetValue(this,"CEO ghi nguyên nhân thiếu tiền.");
+            if(Luu)await (Task)typeof(TrangCa).GetMethod("DongCaAsync",flags).Invoke(this,null);
+        }
+    }
+
     private sealed class BamMoCa : TrangCa
     {
         protected override async Task OnInitializedAsync()
@@ -115,6 +156,8 @@ public class CaTuDongWebTests
         public PhamViChiNhanh PhamVi { get; }
         public List<(int ChiNhanh, decimal Tien)> DaMo { get; } = new();
         public CaLamViecDto CaDangMo { get; set; }
+        public CaLamViecDto CaDaDong { get; set; }
+        public List<string> DaThaoTac { get; } = new();
 
         private PhienThu(string vaiTro, int? chiNhanh)
         {
@@ -163,6 +206,12 @@ public class CaTuDongWebTests
             return await renderer.Dispatcher.InvokeAsync(async () => WebUtility.HtmlDecode(
                 (await renderer.RenderComponentAsync(bamMo ? typeof(BamMoCa) : typeof(TrangCa), ParameterView.Empty)).ToHtmlString()));
         }
+        public async Task<string> RenderDongCa(bool luu)
+        {
+            await using var renderer=new HtmlRenderer(_services,_services.GetRequiredService<ILoggerFactory>());
+            return await renderer.Dispatcher.InvokeAsync(async()=>WebUtility.HtmlDecode(
+                (await renderer.RenderComponentAsync<NhapDongCa>(ParameterView.FromDictionary(new Dictionary<string,object>{{"Luu",luu}}))).ToHtmlString()));
+        }
         public async ValueTask DisposeAsync() { _http.Dispose(); await _services.DisposeAsync(); }
     }
 
@@ -174,15 +223,25 @@ public class CaTuDongWebTests
             {
                 if (request.RequestUri.AbsolutePath == "/api/ca/dang-mo")
                     return thu.CaDangMo == null ? new(HttpStatusCode.NoContent) : new(HttpStatusCode.OK) { Content = JsonContent.Create(thu.CaDangMo) };
+                if(request.RequestUri.AbsolutePath=="/api/ca/cho-tong-ket")return new(HttpStatusCode.NoContent);
                 object ds = request.RequestUri.AbsolutePath switch {
                     "/api/danh-muc/chi-nhanh" => new[] { new ChiNhanhDto { MaChiNhanh = 1 }, new ChiNhanhDto { MaChiNhanh = 2 } },
                     "/api/quan-tri/bao-cao/hien-tai" => new TongQuanHienTaiDto(),
-                    "/api/ca" or "/api/ca/cho-xac-nhan" => Array.Empty<CaLamViecDto>(),
+                    "/api/ca" => thu.CaDaDong==null ? Array.Empty<CaLamViecDto>() : new[]{thu.CaDaDong},
+                    "/api/ca/cho-xac-nhan" => Array.Empty<CaLamViecDto>(),
                     _ => throw new InvalidOperationException("GET ngoài dự kiến: " + request.RequestUri.AbsolutePath)
                 };
                 return new(HttpStatusCode.OK) { Content = JsonContent.Create(ds) };
             }
             Assert.Equal("POST", request.Method.Method);
+            thu.DaThaoTac.Add(request.RequestUri.AbsolutePath);
+            if(request.RequestUri.AbsolutePath=="/api/ca/dong") {
+                var close=await request.Content.ReadFromJsonAsync<DongCaRequest>(cancellationToken:token);
+                Assert.Equal(50,close.MaCa);Assert.Equal(299000m,close.TongDoanhThuCuoiCa);Assert.Equal("CEO ghi nguyên nhân thiếu tiền.",close.GhiChu);
+                thu.CaDaDong=thu.CaDangMo;thu.CaDangMo=null;
+                thu.CaDaDong.TrangThai="DA_XAC_NHAN";thu.CaDaDong.GhiChu=close.GhiChu;thu.CaDaDong.TongDoanhThuCuoiCa=close.TongDoanhThuCuoiCa;
+                return new(HttpStatusCode.OK){Content=JsonContent.Create(new PhotocopyShared.Dtos.KetQuaDto {Message="Đã đóng ca. Ca của CEO không cần người khác xác nhận."})};
+            }
             Assert.Equal("/api/ca/mo", request.RequestUri.AbsolutePath);
             Assert.Equal("phien-kiem-thu", request.Headers.Authorization?.Parameter);
             int cn = int.Parse(request.Headers.GetValues(TenHeader.MaChiNhanh).Single());

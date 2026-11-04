@@ -67,6 +67,8 @@ public sealed class DanhSachThongBaoDto
 /// (chốt 20/09/2026). Tiền mặt chỉ dành cho khách tới tận tiệm ngồi đợi in — đơn đó do nhân viên quầy lập.</summary>
 public sealed partial class DatDonHangRequest
 {
+    /// <summary>Giữ nguyên khi gửi lại cùng yêu cầu; null chỉ dành cho client cũ.</summary>
+    public Guid? MaYeuCauTao { get; set; }
     [Range(1, int.MaxValue, ErrorMessage = "Mã chi nhánh phải là số nguyên dương.")]
     public int MaChiNhanh { get; set; }
     /// <summary>TAI_QUAY hoặc GIAO_HANG.</summary>

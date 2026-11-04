@@ -52,7 +52,7 @@ public partial class GiaoHangController
             if (string.IsNullOrWhiteSpace(req.LyDo) || req.LyDo.Trim().Length is < 5 or > 255)
                 return BadRequest(new { message = "Nhập lý do từ 5 đến 255 ký tự." });
             hoSo = new HoSoBangChung { ViTri = viTri };
-            hoSo.Anh = await _bangChung.Luu(maGiaoHang, req.Anh, HttpContext.RequestAborted);
+            hoSo.Anh = await _bangChung.Luu(maGiaoHang, req.Anh, HttpContext.RequestAborted, NguonAnhGiaoHang.Shipper);
             hoSo.DiaChi = await DiaChiBangChung(viTri, HttpContext.RequestAborted);
             return await GhiKetQua(maGiaoHang, new KetQuaGiaoRequest { ThanhCong = false, LyDo = req.LyDo }, hoSo);
         }
@@ -67,7 +67,7 @@ public partial class GiaoHangController
         {
             // Commit mất phản hồi có thể đã thành công: giữ ảnh, không xóa mù làm mất bằng chứng.
             if (hoSo != null && !hoSo.DaLuu && !hoSo.BatDauCommit)
-                _bangChung.XoaTepCuaYeuCau(maGiaoHang, hoSo.Anh);
+                _bangChung.XoaTepCuaYeuCau(maGiaoHang, hoSo.Anh, NguonAnhGiaoHang.Shipper);
         }
     }
 
@@ -103,15 +103,15 @@ public partial class GiaoHangController
         if (!Guid.TryParseExact(maAnh, "N", out _)) return BadRequest(new { message = "Mã ảnh không hợp lệ." });
         var row = await DocBangChung(maGiaoHang);
         if (row == null) return NotFound();
-        return await TraAnhBangChung(maGiaoHang,maAnh,DocDanhSachAnh((string)row.AnhBangChungJson));
+        return await TraAnhBangChung(maGiaoHang,maAnh,DocDanhSachAnh((string)row.AnhBangChungJson),NguonAnhGiaoHang.Shipper);
     }
 
-    private async Task<IActionResult> TraAnhBangChung(int maGiaoHang,string maAnh,List<AnhBangChungDto> danhSach)
+    private async Task<IActionResult> TraAnhBangChung(int maGiaoHang,string maAnh,List<AnhBangChungDto> danhSach,NguonAnhGiaoHang nguon)
     {
         Response.Headers["X-Content-Type-Options"]="nosniff";
         var anh = danhSach.SingleOrDefault(x => x.MaAnh == maAnh);
         if (anh == null) return NotFound();
-        string path = _bangChung.DuongDan(maGiaoHang, anh);
+        string path = _bangChung.DuongDan(maGiaoHang, anh, nguon);
         FileStream stream = null;
         try
         {

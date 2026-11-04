@@ -50,6 +50,18 @@ public sealed class OcrQueue(IOcrProcessor processor, ILogger<OcrQueue> logger, 
     {
         lock (_lock) { Prune(); return _jobs.TryGetValue(id, out var job) && job.Owner == owner ? Snapshot(job) : null; }
     }
+    // Đường API cũ cũng phải qua cùng admission/quota và một worker.
+    public async Task<OcrTicket> Wait(int owner, Guid id, CancellationToken cancellation)
+    {
+        while (true)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            var ticket = Get(owner, id) ?? throw new InvalidOperationException("Tác vụ OCR không còn tồn tại.");
+            if (ticket.State is not ("CHO_XU_LY" or "DANG_XU_LY")) return ticket;
+            await Task.Delay(100, cancellation);
+        }
+    }
+
     public bool Cancel(int owner, Guid id)
     {
         lock (_lock)

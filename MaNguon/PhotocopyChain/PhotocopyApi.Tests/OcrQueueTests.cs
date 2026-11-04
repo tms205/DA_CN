@@ -32,6 +32,25 @@ public class OcrQueueTests
         throw new TimeoutException("Worker không hoàn tất.");
     }
     [Fact]
+    public async Task LegacyAndNewEndpointShareQuotaAndLegacyCancellationReleasesWorker()
+    {
+        var processor=new Processor();using var queue=Queue(processor);await queue.StartAsync(default);
+        var context=new DefaultHttpContext { User=new ClaimsPrincipal(new ClaimsIdentity(new[] {new Claim(TenClaim.MaNguoiDung,"1")},"test")) };
+        var controller=new OcrController(null,NullLogger<OcrController>.Instance,processor,queue) { ControllerContext=new(){HttpContext=context} };
+        using var cancel=new CancellationTokenSource();
+        try {
+            var legacy=controller.NhanDang(Image(),"2b",cancel.Token);
+            Assert.Equal("2b",await processor.Started.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(3)));
+            var ticket=Assert.IsType<AcceptedResult>(await controller.TaoTacVu(Image(),"4b",default));
+            var rejected=Assert.IsType<ObjectResult>(await controller.TaoTacVu(Image(),"2b",default));Assert.Equal(429,rejected.StatusCode);
+            var rejectedOld=Assert.IsType<ObjectResult>(await controller.NhanDang(Image(),"2b",default));Assert.Equal(429,rejectedOld.StatusCode);
+            cancel.Cancel();Assert.IsType<EmptyResult>(await legacy.WaitAsync(TimeSpan.FromSeconds(3)));
+            Assert.Equal("4b",await processor.Started.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(3)));
+            processor.Proceed.Release();var next=(OcrTicket)ticket.Value;Assert.Equal("HOAN_TAT",(await Finished(queue,1,next.Id)).State);
+            Assert.Equal(1,processor.MaxActive);
+        } finally { await queue.StopAsync(default); }
+    }
+    [Fact]
     public async Task WebAndPhoneQueueInOrderAndNeverRunGpuTogether()
     {
         var processor = new Processor(); using var queue = Queue(processor);

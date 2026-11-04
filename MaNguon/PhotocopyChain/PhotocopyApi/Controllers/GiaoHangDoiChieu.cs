@@ -68,7 +68,7 @@ public partial class GiaoHangController
         if (!Guid.TryParseExact(maAnh, "N", out _)) return BadRequest(new { message = "Mã ảnh không hợp lệ." });
         var row = await DocLuotDoiChieu(maGiaoHang);
         if (row == null) return NotFound();
-        return await TraAnhBangChung(maGiaoHang, maAnh, DocPhanHoi(row.DoiChieuKhachHangJson)?.Anh ?? new());
+        return await TraAnhBangChung(maGiaoHang, maAnh, DocPhanHoi(row.DoiChieuKhachHangJson)?.Anh ?? new(), NguonAnhGiaoHang.KhachHang);
     }
 
     [HttpPost("luot/{maGiaoHang:int:min(1)}/doi-chieu")]
@@ -84,7 +84,7 @@ public partial class GiaoHangController
             if (row == null) return NotFound(new { message = "Không tìm thấy lượt giao thất bại của bạn." });
             if (row.DoiChieuKhachHangJson != null) return Ok(new { message = "Phản hồi lượt này đã được ghi nhận; bằng chứng cũ được giữ nguyên." });
             QuyTacDoiChieu.KiemTraNoiDung(req.NoiDung);
-            files = await _bangChung.Luu(maGiaoHang, req.Anh, HttpContext.RequestAborted);
+            files = await _bangChung.Luu(maGiaoHang, req.Anh, HttpContext.RequestAborted, NguonAnhGiaoHang.KhachHang);
             // File/ảnh được xử lý trước khi khóa SQL; khóa theo thứ tự Đơn → Lượt như nghiệp vụ giao hàng.
             using var conn = new SqlConnection(_chuoiKetNoi); await conn.OpenAsync();
             await using var tran = (SqlTransaction)await conn.BeginTransactionAsync(IsolationLevel.Serializable);
@@ -108,7 +108,7 @@ public partial class GiaoHangController
             _log.LogWarning("Chưa xác nhận lưu phản hồi lượt giao {MaGiaoHang}; loại lỗi {Loai}.", maGiaoHang, ex.GetType().Name);
             return StatusCode(503, new { message = "Chưa xác nhận được phản hồi. Giữ ảnh và kiểm tra lại đơn trước khi gửi lại." });
         }
-        finally { if (!saved && !committing) _bangChung.XoaTepCuaYeuCau(maGiaoHang, files); }
+        finally { if (!saved && !committing) _bangChung.XoaTepCuaYeuCau(maGiaoHang, files, NguonAnhGiaoHang.KhachHang); }
     }
 
     [HttpPut("luot/{maGiaoHang:int:min(1)}/doi-chieu/xu-ly")]

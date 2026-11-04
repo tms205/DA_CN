@@ -9,6 +9,11 @@ public class BaoTriMiddleware
         var state = store.Read();
         string platform=BaoTriStore.NenTang(context.User);
         var path = context.Request.Path;
+        // Tiền có thể đã tới ngân hàng: bảo trì không được chặn callback đã phát sinh.
+        // Endpoint webhook vẫn xác minh chữ ký/số tiền; luồng xếp in kiểm tra bảo trì riêng.
+        if ((HttpMethods.IsPost(context.Request.Method) && path.Equals("/api/thanh-toan/webhook",StringComparison.OrdinalIgnoreCase)) ||
+            (HttpMethods.IsGet(context.Request.Method) && path.Equals("/api/thanh-toan/payos/ket-qua",StringComparison.OrdinalIgnoreCase)))
+        { await _next(context); return; }
         if(platform==null && path.StartsWithSegments("/api/auth/admin"))platform="web";
         if(platform==null && path.Equals("/api/auth/login",StringComparison.OrdinalIgnoreCase))platform="app";
         if(platform==null && (path.StartsWithSegments("/api/auth/register")||path.Equals("/api/auth/google",StringComparison.OrdinalIgnoreCase)||path.StartsWithSegments("/api/auth/google/register")))platform="app";
@@ -18,8 +23,6 @@ public class BaoTriMiddleware
         bool full=BaoTriStore.KhoaToanBo(state,platform);
         if(platform==null && (path.StartsWithSegments("/api/may-in-ao")||path.StartsWithSegments("/api/printer-connector")||path.Equals("/api/thanh-toan/webhook",StringComparison.OrdinalIgnoreCase)||path.Equals("/api/thanh-toan/payos/ket-qua",StringComparison.OrdinalIgnoreCase)))full=state.DangBaoTri&&state.KhoaWeb&&state.KhoaApp;
         bool feature=BaoTriStore.ChucNang(state,platform).Contains(ChucNang(path));
-        // Callback đã phát sinh từ cổng thanh toán phải được ghi nhận khi chỉ khóa một chức năng.
-        if(!full && (path.Value?.Contains("webhook",StringComparison.OrdinalIgnoreCase)==true || path.Equals("/api/thanh-toan/payos/ket-qua",StringComparison.OrdinalIgnoreCase)))feature=false;
         if ((!full && !feature) || path.Equals("/api/bao-tri/trang-thai", StringComparison.OrdinalIgnoreCase) ||
             path.Equals("/api/bao-tri/phien", StringComparison.OrdinalIgnoreCase) ||
             path.Equals("/api/auth/admin/login", StringComparison.OrdinalIgnoreCase) ||

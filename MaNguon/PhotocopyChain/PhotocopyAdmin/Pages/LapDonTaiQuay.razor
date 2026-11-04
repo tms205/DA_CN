@@ -542,6 +542,8 @@
     private LienKetPayOSDto _lienKetPayOS;
     private int? _maDonVuaLap;
     private bool _dangGui;
+    private Guid _maYeuCauTao;
+    private string _noiDungYeuCauTao;
     private bool _dangBaoGia;
     private int _lanBaoGia;
     private bool _dangTaiFile;
@@ -814,6 +816,11 @@
         if (_dangGui || _dangTaiFile || _baoGia == null) return;
         if (_khach == null) { _loi = "Vui lòng chọn khách hàng."; return; }
         var req = new DatDonTaiQuayRequest { MaKhachHang = _khach.MaKhachHang, PhuongThucThanhToan = _phuongThucThanhToan, InGap = _inGap, MaCodeKhuyenMai = _maCode, GhiChu = _ghiChu, FileIn = TaoDongIn() };
+        string noiDung=System.Text.Json.JsonSerializer.Serialize(req);
+        if(_noiDungYeuCauTao!=noiDung || _maYeuCauTao==Guid.Empty) {
+            _maYeuCauTao=Guid.NewGuid();_noiDungYeuCauTao=noiDung;
+        }
+        req.MaYeuCauTao=_maYeuCauTao;
         _loi = QuyTacNhap.LayLoi(req);
         if (_loi != null) return;
         _dangGui = true; _thongBao = null;
@@ -832,7 +839,7 @@
             }
             else _loi = (await res.Content.ReadFromJsonAsync<ApiError>()).Message;
         }
-        catch { _loi = "Không lập được đơn tại quầy."; }
+        catch { _loi = "Chưa xác nhận được kết quả. Giữ nguyên thông tin và bấm lại để kiểm tra cùng yêu cầu, tránh lập thêm đơn."; }
         _dangGui = false;
     }
 

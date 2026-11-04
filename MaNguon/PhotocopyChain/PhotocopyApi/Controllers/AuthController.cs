@@ -145,49 +145,33 @@ public partial class AuthController : ControllerBase
 
     // POST api/auth/register/otp — Đăng ký bước 1: kiểm tra trùng, gửi mã OTP qua email (CHƯA tạo tài khoản)
     [HttpPost("register/otp")]
+    [EnableRateLimiting("khoi-phuc-mat-khau")]
     public async Task<IActionResult> GuiOtpDangKy(DangKyRequest req)
     {
         string email = req.Email.Trim().ToLower();
 
-        // Nhập sai mã 5 lần thì bị khóa đăng ký 15 phút
-        if (_cache.TryGetValue("khoa-dang-ky:" + email, out DateTime khoaDen))
+        string khoa = "register:" + email;
+        int choGiay = _otpDatLai.ThuBatDauGui(khoa);
+        if (choGiay > 0)
+            return StatusCode(429, new { message = $"Vui lòng đợi {choGiay} giây rồi gửi lại mã." });
+        bool daGui = false;
+        DangKyTam dangKy;
+        try
         {
-            int soPhut = (int)Math.Ceiling((khoaDen - DateTime.Now).TotalMinutes);
-            return StatusCode(403, new { message = $"Nhập sai mã quá 5 lần. Thử đăng ký lại sau {soPhut} phút." });
+            using var conn = new SqlConnection(_chuoiKetNoi);
+            string loiTrung = await KiemTraTrung(conn, req.Email.Trim(), req.SoDienThoai.Trim());
+            if (loiTrung != null) return Conflict(new { message = loiTrung });
+            dangKy = new DangKyTam {
+                HoTen = req.HoTen.Trim(), Email = req.Email.Trim(), SoDienThoai = req.SoDienThoai.Trim(),
+                MatKhauDaBam = BCrypt.Net.BCrypt.HashPassword(req.MatKhau)
+            };
+            string maOtp = TaoMaOtp();
+            daGui = await GuiEmailOtp(dangKy.Email, dangKy.HoTen, maOtp, "kích hoạt tài khoản", 5);
+            if (!daGui) return StatusCode(502, new { message = "Không gửi được email chứa mã OTP. Vui lòng thử lại sau." });
+            // Payload và HMAC cùng một bản ghi; lấy và dùng một lần trong cùng khóa.
+            _otpDatLai.LuuMa(khoa, maOtp, dangKy, TimeSpan.FromMinutes(5));
         }
-
-        // Vừa gửi mã xong thì phải đợi 60 giây mới được gửi lại
-        if (_cache.TryGetValue("dang-ky:" + email, out DangKyTam cu) && cu.GuiLuc.AddSeconds(60) > DateTime.Now)
-        {
-            int soGiay = (int)Math.Ceiling((cu.GuiLuc.AddSeconds(60) - DateTime.Now).TotalSeconds);
-            return StatusCode(429, new { message = $"Vui lòng đợi {soGiay} giây rồi gửi lại mã." });
-        }
-
-        // Báo trùng ngay từ bước này, khỏi bắt khách nhập mã xong mới biết
-        using var conn = new SqlConnection(_chuoiKetNoi);
-        string loiTrung = await KiemTraTrung(conn, req.Email.Trim(), req.SoDienThoai.Trim());
-        if (loiTrung != null)
-            return Conflict(new { message = loiTrung });
-
-        // Giữ tạm thông tin đăng ký trong bộ nhớ 5 phút
-        var dangKy = new DangKyTam
-        {
-            HoTen = req.HoTen.Trim(),
-            Email = req.Email.Trim(),
-            SoDienThoai = req.SoDienThoai.Trim(),
-            MatKhauDaBam = BCrypt.Net.BCrypt.HashPassword(req.MatKhau),
-            MaOtp = TaoMaOtp(),
-            GuiLuc = DateTime.Now,
-            SoLanNhapSai = 0
-        };
-        _cache.Set("dang-ky:" + email, dangKy, TimeSpan.FromMinutes(5));
-
-        bool daGui = await GuiEmailOtp(dangKy.Email, dangKy.HoTen, dangKy.MaOtp, "kích hoạt tài khoản", 5);
-        if (!daGui)
-        {
-            _cache.Remove("dang-ky:" + email);   // gửi lỗi thì cho bấm gửi lại ngay, không bắt đợi 60 giây
-            return StatusCode(502, new { message = "Không gửi được email chứa mã OTP. Vui lòng thử lại sau." });
-        }
+        finally { if (!daGui) _otpDatLai.HuyMa(khoa); }
 
         return Ok(new OtpDaGuiDto
         {
@@ -199,28 +183,13 @@ public partial class AuthController : ControllerBase
 
     // POST api/auth/register — Đăng ký bước 2: nhập đúng mã OTP thì mới tạo tài khoản khách hàng và đăng nhập luôn
     [HttpPost("register")]
+    [EnableRateLimiting("khoi-phuc-mat-khau")]
     public async Task<IActionResult> XacNhanDangKy(XacNhanDangKyRequest req)
     {
         string email = req.Email.Trim().ToLower();
 
-        // Quá 5 phút thì bộ nhớ tự xóa thông tin đăng ký
-        if (!_cache.TryGetValue("dang-ky:" + email, out DangKyTam dangKy))
-            return BadRequest(new { message = "Mã OTP đã hết hạn. Vui lòng bấm gửi lại mã." });
-
-        if (req.MaOtp != dangKy.MaOtp)
-        {
-            dangKy.SoLanNhapSai++;
-            if (dangKy.SoLanNhapSai >= 5)
-            {
-                _cache.Remove("dang-ky:" + email);
-                _cache.Set("khoa-dang-ky:" + email, DateTime.Now.AddMinutes(15), TimeSpan.FromMinutes(15));
-                return StatusCode(403, new { message = "Nhập sai mã quá 5 lần. Chức năng đăng ký bị khóa tạm 15 phút." });
-            }
-            return BadRequest(new { message = $"Mã OTP không đúng. Còn {5 - dangKy.SoLanNhapSai} lần thử." });
-        }
-
-        // Đúng mã → xóa khỏi bộ nhớ, kiểm tra trùng lần nữa (trong lúc chờ có thể người khác đã đăng ký) rồi thêm vào CSDL
-        _cache.Remove("dang-ky:" + email);
+        if (!_otpDatLai.DungMa<DangKyTam>("register:" + email, req.MaOtp, out var dangKy))
+            return BadRequest(new { message = "Mã OTP không đúng, đã dùng hoặc hết hạn. Sau 5 lần sai phải đợi 15 phút trước khi gửi lại." });
 
         using var conn = new SqlConnection(_chuoiKetNoi);
         string loiTrung = await KiemTraTrung(conn, dangKy.Email, dangKy.SoDienThoai);

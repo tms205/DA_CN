@@ -12,7 +12,7 @@
    Ba ca 07:30–12:30, 12:30–17:30, 17:30–21:30; mở từ 21:30 đến trước 07:30 thuộc ca sáng sắp tới, kết thúc 12:30; hết giờ chờ tổng kết tiền —
    Nhân viên/quản lý đăng nhập tự mở ca riêng 200.000đ; CEO chọn chi nhánh rồi mở ca thủ công.
    Hết ca thì đếm tiền rồi bấm Đóng ca.
-   Người trực ca không được tự xác nhận ca của chính mình. *@
+   Ca của CEO chốt ngay sau thực đếm; các vai trò còn lại cần người khác xác nhận. *@
 <TieuDeTrang TieuDe="Ca làm việc & két tiền" MoTa="@MoTa()" />
 
 <div class="than-trang khoi-doc">
@@ -48,7 +48,7 @@
         <section class="the ca-the">
             <div class="ca-dau"><div><h2 class="the-tieu-de nho">@(_ca.TrangThai == "CHO_TONG_KET" ? "Ca hết giờ — chờ tổng kết" : "Ca đang mở")</h2><div class="nv-phu">@_ca.TenNhanVien · @_ca.TenChiNhanh · mở lúc @_ca.GioMoCa.ToString("HH:mm dd/MM")</div></div><span class="nhan-mau @MauTrangThaiCa(_ca.TrangThai)">@TenTrangThaiCa(_ca)</span></div>
             <p class="goi-y">@_ca.TenCa · Ngày nghiệp vụ @_ca.NgayLamViec.ToString("dd/MM/yyyy") · Tự kết ca lúc @_ca.GioKetThucDuKien.ToString("HH:mm dd/MM/yyyy")</p>
-            @if (_ca.TrangThai == "CHO_TONG_KET") { <p class="o-canh-bao">Ca đã ngừng nhận giao dịch từ @_ca.GioDongCa?.ToString("HH:mm dd/MM/yyyy"). Nhập tiền thực đếm và lý do nếu chênh lệch để gửi quản lý đối soát.</p> }
+            @if (_ca.TrangThai == "CHO_TONG_KET") { <p class="o-canh-bao">Ca đã ngừng nhận giao dịch từ @_ca.GioDongCa?.ToString("HH:mm dd/MM/yyyy"). @(LaCeo() ? "Nhập tiền thực đếm và lý do nếu chênh lệch để chốt ca; không cần người khác xác nhận." : "Nhập tiền thực đếm và lý do nếu chênh lệch để gửi quản lý đối soát.")</p> }
             <div class="ca-so-lieu"><div class="ca-o"><div class="ca-o-nhan">Tiền đầu ca</div><b class="mono">@Tien(_ca.TienDauCa)</b></div><div class="ca-o"><div class="ca-o-nhan">COD đã thu</div><b class="mono">@Tien(_ca.DoanhThuTrongCa)</b></div><div class="ca-o"><div class="ca-o-nhan">VietQR · không vào két</div><b class="mono">@Tien(_ca.DoanhThuVietQr)</b></div><div class="ca-o"><div class="ca-o-nhan">Két phải có</div><b class="mono">@Tien(TienPhaiCo(_ca))</b></div></div>
             <button type="button" class="nut-chinh" @onclick="MoHopCa">Đóng ca &amp; kiểm đếm</button>
         </section>
@@ -112,6 +112,10 @@
             </div>
 
             <h3 class="hd-muc">Đóng ca — đếm tiền trong két</h3>
+            @if (LaCeo())
+            {
+                <p class="goi-y">Ca của CEO được chốt ngay sau khi lưu. Nếu thừa hoặc thiếu tiền, cần ghi rõ lý do; không cần người khác xác nhận.</p>
+            }
             <div class="truong ca-o-tien">
                 <label class="nhan">Số tiền đếm được (₫)</label>
                 <div class="o-nhap">
@@ -134,7 +138,7 @@
                         <span class="o-cb-icon">@((MarkupString)Svg.CanhBao())</span>
                         <div>
                             <div class="o-cb-tieu-de">Thiếu @Tien(-lech)</div>
-                            <div class="o-cb-noi-dung">Quản lý sẽ trừ khoản đã chi cho tiệm, phần còn lại nhân viên bù ngay khi xác nhận ca.</div>
+                            <div class="o-cb-noi-dung">@(LaCeo() ? "Ghi rõ lý do thiếu tiền để lưu vào lịch sử ca. Không tự ghi nhận tiền bù." : "Quản lý sẽ trừ khoản đã chi cho tiệm, phần còn lại nhân viên bù ngay khi xác nhận ca.")</div>
                         </div>
                     </div>
                 }
@@ -144,7 +148,7 @@
                         <span class="o-cb-icon">@((MarkupString)Svg.ThongTin())</span>
                         <div>
                             <div class="o-cb-tieu-de">Thừa @Tien(lech)</div>
-                            <div class="o-cb-noi-dung">Phần thừa nộp về tiệm khi quản lý xác nhận ca.</div>
+                            <div class="o-cb-noi-dung">@(LaCeo() ? "Ghi rõ lý do thừa tiền để lưu vào lịch sử ca." : "Phần thừa nộp về tiệm khi quản lý xác nhận ca.")</div>
                         </div>
                     </div>
                 }
@@ -193,7 +197,12 @@
                         @foreach (var ca in CaTrangHienTai())
                         {
                             <tr>
-                                <td data-nhan="Nhân viên"><div class="nv-ten">@ca.TenNhanVien</div></td>
+                                <td data-nhan="Nhân viên"><div class="nv-ten">@ca.TenNhanVien</div>
+                                    @if (!string.IsNullOrWhiteSpace(ca.GhiChu))
+                                    {
+                                        <div class="nv-phu" style="white-space: pre-wrap; overflow-wrap: anywhere">Ghi chú: @ca.GhiChu</div>
+                                    }
+                                </td>
                                 <td data-nhan="Giờ mở / đóng">
                                     <div>@ca.GioMoCa.ToString("HH:mm dd/MM")</div><div class="nv-phu">@ca.TenCa · ngày @ca.NgayLamViec.ToString("dd/MM")</div>
                                     <div class="nv-phu">@(ca.GioDongCa == null ? "chưa đóng" : ca.GioDongCa.Value.ToString("HH:mm dd/MM"))</div>
@@ -394,6 +403,7 @@
     }
 
     private bool LaQuanLyChiNhanh() => Phien.NguoiDung?.TenVaiTro == "BRANCH_ADMIN" || Phien.NguoiDung?.TenVaiTro == "SUPER_ADMIN";
+    private bool LaCeo() => Phien.NguoiDung?.TenVaiTro == "SUPER_ADMIN";
     private bool LaNhanVienStaff() => Phien.NguoiDung?.TenVaiTro == "STAFF";
     private bool CeoDangXemToanChuoi() => Phien.NguoiDung?.TenVaiTro == "SUPER_ADMIN" && PhamVi.MaChiNhanh == null;
 
@@ -551,7 +561,7 @@
         await TaiTatCa();
     }
 
-    // POST api/ca/dong — STAFF chờ xác nhận; BRANCH_ADMIN đóng xong ngay.
+    // POST api/ca/dong — CEO chốt ngay; STAFF/BRANCH_ADMIN chờ người khác đối soát.
     private async Task DongCaAsync()
     {
         if (_dangGui) return;

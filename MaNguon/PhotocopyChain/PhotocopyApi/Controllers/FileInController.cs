@@ -103,6 +103,7 @@ public class FileInController : ControllerBase
         DateTime thoiDiemTaiLen = DateTime.Now;
         var paths = DuongDanTaiLen.Tao(_config["LuuTruFile:ThuMucGoc"], thoiDiemTaiLen, duoi);
         string duongDanGoc = paths.Goc, duongDanPdf = paths.Pdf;
+        using var luotTai = new LuotTaiFile(paths.ThuMuc);
 
         // đổi sang PDF rồi đếm số trang
         int soTrang;
@@ -129,7 +130,8 @@ public class FileInController : ControllerBase
         }
         catch (Exception ex)
         {
-            // Lỗi thì dọn file trên ổ đĩa, trả câu báo lỗi cho App
+            // Chưa ghi SQL: chỉ dọn file riêng của lượt này.
+            luotTai.HoanTat();
             if (daTaoFile)
             {
                 XoaFile(duongDanGoc);
@@ -150,7 +152,8 @@ public class FileInController : ControllerBase
                        SELECT CAST(SCOPE_IDENTITY() AS INT);";
 
         using var conn = new SqlConnection(_chuoiKetNoi);
-        int maFile = await conn.ExecuteScalarAsync<int>(sql, new
+        int maFile;
+        try { maFile = await conn.ExecuteScalarAsync<int>(sql, new
         {
             MaKhachHang = maKhachHangLuu,
             TenFile = Path.GetFileName(file.FileName),
@@ -160,8 +163,23 @@ public class FileInController : ControllerBase
             SoTrang = soTrang,
             KichThuocAnh = kichThuocAnh,
             SoLuongAnh = soLuongAnh
-        });
-
+        }); }
+        catch (SqlException)
+        {
+            // Có thể INSERT đã commit nhưng phản hồi mất. Chỉ đọc lại, không xóa mù.
+            using var check = new SqlConnection(_chuoiKetNoi);
+            try
+            {
+                int? found = await check.QuerySingleOrDefaultAsync<int?>(
+                    "SELECT MaFile FROM FileIn WHERE DuongDan=@Path AND MaKhachHang=@Customer",
+                    new { Path=duongDanPdf, Customer=maKhachHangLuu });
+                if (found.HasValue) { luotTai.HoanTat(); return Ok(await DocFile(check, found.Value, maKhachHangLuu)); }
+            }
+            catch (SqlException) { _logger.LogWarning("Chưa đối chiếu được metadata upload; giữ file để kiểm tra lại."); }
+            // Marker được giữ để job chỉ dọn khi SQL xác nhận không có tham chiếu.
+            return StatusCode(503, new { message="Chưa xác nhận được lượt tải. Vui lòng kiểm tra kho file trước khi tải lại." });
+        }
+        luotTai.HoanTat();
         return Ok(await DocFile(conn, maFile, maKhachHangLuu));
     }
 
@@ -234,33 +252,16 @@ public class FileInController : ControllerBase
         if (maKhachHangCanXoa == 0)
             return BadRequest(new { message = "Thiếu khách hàng của file cần xóa." });
 
-        using var conn = new SqlConnection(_chuoiKetNoi);
-        FileChuaDat file = await conn.QueryFirstOrDefaultAsync<FileChuaDat>(
-            @"SELECT MaFile, DuongDan FROM FileIn f
-              WHERE f.MaFile = @MaFile AND f.MaKhachHang = @MaKhachHang
-                AND f.TrangThai = N'SAN_SANG' AND f.DuongDan IS NOT NULL
-                AND NOT EXISTS (SELECT 1 FROM ChiTietDonHang ct WHERE ct.MaFile = f.MaFile)",
-            new { MaFile = maFileIn, MaKhachHang = maKhachHangCanXoa });
-        if (file == null)
-            return BadRequest(new { message = "File đã nằm trong đơn hàng hoặc không tồn tại." });
-
-        XoaFile(file.DuongDan);
-        if (System.IO.File.Exists(file.DuongDan))
-            return BadRequest(new { message = "File đang được chương trình khác sử dụng, chưa thể xóa." });
-
-        await conn.ExecuteAsync(
-            "UPDATE FileIn SET TrangThai = N'DA_XOA', DuongDan = NULL WHERE MaFile = @MaFile",
-            new { MaFile = maFileIn });
-        return Ok(new { message = "Đã xóa file chưa đặt đơn." });
+        try {
+            var result=await new FileInLifecycleService(_config).Don(maFileIn,LyDoDonFile.ChuaDat,maKhachHangCanXoa,HttpContext.RequestAborted);
+            if(!result.DaDanhDau)return BadRequest(new {message="File đã nằm trong đơn hàng hoặc không tồn tại."});
+            return Ok(new {message=result.DaXoa?"Đã xóa file chưa đặt đơn.":"Đã bỏ file khỏi bản nháp; hệ thống sẽ dọn file đang bị khóa ở lượt sau."});
+        }catch(InvalidOperationException ex){return Conflict(new {message=ex.Message});}
     }
 
     //CÁC HÀM PHỤ
 
-    private class FileChuaDat
-    {
-        public int MaFile { get; set; }
-        public string DuongDan { get; set; }
-    }
+
 
     private async Task<FileInDto> DocFile(SqlConnection conn, int maFile, int maKhachHang)
     {

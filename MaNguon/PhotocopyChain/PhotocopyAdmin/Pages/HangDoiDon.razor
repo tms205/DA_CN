@@ -1,4 +1,4 @@
-﻿@page "/"
+@page "/"
 @using Microsoft.AspNetCore.SignalR.Client
 @using PhotocopyShared.Dtos.DonHang
 @using PhotocopyShared.Dtos.DatIn
@@ -73,78 +73,8 @@
             }
             else
             {
-                <div class="bang-cuon">
-                    <table role="table" class="bang bang-bam">
-                        <thead>
-                            <tr>
-                                <th scope="col">Mã đơn</th>
-                                <th scope="col">Khách hàng</th>
-                                <th scope="col">Quy cách in</th>
-                                <th scope="col">Nhận hàng</th>
-                                <th scope="col">Thanh toán</th>
-                                <th scope="col">Trạng thái</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var don in DonCuaTrangHienTai())
-                            {
-                                <tr class="@QuyTacHangDoi.LopCho(don) @(_donDangChon != null && _donDangChon.MaDonHang == don.MaDonHang ? "dong-chon" : "")"
-                                    @onclick="() => MoChiTiet(don.MaDonHang)">
-                                    <td data-nhan="Mã đơn">
-                                        <div class="hd-ma mono">@don.MaDonHangHienThi</div>
-                                        @if (don.InHoaToc)
-                                        {
-                                            <span class="nhan-mau nhan-cam">@((MarkupString)Svg.TiaSet()) Hỏa tốc</span>
-                                        }
-                                        @if (don.LoaiPhatSinh == "IN_LAI_LOI_QUAY")
-                                        {
-                                            <span class="nhan-mau nhan-do">In lại 0₫ · gốc @don.MaDonHangGocHienThi</span>
-                                        }
-                                        else if (don.LoaiPhatSinh == "BO_SUNG")
-                                        {
-                                            <span class="nhan-mau nhan-accent">Bổ sung · gốc @don.MaDonHangGocHienThi</span>
-                                        }
-                                    </td>
-                                    <td data-nhan="Khách hàng">
-                                        <div class="nv-ten">@don.TenKhachHang</div>
-                                        <div class="nv-phu">@don.NgayDat.ToString("HH:mm dd/MM")</div>
-                                    </td>
-                                    <td data-nhan="Quy cách in">
-                                        <div>@don.TongSoTrang trang · @don.SoFile file</div>
-                                        <div class="nv-phu">@don.QuyCach</div>
-                                    </td>
-                                    <td data-nhan="Nhận hàng">@(don.HinhThucNhan == "GIAO_HANG" ? "Giao tận nơi" : "Tại quầy")</td>
-                                    <td data-nhan="Thanh toán">
-                                        <div>@TenPhuongThuc(don.PhuongThucThanhToan)</div>
-                                        @if (don.TrangThaiThanhToan == "DA_THANH_TOAN")
-                                        {
-                                            <span class="nhan-mau nhan-xanh">Đã thanh toán</span>
-                                        }
-                                        else if (don.TrangThaiThanhToan == "DA_HOAN_TIEN")
-                                        {
-                                            <span class="nhan-mau nhan-xam">Đã hoàn tiền</span>
-                                        }
-                                        else
-                                        {
-                                            <span class="nhan-mau nhan-xam">Chưa thanh toán</span>
-                                        }
-                                    </td>
-                                    <td data-nhan="Trạng thái">
-                                        <span class="nhan-mau @MauNhan(don.TrangThaiDonHang)">@TrangThaiDonHang.TenHienThi(don.TrangThaiDonHang)</span>
-                                        @if (don.KenhDatDon == "APP" && don.TrangThaiDonHang == "CHO_XAC_NHAN" && don.GiayChoTiepNhan > 0)
-                                        {
-                                            <DemNguocTiepNhan @key="don.MaDonHang" Dong="don" HetHan="TaiDanhSach" />
-                                        }
-                                        else if (!string.IsNullOrEmpty(QuyTacHangDoi.NhanCho(don)))
-                                        {
-                                            <div class="hd-viec-cho">@QuyTacHangDoi.NhanCho(don)</div>
-                                        }
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
+                <BangHangDoiDon Don="DonCuaTrangHienTai()" MaDonDangChon="_donDangChon?.MaDonHang"
+                    MoDon="MoChiTiet" LamMoi="TaiDanhSach" MauNhan="MauNhan" TenPhuongThuc="TenPhuongThuc" />
                 <div class="ca-phan-trang">
                     <span>Trang @_trangDon / @TongTrangDon · @LocDanhSach().Count đơn phù hợp · @(_dangNoiRealtime ? "đang cập nhật realtime" : "chưa nối được realtime")</span>
                     <div class="ca-nut-trang">

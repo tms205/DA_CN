@@ -105,7 +105,7 @@ builder.Services.AddRateLimiter(options =>
         context.HttpContext.Response.StatusCode = 429;
         bool laGoogle = context.HttpContext.Request.Path.Value?.Contains("/google", StringComparison.OrdinalIgnoreCase) == true;
         await context.HttpContext.Response.WriteAsJsonAsync(
-            new { message = laGoogle ? "Quá nhiều yêu cầu đăng nhập Google. Vui lòng thử lại sau." : "Quá nhiều yêu cầu khôi phục mật khẩu. Vui lòng thử lại sau." }, dung);
+            new { message = laGoogle ? "Quá nhiều yêu cầu đăng nhập Google. Vui lòng thử lại sau." : "Quá nhiều yêu cầu xác thực OTP. Vui lòng thử lại sau." }, dung);
     };
 });
 

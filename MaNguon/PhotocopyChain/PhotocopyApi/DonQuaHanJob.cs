@@ -1,4 +1,5 @@
 using Dapper;
+using PhotocopyApi.DichVu;
 using PhotocopyApi.BaoTri;
 using Microsoft.Data.SqlClient;
 
@@ -15,10 +16,12 @@ public class DonQuaHanJob : BackgroundService
     private readonly string _chuoiKetNoi;
     private readonly ILogger<DonQuaHanJob> _logger;
     private readonly BaoTriStore _baoTri;
+    private readonly FileInLifecycleService _files;
 
     public DonQuaHanJob(IConfiguration config, ILogger<DonQuaHanJob> logger, BaoTriStore baoTri = null)
     {
         _chuoiKetNoi = config.GetConnectionString("PhotocopyChain");
+        _files = new FileInLifecycleService(config);
         _logger = logger;
         _baoTri = baoTri;
     }
@@ -34,8 +37,7 @@ public class DonQuaHanJob : BackgroundService
                 using var conn = new SqlConnection(_chuoiKetNoi);
                 await conn.ExecuteAsync("sp_HuyDonQuaHan", commandType: System.Data.CommandType.StoredProcedure);
                 if(!BaoTriStore.KhoaTacVuNen(_baoTri?.Read(),"FILE_IN")) {
-                    await XoaFileCuaDonDaKetThuc(conn);
-                    await XoaFileTaiLenBiBoDo(conn);
+                    await _files.Quet(dungLai);
                 }
             }
             catch (Exception ex)
@@ -56,79 +58,4 @@ public class DonQuaHanJob : BackgroundService
         }
     }
 
-    // File tải lên nhưng không gắn vào đơn nào (đóng trang, đổi khách, mất mạng...)
-    // được giữ 1 giờ để người dùng còn thời gian thao tác, sau đó tự dọn.
-    private async Task XoaFileTaiLenBiBoDo(SqlConnection conn)
-    {
-        var dsFile = await conn.QueryAsync<FileCanXoa>(
-            @"SELECT f.MaFile, f.DuongDan FROM FileIn f
-              WHERE f.TrangThai = N'SAN_SANG' AND f.DuongDan IS NOT NULL
-                AND f.NgayTaiLen < DATEADD(HOUR, -1, GETDATE())
-                AND NOT EXISTS (SELECT 1 FROM ChiTietDonHang ct WHERE ct.MaFile = f.MaFile)");
-
-        foreach (FileCanXoa file in dsFile)
-        {
-            try
-            {
-                if (File.Exists(file.DuongDan)) File.Delete(file.DuongDan);
-                if (!File.Exists(file.DuongDan))
-                    await conn.ExecuteAsync(
-                        "UPDATE FileIn SET TrangThai = N'DA_XOA', DuongDan = NULL WHERE MaFile = @MaFile",
-                        new { file.MaFile });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning("Chưa xóa được file tải lên bị bỏ dở {DuongDan}: {LoiChiTiet}", file.DuongDan, ex.Message);
-            }
-        }
-    }
-
-    private async Task XoaFileCuaDonDaKetThuc(SqlConnection conn)
-    {
-        // Bước 1: lấy các file chỉ còn thuộc đơn đã hoàn tất / đã hủy.
-        // Nếu cùng một file vẫn đang được một đơn khác sử dụng thì chưa xóa.
-        var dsFile = await conn.QueryAsync<FileCanXoa>(
-            @"SELECT f.MaFile, f.DuongDan
-              FROM FileIn f
-              WHERE f.TrangThai = N'SAN_SANG' AND f.DuongDan IS NOT NULL
-                AND EXISTS (
-                    SELECT 1 FROM ChiTietDonHang ct JOIN DonHang dh ON dh.MaDonHang = ct.MaDonHang
-                    WHERE ct.MaFile = f.MaFile AND dh.TrangThai IN ('HOAN_THANH','DA_HUY')
-                )
-                AND NOT EXISTS (
-                    SELECT 1 FROM ChiTietDonHang ct JOIN DonHang dh ON dh.MaDonHang = ct.MaDonHang
-                    WHERE ct.MaFile = f.MaFile AND dh.TrangThai NOT IN ('HOAN_THANH','DA_HUY')
-                )
-                AND NOT EXISTS (
-                    SELECT 1 FROM ChiTietDonHang ct JOIN DonHang dh ON dh.MaDonHang = ct.MaDonHang
-                    WHERE ct.MaFile = f.MaFile AND dh.TrangThai = 'DA_HUY'
-                      AND dh.GhiChu = N'Quá 15 phút chưa thanh toán'
-                      AND dh.NgayDat >= DATEADD(HOUR, -24, GETDATE())
-                )");
-
-        foreach (FileCanXoa file in dsFile)
-        {
-            try
-            {
-                // Bước 2: xóa file PDF thật trên ổ D.
-                if (File.Exists(file.DuongDan)) File.Delete(file.DuongDan);
-
-                // Bước 3: file đã mất khỏi ổ đĩa thì bỏ đường dẫn, nhưng vẫn giữ tên + số trang để tra cứu.
-                await conn.ExecuteAsync(
-                    "UPDATE FileIn SET TrangThai = N'DA_XOA', DuongDan = NULL WHERE MaFile = @MaFile",
-                    new { file.MaFile });
-            }
-            catch (Exception ex)
-            {
-                // Không xóa được (file đang bị chương trình in giữ...) thì giữ nguyên đường dẫn để phút sau thử lại.
-                _logger.LogWarning("Chưa xóa được file {DuongDan}: {LoiChiTiet}", file.DuongDan, ex.Message);
-            }
-        }
-    }
-
-    private class FileCanXoa
-    {
-        public int MaFile { get; set; }
-        public string DuongDan { get; set; }
-    }
 }

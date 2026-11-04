@@ -18,7 +18,7 @@ namespace PhotocopyApi.Controllers;
 // STAFF/BRANCH_ADMIN đăng nhập tự mở ca riêng 200.000đ; CEO chọn chi nhánh rồi mở ca thủ công trên Web.
 // Hết ca thì kiểm đếm và đóng ca; không tự đóng khi chuyển phạm vi chi nhánh.
 // Phải có ca đang mở thì nhân viên mới được tiếp nhận, xử lý đơn và thu COD của khách.
-// Quản lý xác nhận ca (sp_XacNhanCa, xử lý lệch két) làm ở Tuần 3.
+// Ca CEO tự chốt sau thực đếm; ca nhân viên/quản lý vẫn do người khác đối soát.
 [ApiController]
 [Route("api/ca")]
 [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
@@ -217,13 +217,12 @@ public class CaController : ControllerBase
         return Ok(ca);
     }
 
-    // Gửi tiền thực đếm; tất cả vai trò đều chờ người quản lý khác đối soát.
+    // Gửi tiền thực đếm: thủ tục tự xác định ca CEO để chốt ngay, không cần người khác duyệt.
     [HttpPost("dong")]
     [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
     public async Task<IActionResult> DongCa(DongCaRequest req)
     {
         int maNhanVien = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
-        string vaiTro = User.FindFirst(TenClaim.VaiTro).Value;
 
         if (req.TongDoanhThuCuoiCa == null || req.TongDoanhThuCuoiCa < 0)
             return BadRequest(new { message = "Số tiền đếm được không hợp lệ." });
@@ -240,9 +239,10 @@ public class CaController : ControllerBase
         if (maCa == null)
             return BadRequest(new { message = "Bạn chưa mở ca nào." });
 
+        bool daTuChot;
         try
         {
-            await conn.ExecuteAsync("sp_DongCa",
+            daTuChot = await conn.ExecuteScalarAsync<bool>("sp_DongCa",
                 new { MaCa = maCa.Value, TongDoanhThuCuoiCa = req.TongDoanhThuCuoiCa.Value, GhiChu = req.GhiChu?.Trim() },
                 commandType: CommandType.StoredProcedure);
         }
@@ -253,7 +253,9 @@ public class CaController : ControllerBase
 
         return Ok(new KetQuaDto
         {
-            Message = "Đã gửi tổng kết ca, chờ quản lý khác kiểm đếm và xác nhận."
+            Message = daTuChot
+                ? "Đã đóng ca và lưu số tiền thực đếm cùng ghi chú. Ca của CEO không cần người khác xác nhận."
+                : "Đã gửi tổng kết ca, chờ quản lý khác kiểm đếm và xác nhận."
         });
     }
 

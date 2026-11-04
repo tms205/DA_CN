@@ -30,6 +30,45 @@ public class GiaoHangDocCSDLTests
     }
 
     [KiemThuGiaoHangDoc]
+    public async Task AnhHaiBen_DocDungHashVaKhongLayCheo_SauTachThuMuc()
+    {
+        var config=CauHinh();using var cache=new MemoryCache(new MemoryCacheOptions());
+        using var conn=new SqlConnection(config.GetConnectionString("PhotocopyChain"));
+        var rows=await conn.QueryAsync(@"SELECT gh.MaGiaoHang,gh.MaShipper,dh.MaKhachHang,dh.MaChiNhanh,
+            gh.AnhBangChungJson,gh.DoiChieuKhachHangJson FROM GiaoHang gh JOIN DonHang dh ON dh.MaDonHang=gh.MaDonHang
+            WHERE gh.TrangThai='THAT_BAI' AND (gh.AnhBangChungJson IS NOT NULL OR gh.DoiChieuKhachHangJson IS NOT NULL)");
+        GiaoHangController Api(string role,int actor,int branch)=>new(config,cache,null,NullLogger<GiaoHangController>.Instance) {
+            ControllerContext=new() {HttpContext=new DefaultHttpContext {User=new ClaimsPrincipal(new ClaimsIdentity(new[]{
+                new Claim(TenClaim.MaNguoiDung,actor.ToString()),new Claim(TenClaim.VaiTro,role),
+                new Claim(TenClaim.MaChiNhanh,branch.ToString())},"fixture",ClaimTypes.Name,TenClaim.VaiTro))}}
+        };
+        async Task Check(IActionResult result,AnhBangChungDto expected) {
+            var image=Assert.IsType<FileStreamResult>(result);
+            await using var stream=image.FileStream;
+            Assert.Equal(expected.Sha256,Convert.ToHexString(await System.Security.Cryptography.SHA256.HashDataAsync(stream)));
+            Assert.Equal(expected.LoaiNoiDung,image.ContentType);
+        }
+        int count=0;
+        foreach(var row in rows) {
+            int attempt=row.MaGiaoHang,branch=row.MaChiNhanh;
+            var ship=Api(VaiTro.Shipper,(int)row.MaShipper,branch);
+            var customer=Api(VaiTro.Customer,(int)row.MaKhachHang,branch);
+            var shipImages=System.Text.Json.JsonSerializer.Deserialize<List<AnhBangChungDto>>((string)row.AnhBangChungJson??"[]");
+            var feedback=System.Text.Json.JsonSerializer.Deserialize<PhanHoiGiaoHangDto>((string)row.DoiChieuKhachHangJson??"{}");
+            foreach(var image in shipImages) {
+                await Check(await ship.XemAnhBangChung(attempt,image.MaAnh),image);count++;
+                Assert.IsType<NotFoundResult>(await customer.XemAnhDoiChieu(attempt,image.MaAnh));
+            }
+            foreach(var image in feedback.Anh) {
+                await Check(await customer.XemAnhDoiChieu(attempt,image.MaAnh),image);count++;
+                Assert.IsType<NotFoundResult>(await ship.XemAnhBangChung(attempt,image.MaAnh));
+            }
+        }
+        Assert.True(count>0,"Cần ảnh đã lưu để kiểm tra đọc thực tế.");
+        _output.WriteLine($"Đã kiểm tra {count} ảnh: đúng hash, đúng nguồn và không lấy chéo; không ghi database.");
+    }
+
+    [KiemThuGiaoHangDoc]
     public async Task DanhSachThat_KhopPhamViChiNhanhVaCacCotCSDL()
     {
         var config = CauHinh();

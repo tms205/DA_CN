@@ -33,6 +33,7 @@ public sealed class OtpDatLaiStore
 
             ma.GuiLuc = now;
             ma.DangGui = true;
+            ma.NoiDung = null;
             ma.MaDaBam = null; // Gửi lại thì mã cũ không còn hiệu lực.
             ma.SoLanSai = 0;
             Luu(email, ma);
@@ -40,13 +41,14 @@ public sealed class OtpDatLaiStore
         }
     }
 
-    public void LuuMa(string email, string maOtp)
+    public void LuuMa(string email, string maOtp, object noiDung = null, TimeSpan? thoiHan = null)
     {
         lock (_khoa)
         {
             TrangThaiMa ma = Doc(email);
             ma.MaDaBam = Bam(email, maOtp);
-            ma.HetHanLuc = _dongHo.GetUtcNow().AddMinutes(10);
+            ma.HetHanLuc = _dongHo.GetUtcNow().Add(thoiHan ?? TimeSpan.FromMinutes(10));
+            ma.NoiDung = noiDung;
             ma.DangGui = false;
             Luu(email, ma);
         }
@@ -58,20 +60,29 @@ public sealed class OtpDatLaiStore
         {
             TrangThaiMa ma = Doc(email);
             ma.MaDaBam = null;
+            ma.NoiDung = null;
             ma.DangGui = false;
             Luu(email, ma);
         }
     }
 
     // Xác minh để sang bước nhập mật khẩu, chưa đánh dấu mã đã dùng.
-    public bool KiemTraMa(string email, string maOtp) => KiemTra(email, maOtp, false);
+    public bool KiemTraMa(string email, string maOtp) => KiemTra(email, maOtp, false, out _);
 
-    public bool DungMa(string email, string maOtp) => KiemTra(email, maOtp, true);
+    public bool DungMa(string email, string maOtp) => KiemTra(email, maOtp, true, out _);
 
-    private bool KiemTra(string email, string maOtp, bool danhDauDaDung)
+    public bool DungMa<T>(string email, string maOtp, out T noiDung) where T : class
+    {
+        bool dung = KiemTra(email, maOtp, true, out object payload);
+        noiDung = payload as T;
+        return dung && noiDung != null;
+    }
+
+    private bool KiemTra(string email, string maOtp, bool danhDauDaDung, out object noiDung)
     {
         lock (_khoa)
         {
+            noiDung = null;
             TrangThaiMa ma = Doc(email);
             DateTimeOffset now = _dongHo.GetUtcNow();
             if (ma.MaDaBam == null || ma.HetHanLuc <= now || ma.KhoaDen > now)
@@ -83,14 +94,17 @@ public sealed class OtpDatLaiStore
                 if (ma.SoLanSai >= 5)
                 {
                     ma.MaDaBam = null;
+                    ma.NoiDung = null;
                     ma.KhoaDen = now.AddMinutes(15);
                 }
                 Luu(email, ma);
                 return false;
             }
 
+            noiDung = ma.NoiDung;
             if (danhDauDaDung)
             {
+                ma.NoiDung = null;
                 ma.MaDaBam = null; // Đánh dấu đã dùng ngay trong khóa, trước khi cập nhật mật khẩu.
                 Luu(email, ma);
             }
@@ -107,6 +121,7 @@ public sealed class OtpDatLaiStore
     private sealed class TrangThaiMa
     {
         public byte[] MaDaBam { get; set; }
+        public object NoiDung { get; set; }
         public DateTimeOffset GuiLuc { get; set; }
         public DateTimeOffset HetHanLuc { get; set; }
         public DateTimeOffset KhoaDen { get; set; }

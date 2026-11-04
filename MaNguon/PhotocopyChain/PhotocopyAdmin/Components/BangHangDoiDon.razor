@@ -1,0 +1,85 @@
+@using PhotocopyShared.Dtos.DonHang
+
+<div class="bang-cuon">
+                    <table role="table" class="bang bang-bam">
+                        <thead>
+                            <tr>
+                                <th scope="col">Mã đơn</th>
+                                <th scope="col">Khách hàng</th>
+                                <th scope="col">Quy cách in</th>
+                                <th scope="col">Nhận hàng</th>
+                                <th scope="col">Thanh toán</th>
+                                <th scope="col">Trạng thái</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var don in Don)
+                            {
+                                <tr class="@QuyTacHangDoi.LopCho(don) @(MaDonDangChon == don.MaDonHang ? "dong-chon" : "")"
+                                    tabindex="0" aria-label="@($"Mở chi tiết {don.MaDonHangHienThi}")"
+                                    @onkeydown="e => MoBangPhim(e,don.MaDonHang)" @onclick="() => MoDon.InvokeAsync(don.MaDonHang)">
+                                    <td data-nhan="Mã đơn">
+                                        <div class="hd-ma mono">@don.MaDonHangHienThi</div>
+                                        @if (don.InHoaToc)
+                                        {
+                                            <span class="nhan-mau nhan-cam">@((MarkupString)Svg.TiaSet()) Hỏa tốc</span>
+                                        }
+                                        @if (don.LoaiPhatSinh == "IN_LAI_LOI_QUAY")
+                                        {
+                                            <span class="nhan-mau nhan-do">In lại 0₫ · gốc @don.MaDonHangGocHienThi</span>
+                                        }
+                                        else if (don.LoaiPhatSinh == "BO_SUNG")
+                                        {
+                                            <span class="nhan-mau nhan-accent">Bổ sung · gốc @don.MaDonHangGocHienThi</span>
+                                        }
+                                    </td>
+                                    <td data-nhan="Khách hàng">
+                                        <div class="nv-ten">@don.TenKhachHang</div>
+                                        <div class="nv-phu">@don.NgayDat.ToString("HH:mm dd/MM")</div>
+                                    </td>
+                                    <td data-nhan="Quy cách in">
+                                        <div>@don.TongSoTrang trang · @don.SoFile file</div>
+                                        <div class="nv-phu">@don.QuyCach</div>
+                                    </td>
+                                    <td data-nhan="Nhận hàng">@(don.HinhThucNhan == "GIAO_HANG" ? "Giao tận nơi" : "Tại quầy")</td>
+                                    <td data-nhan="Thanh toán">
+                                        <div>@TenPhuongThuc(don.PhuongThucThanhToan)</div>
+                                        @if (don.TrangThaiThanhToan == "DA_THANH_TOAN")
+                                        {
+                                            <span class="nhan-mau nhan-xanh">Đã thanh toán</span>
+                                        }
+                                        else if (don.TrangThaiThanhToan == "DA_HOAN_TIEN")
+                                        {
+                                            <span class="nhan-mau nhan-xam">Đã hoàn tiền</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="nhan-mau nhan-xam">Chưa thanh toán</span>
+                                        }
+                                    </td>
+                                    <td data-nhan="Trạng thái">
+                                        <span class="nhan-mau @MauNhan(don.TrangThaiDonHang)">@TrangThaiDonHang.TenHienThi(don.TrangThaiDonHang)</span>
+                                        @if (don.KenhDatDon == "APP" && don.TrangThaiDonHang == "CHO_XAC_NHAN" && don.GiayChoTiepNhan > 0)
+                                        {
+                                            <DemNguocTiepNhan @key="don.MaDonHang" Dong="don" HetHan="LamMoi" />
+                                        }
+                                        else if (!string.IsNullOrEmpty(QuyTacHangDoi.NhanCho(don)))
+                                        {
+                                            <div class="hd-viec-cho">@QuyTacHangDoi.NhanCho(don)</div>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+@code {
+    [Parameter] public IEnumerable<HangDoiDonDto> Don { get; set; } = Array.Empty<HangDoiDonDto>();
+    [Parameter] public int? MaDonDangChon { get; set; }
+    [Parameter] public EventCallback<int> MoDon { get; set; }
+    [Parameter] public EventCallback LamMoi { get; set; }
+    [Parameter, EditorRequired] public Func<string,string> MauNhan { get; set; }
+    [Parameter, EditorRequired] public Func<string,string> TenPhuongThuc { get; set; }
+    private Task MoBangPhim(KeyboardEventArgs e,int id) => e.Key is "Enter" or " " ? MoDon.InvokeAsync(id) : Task.CompletedTask;
+}

@@ -88,7 +88,7 @@ void main() {
         },
         () => MockClient((r) async {
           calls.add(r.url.path);
-          if (r.url.path == '/api/thong-bao')
+          if (r.url.path == '/api/thong-bao') {
             return json({
               'soChuaDoc': 0,
               'danhSach': [
@@ -105,6 +105,7 @@ void main() {
                 },
               ],
             });
+          }
           if (r.url.path == '/api/don-hang/15') return json(don('DA_IN'));
           throw StateError('Unexpected path ${r.url.path}');
         }),

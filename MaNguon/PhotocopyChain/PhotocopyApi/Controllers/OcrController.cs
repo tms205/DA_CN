@@ -9,12 +9,10 @@ namespace PhotocopyApi.Controllers;
 [Authorize(Roles = "CUSTOMER,SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
 public class OcrController : ControllerBase
 {
-    private readonly IOcrProcessor _processor;
     private readonly OcrQueue _queue;
     private readonly ILogger<OcrController> _logger;
     public OcrController(IWebHostEnvironment environment, ILogger<OcrController> logger, IOcrProcessor processor = null, OcrQueue queue = null)
     {
-        _processor = processor ?? new OcrPython(environment, Microsoft.Extensions.Logging.Abstractions.NullLogger<OcrPython>.Instance);
         _queue = queue;
         _logger = logger;
     }
@@ -32,19 +30,21 @@ public class OcrController : ControllerBase
         Response.Headers.CacheControl = "no-store";
         var error = ValidateImage(file, model, vungCat);
         if (error != null) return BadRequest(new { message = error });
-        string directory = Path.Combine(Path.GetTempPath(), "PhotocopyOcr", Guid.NewGuid().ToString("N"));
+        if (!int.TryParse(User.FindFirst(PhotocopyShared.Constants.TenClaim.MaNguoiDung)?.Value, out int owner) || owner <= 0) return Unauthorized();
+        if (_queue == null) return StatusCode(503, new { message = "Hàng chờ OCR chưa sẵn sàng." });
+        Guid? id = null;
         try
         {
-            Directory.CreateDirectory(directory);
-            string image = Path.Combine(directory, "input" + Path.GetExtension(file.FileName).ToLowerInvariant());
-            await using (var output = new FileStream(image, FileMode.CreateNew)) await file.CopyToAsync(output, cancellation);
-            var result = await _processor.Run(image, model, vungCat, cancellation);
+            var ticket = await _queue.Add(owner, file, model, vungCat, cancellation);
+            id = ticket.Id;
+            var result = await _queue.Wait(owner, ticket.Id, cancellation);
+            if (result.State != "HOAN_TAT") return StatusCode(503, new { message = result.Message ?? "Yêu cầu OCR đã dừng. Vui lòng thử lại." });
             return Ok(new { text = result.Text, model, truncated = result.Truncated, requiresReview = true });
         }
+        catch (OcrQueueFullException ex) { return StatusCode(429, new { message = ex.Message }); }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { return new EmptyResult(); }
-        catch (InvalidOperationException ex) { return StatusCode(503, new { message = ex.Message }); }
         catch (Exception ex) { _logger.LogError(ex, "OCR một ảnh thất bại"); return StatusCode(503, new { message = "Không xử lý được OCR. Vui lòng thử lại." }); }
-        finally { try { if (Directory.Exists(directory)) Directory.Delete(directory, true); } catch (IOException) { _logger.LogWarning("Không dọn được ảnh OCR tạm"); } catch (UnauthorizedAccessException) { _logger.LogWarning("Không dọn được ảnh OCR tạm"); } }
+        finally { if (id.HasValue && cancellation.IsCancellationRequested) _queue.Cancel(owner, id.Value); }
     }
 
     [HttpPost("tac-vu")]

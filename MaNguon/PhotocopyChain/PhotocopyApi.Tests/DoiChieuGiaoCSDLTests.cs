@@ -67,7 +67,8 @@ public class DoiChieuGiaoCSDLTests
             Assert.All(results, r => Assert.IsType<OkObjectResult>(r));
             var view = Assert.IsType<LuotDoiChieuGiaoDto>(Assert.IsType<OkObjectResult>(await Api(VaiTro.Customer, khach[0], null).XemDoiChieu(attempt)).Value);
             Assert.Equal(khach[0], view.PhanHoi.MaKhachHang); Assert.Single(view.PhanHoi.Anh);
-            Assert.Equal(2, Directory.GetFiles(Path.Combine(root, attempt.ToString())).Length); // Một ảnh shipper + một ảnh khách; file request thua đã dọn.
+            Assert.Equal(2, Directory.GetFiles(Path.Combine(root, attempt.ToString()),"*",SearchOption.AllDirectories).Length); // Ảnh shipper cũ ở gốc + ảnh khách mới trong KhachHang.
+            Assert.Single(Directory.GetFiles(Path.Combine(root,attempt.ToString(),"KhachHang")));
             Assert.Equal(oldJson, await conn.ExecuteScalarAsync<string>("SELECT AnhBangChungJson FROM GiaoHang WHERE MaGiaoHang=@attempt", new { attempt }));
             Assert.IsType<NotFoundResult>(await Api(VaiTro.Customer, khach[0], null).XemAnhDoiChieu(attempt, old[0].MaAnh));
             Assert.IsType<NotFoundResult>(await Api(VaiTro.Shipper, shipper, branch).XemAnhBangChung(attempt, view.PhanHoi.Anh[0].MaAnh));

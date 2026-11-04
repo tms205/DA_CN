@@ -8,7 +8,4 @@ public class DangKyTam
     public string Email { get; set; }
     public string SoDienThoai { get; set; }
     public string MatKhauDaBam { get; set; }
-    public string MaOtp { get; set; }
-    public DateTime GuiLuc { get; set; }      // để bắt đợi 60 giây mới được gửi lại mã
-    public int SoLanNhapSai { get; set; }
 }

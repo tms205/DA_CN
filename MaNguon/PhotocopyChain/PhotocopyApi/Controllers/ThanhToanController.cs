@@ -403,37 +403,47 @@ public class ThanhToanController : ControllerBase
         }
         await giaoDich.CommitAsync();
 
-        // Đơn đã hủy (kể cả quá hạn) giữ nguyên để hoàn tiền; không chạy lại quy trình in.
-        KetQuaXepIn ketQuaIn = don.TrangThai == TrangThaiDonHang.DaHuy
-            ? null : await _tuDongIn.XepInSauThanhToan(maDonHang);
-
-        DonDeBao donSau = await conn.QueryFirstAsync<DonDeBao>(
-            @"SELECT dh.MaDonHang, 'DH' + RIGHT('00000' + CAST(dh.MaDonHang AS VARCHAR(10)), 5) AS MaDonHangHienThi,
-                     dh.MaChiNhanh, dh.MaKhachHang, dh.TrangThai, tt.TrangThai AS TrangThaiThanhToan
-              FROM DonHang dh JOIN ThanhToan tt ON tt.MaDonHang = dh.MaDonHang
-              WHERE dh.MaDonHang = @MaDonHang", new { MaDonHang = maDonHang });
-
-        var tin = new TinCapNhat
+        try
         {
-            MaDonHang = donSau.MaDonHang,
-            MaDonHangHienThi = donSau.MaDonHangHienThi,
-            MaChiNhanh = donSau.MaChiNhanh,
-            TrangThai = donSau.TrangThai,
-            NoiDung = donSau.TrangThai == TrangThaiDonHang.DaHuy
-                ? "Đơn " + donSau.MaDonHangHienThi + " đã hủy; khoản tiền đã nhận được giữ để xử lý hoàn"
-                : "Đơn " + donSau.MaDonHangHienThi + " đã thanh toán"
-        };
-        string suKien = donSau.TrangThai == TrangThaiDonHang.DaHuy ? HubEvents.OrderStatusChanged : HubEvents.PaymentConfirmed;
-        await CapNhatHub.GuiChoNguoiDung(_hub, donSau.MaKhachHang, suKien, tin);
-        await CapNhatHub.GuiChoChiNhanh(_hub, donSau.MaChiNhanh, suKien, tin);
+            // Đơn đã hủy (kể cả quá hạn) giữ nguyên để hoàn tiền; không chạy lại quy trình in.
+            KetQuaXepIn ketQuaIn = don.TrangThai == TrangThaiDonHang.DaHuy
+                ? null : await _tuDongIn.XepInSauThanhToan(maDonHang);
 
-        string message = donSau.TrangThai == TrangThaiDonHang.DaHuy
-            ? (donSau.TrangThaiThanhToan == "DA_HOAN_TIEN" ? "Đơn đã hủy và đã hoàn tiền."
-                : "Đã ghi nhận tiền cho đơn đã hủy, đang chờ CEO xử lý hoàn tiền. Đơn không được đưa trở lại in.")
-            : ketQuaIn?.DaBatDauIn == true ? "Đã ghi nhận thanh toán và bắt đầu in tự động."
-                : "Đã ghi nhận thanh toán. " + ketQuaIn?.Message;
-        return Ok(new KetQuaDto { Message = message });
+            DonDeBao donSau = await conn.QueryFirstAsync<DonDeBao>(
+                @"SELECT dh.MaDonHang, 'DH' + RIGHT('00000' + CAST(dh.MaDonHang AS VARCHAR(10)), 5) AS MaDonHangHienThi,
+                         dh.MaChiNhanh, dh.MaKhachHang, dh.TrangThai, tt.TrangThai AS TrangThaiThanhToan
+                  FROM DonHang dh JOIN ThanhToan tt ON tt.MaDonHang = dh.MaDonHang
+                  WHERE dh.MaDonHang = @MaDonHang", new { MaDonHang = maDonHang });
+
+            var tin = new TinCapNhat
+            {
+                MaDonHang = donSau.MaDonHang,
+                MaDonHangHienThi = donSau.MaDonHangHienThi,
+                MaChiNhanh = donSau.MaChiNhanh,
+                TrangThai = donSau.TrangThai,
+                NoiDung = donSau.TrangThai == TrangThaiDonHang.DaHuy
+                    ? "Đơn " + donSau.MaDonHangHienThi + " đã hủy; khoản tiền đã nhận được giữ để xử lý hoàn"
+                    : "Đơn " + donSau.MaDonHangHienThi + " đã thanh toán"
+            };
+            string suKien = donSau.TrangThai == TrangThaiDonHang.DaHuy ? HubEvents.OrderStatusChanged : HubEvents.PaymentConfirmed;
+            await CapNhatHub.GuiChoNguoiDung(_hub, donSau.MaKhachHang, suKien, tin);
+            await CapNhatHub.GuiChoChiNhanh(_hub, donSau.MaChiNhanh, suKien, tin);
+
+            string message = donSau.TrangThai == TrangThaiDonHang.DaHuy
+                ? (donSau.TrangThaiThanhToan == "DA_HOAN_TIEN" ? "Đơn đã hủy và đã hoàn tiền."
+                    : "Đã ghi nhận tiền cho đơn đã hủy, đang chờ CEO xử lý hoàn tiền. Đơn không được đưa trở lại in.")
+                : ketQuaIn?.DaBatDauIn == true ? "Đã ghi nhận thanh toán và bắt đầu in tự động."
+                    : "Đã ghi nhận thanh toán. " + ketQuaIn?.Message;
+            return Ok(new KetQuaDto { Message = message });
+        }
+        catch (Exception ex)
+        {
+            // Tiền đã commit: client/webhook nhận thành công, job/poll đọc trạng thái lại.
+            _logger.LogWarning("Thanh toán đơn {MaDonHang} đã ghi nhận; bước sau commit chưa hoàn tất ({LoaiLoi}).", maDonHang, ex.GetType().Name);
+            return Ok(new KetQuaDto { Message = "Đã ghi nhận thanh toán. Hệ thống đang đồng bộ trạng thái đơn; vui lòng xem lại chi tiết." });
+        }
     }
+
 
     // Đơn hàng đọc ra để gửi tin real-time
     public class DonDeBao
