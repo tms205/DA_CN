@@ -65,6 +65,10 @@ void main() {
       expect(datDon, 0);
       await tester.tap(find.text('Đặt đơn và chuyển khoản'));
       await tester.pumpAndSettle();
+      expect(datDon, 0, reason: 'Chưa tạo đơn khi chưa đồng ý chính sách');
+      expect(find.text('Chính sách hủy và hoàn tiền'), findsOneWidget);
+      await tester.tap(find.text('Đã hiểu · Tiếp tục'));
+      await tester.pumpAndSettle();
       expect(datDon, 1);
       expect(find.textContaining('đã hết hạn'), findsOneWidget);
       await tester.tap(find.text('Tính lại phí'));

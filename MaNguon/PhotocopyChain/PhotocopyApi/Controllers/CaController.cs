@@ -180,8 +180,6 @@ public class CaController : ControllerBase
             if (await _lich.ConCaChuaTongKetAsync(maNhanVien, HttpContext.RequestAborted))
                 return Conflict(new { message = "Bạn còn ca hết giờ chưa tổng kết. Hãy nhập tiền thực đếm trước khi mở ca mới." });
         }
-        if (!LichCa.TrongGio(LichCa.BayGio(TimeProvider.System)))
-            return Conflict(new { message = "Chỉ mở ca trong giờ làm việc 07:30–21:30." });
         var claimChiNhanh = User.FindFirst(TenClaim.MaChiNhanh);
         if (claimChiNhanh == null)
             return BadRequest(new { message = "Vui lòng chọn một chi nhánh trước khi mở ca." });

@@ -1,5 +1,6 @@
+import 'chon_anh_bang_chung.dart';
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/services.dart';
 
@@ -17,8 +18,11 @@ class NutHuyDon extends StatefulWidget {
     required this.daHuy,
     this.daThanhToan = false,
     this.capNhatHoanTien = false,
+    this.khieuNaiSanPham = false,
+    this.giayConLai,
     this.thongTinHoanTien,
     this.chonAnh,
+    this.chonNhieuAnh,
     this.guiAnh,
   });
 
@@ -26,8 +30,11 @@ class NutHuyDon extends StatefulWidget {
   final Future<void> Function() daHuy;
   final bool daThanhToan;
   final bool capNhatHoanTien;
+  final bool khieuNaiSanPham;
+  final int Function()? giayConLai;
   final Map<String, dynamic>? thongTinHoanTien;
   final Future<PlatformFile?> Function()? chonAnh;
+  final Future<List<PlatformFile>> Function()? chonNhieuAnh;
   final Future<KetQuaApi> Function(int, List<Map<String, String>>)? guiAnh;
 
   @override
@@ -47,20 +54,29 @@ class _NutHuyDonState extends State<NutHuyDon> {
         builder: (_) => _HoiHuyDon(
           daThanhToan: widget.daThanhToan || widget.capNhatHoanTien,
           capNhatHoanTien: widget.capNhatHoanTien,
+          khieuNaiSanPham: widget.khieuNaiSanPham,
+          giayConLai: widget.giayConLai,
           thongTinHoanTien: _banNhap ?? widget.thongTinHoanTien,
           chonAnh: widget.chonAnh,
+          chonNhieuAnh: widget.chonNhieuAnh,
         ),
       );
       if (thongTin == null || !mounted) return;
+      if (widget.giayConLai != null && widget.giayConLai!() <= 0) {
+        hienThongBaoNhanh(context, 'Đã hết hạn 2 phút. Không gửi yêu cầu hủy.');
+        return;
+      }
       _banNhap = Map<String, dynamic>.from(thongTin);
       final body = Map<String, dynamic>.from(thongTin);
       final anh = (body.remove('anhBangChung') as List? ?? [])
           .map((a) => Map<String, String>.from(a))
           .toList();
-      if (!widget.capNhatHoanTien) {
+      if (widget.khieuNaiSanPham) {
         final uploaded =
             await (widget.guiAnh?.call(widget.maDonHang, anh) ??
-                Api.guiBangChungHuy(widget.maDonHang, anh));
+                (widget.khieuNaiSanPham
+                    ? Api.guiAnhKhieuNai(widget.maDonHang, anh)
+                    : Api.guiBangChungHuy(widget.maDonHang, anh)));
         if (!mounted) return;
         if (!uploaded.thanhCong) {
           hienThongBaoNhanh(context, uploaded.loi);
@@ -68,7 +84,12 @@ class _NutHuyDonState extends State<NutHuyDon> {
         }
         body['maBangChung'] = uploaded.duLieu['maBangChung'];
       }
-      final thaoTac = widget.capNhatHoanTien ? 'thong-tin-hoan-tien' : 'huy';
+      final thaoTac = widget.khieuNaiSanPham
+          ? 'khieu-nai-hoan-tien'
+          : widget.capNhatHoanTien
+          ? 'thong-tin-hoan-tien'
+          : 'huy';
+      if (widget.khieuNaiSanPham) body['moTa'] = body.remove('lyDo');
       final kq = await Api.post(
         '/api/don-hang/${widget.maDonHang}/$thaoTac',
         body,
@@ -95,6 +116,10 @@ class _NutHuyDonState extends State<NutHuyDon> {
         ? (widget.thongTinHoanTien == null
               ? 'Bổ sung thông tin hoàn tiền'
               : 'Sửa thông tin hoàn tiền')
+        : widget.khieuNaiSanPham
+        ? 'Yêu cầu hoàn tiền do sản phẩm'
+        : widget.daThanhToan
+        ? 'Hủy đơn & yêu cầu hoàn tiền'
         : 'Hủy đơn',
     icon: const AppIcon(Ico.chamThan, size: 17, color: AppColors.loiChu),
     onPressed: _dangXuLy ? null : _huy,
@@ -107,11 +132,17 @@ class _HoiHuyDon extends StatefulWidget {
     required this.capNhatHoanTien,
     this.thongTinHoanTien,
     this.chonAnh,
+    this.chonNhieuAnh,
+    this.khieuNaiSanPham = false,
+    this.giayConLai,
   });
+  final bool khieuNaiSanPham;
+  final int Function()? giayConLai;
   final bool daThanhToan;
   final bool capNhatHoanTien;
   final Map<String, dynamic>? thongTinHoanTien;
   final Future<PlatformFile?> Function()? chonAnh;
+  final Future<List<PlatformFile>> Function()? chonNhieuAnh;
 
   @override
   State<_HoiHuyDon> createState() => _HoiHuyDonState();
@@ -122,35 +153,36 @@ class _HoiHuyDonState extends State<_HoiHuyDon> {
   late final TextEditingController _lyDo;
   late final TextEditingController _nganHang;
   late final TextEditingController _soTaiKhoan;
+  final _chuTaiKhoan = TextEditingController();
+  Timer? _nhipHan;
   bool _daXacNhan = false;
   final List<Map<String, String>> _anh = [];
   String? _loiAnh;
+  bool _dangChonAnh = false;
   Future<void> _chonAnh() async {
-    if (_anh.length >= 3) return;
+    if (_anh.length >= 3 || _dangChonAnh) return;
+    setState(() => _dangChonAnh = true);
     try {
-      final file =
-          await (widget.chonAnh?.call() ??
-              FilePicker.pickFile(
-                type: FileType.custom,
-                allowedExtensions: ['jpg', 'jpeg', 'png'],
-              ));
-      if (file?.path == null || !mounted) return;
-      final size = await File(file!.path!).length();
+      final files = await chonAnhBangChung(
+        daChon: _anh.map((a) => a['path']!),
+        chonMot: widget.chonAnh,
+        chonNhieu: widget.chonNhieuAnh,
+      );
       if (!mounted) return;
-      if (size <= 0 || size > 5 * 1024 * 1024) {
-        throw StateError('Mỗi ảnh tối đa 5 MB.');
-      }
-      if (_anh.any((a) => a['path'] == file.path)) return;
       setState(() {
-        _anh.add({'path': file.path!, 'name': file.name});
+        _anh.addAll(files.map((f) => {'path': f.path!, 'name': f.name}));
         _loiAnh = null;
       });
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         setState(
-          () => _loiAnh = 'Không đọc được ảnh. Chọn JPG/PNG tối đa 5 MB.',
+          () => _loiAnh = e is FormatException
+              ? e.message.toString()
+              : 'Không đọc được ảnh. Chọn JPG/PNG tối đa 5 MB.',
         );
       }
+    } finally {
+      if (mounted) setState(() => _dangChonAnh = false);
     }
   }
 
@@ -158,6 +190,12 @@ class _HoiHuyDonState extends State<_HoiHuyDon> {
   void initState() {
     super.initState();
     final info = widget.thongTinHoanTien;
+    _chuTaiKhoan.text = info?['chuTaiKhoan']?.toString() ?? '';
+    if (widget.giayConLai != null) {
+      _nhipHan = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() {});
+      });
+    }
     _anh.addAll(
       (info?['anhBangChung'] as List? ?? []).map(
         (a) => Map<String, String>.from(a),
@@ -166,7 +204,9 @@ class _HoiHuyDonState extends State<_HoiHuyDon> {
     _lyDo = TextEditingController(
       text:
           info?['lyDo']?.toString() ??
-          (widget.capNhatHoanTien ? '' : 'Tôi không còn nhu cầu in'),
+          (widget.capNhatHoanTien || widget.khieuNaiSanPham
+              ? ''
+              : 'Tôi không còn nhu cầu in'),
     );
     _nganHang = TextEditingController(
       text: info?['nganHang']?.toString() ?? '',
@@ -178,6 +218,8 @@ class _HoiHuyDonState extends State<_HoiHuyDon> {
 
   @override
   void dispose() {
+    _nhipHan?.cancel();
+    _chuTaiKhoan.dispose();
     _lyDo.dispose();
     _nganHang.dispose();
     _soTaiKhoan.dispose();
@@ -185,17 +227,21 @@ class _HoiHuyDonState extends State<_HoiHuyDon> {
   }
 
   void _xacNhan() {
-    if (_daXacNhan) return;
+    if (_daXacNhan ||
+        (widget.giayConLai != null && widget.giayConLai!() <= 0)) {
+      return;
+    }
     final valid = _form.currentState!.validate();
-    if (!widget.capNhatHoanTien && _anh.isEmpty) {
-      setState(() => _loiAnh = 'Vui lòng chọn ảnh bằng chứng hủy đơn.');
+    if (widget.khieuNaiSanPham && _anh.isEmpty) {
+      setState(() => _loiAnh = 'Vui lòng chọn ít nhất một ảnh sản phẩm.');
       return;
     }
     if (valid) {
       _daXacNhan = true;
       Navigator.pop(context, {
         'lyDo': _lyDo.text.trim(),
-        if (!widget.capNhatHoanTien) 'anhBangChung': _anh,
+        if (widget.khieuNaiSanPham) 'chuTaiKhoan': _chuTaiKhoan.text.trim(),
+        if (widget.khieuNaiSanPham) 'anhBangChung': _anh,
         if (widget.daThanhToan) ...{
           'nganHang': _nganHang.text.trim(),
           'soTaiKhoan': _soTaiKhoan.text.trim(),
@@ -207,7 +253,11 @@ class _HoiHuyDonState extends State<_HoiHuyDon> {
   @override
   Widget build(BuildContext context) => AlertDialog(
     title: Text(
-      widget.capNhatHoanTien ? 'Thông tin nhận hoàn tiền' : 'Hủy đơn hàng?',
+      widget.khieuNaiSanPham
+          ? 'Sản phẩm có vấn đề?'
+          : widget.capNhatHoanTien
+          ? 'Thông tin nhận hoàn tiền'
+          : 'Hủy đơn hàng?',
     ),
     content: SingleChildScrollView(
       child: Form(
@@ -216,26 +266,62 @@ class _HoiHuyDonState extends State<_HoiHuyDon> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (widget.giayConLai != null)
+              Text(
+                widget.giayConLai!() <= 0
+                    ? 'Đã hết hạn hủy 2 phút.'
+                    : 'Còn ${widget.giayConLai!() ~/ 60}:${(widget.giayConLai!() % 60).toString().padLeft(2, '0')} · Mở form vẫn tính giờ',
+                style: const TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             Text(
-              widget.daThanhToan
-                  ? 'Đơn hủy trước khi in sẽ được hoàn đủ tiền sau khi CEO xác nhận đã chuyển hoàn.'
-                  : 'Chỉ hủy khi chưa tiếp nhận và còn hơn 15 phút trước giờ hẹn. Tiền đến sau khi hủy sẽ được cửa hàng đối soát.',
+              widget.khieuNaiSanPham
+                  ? 'Mô tả rõ chỗ lỗi/không hài lòng và đính kèm ảnh sản phẩm. CEO xem xét; gửi yêu cầu chưa đồng nghĩa được hoàn tiền.'
+                  : widget.capNhatHoanTien
+                  ? 'Đơn đã hủy đang chờ hoàn tiền. Kiểm tra và cập nhật đúng tài khoản để CEO chuyển hoàn.'
+                  : widget.daThanhToan
+                  ? 'Đơn chỉ hủy khi chưa tiếp nhận và còn trong 2 phút sau thanh toán. Không cần ảnh; khoản hoàn sẽ chờ CEO xác nhận chuyển tiền.'
+                  : 'Đơn chưa thanh toán và chưa tiếp nhận có thể hủy ngay, không cần ảnh. Tiền đến sau khi hủy sẽ được cửa hàng đối soát.',
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _lyDo,
-              maxLength: widget.daThanhToan ? 100 : 255,
+              maxLength: widget.khieuNaiSanPham
+                  ? 2000
+                  : widget.daThanhToan
+                  ? 100
+                  : 255,
               minLines: 2,
               maxLines: 4,
               decoration: InputDecoration(
-                labelText: widget.daThanhToan ? 'Lý do hoàn tiền' : 'Lý do hủy',
+                labelText: widget.khieuNaiSanPham
+                    ? 'Mô tả chi tiết (trên 10 ký tự)'
+                    : widget.daThanhToan
+                    ? 'Lý do hoàn tiền'
+                    : 'Lý do hủy',
               ),
-              validator: (value) => value == null || value.trim().isEmpty
+              validator: (value) =>
+                  widget.khieuNaiSanPham && (value?.trim().length ?? 0) < 11
+                  ? 'Mô tả trên 10 ký tự.'
+                  : value == null || value.trim().isEmpty
                   ? (widget.daThanhToan
                         ? 'Vui lòng nhập lý do hoàn tiền.'
                         : 'Vui lòng nhập lý do hủy.')
                   : null,
             ),
+            if (widget.khieuNaiSanPham)
+              TextFormField(
+                controller: _chuTaiKhoan,
+                maxLength: 100,
+                decoration: const InputDecoration(
+                  labelText: 'Chủ tài khoản ngân hàng',
+                ),
+                validator: (v) => (v?.trim().length ?? 0) < 2
+                    ? 'Nhập tên chủ tài khoản.'
+                    : null,
+              ),
             if (widget.daThanhToan) ...[
               TextFormField(
                 key: const ValueKey('hoan-ngan-hang'),
@@ -268,14 +354,18 @@ class _HoiHuyDonState extends State<_HoiHuyDon> {
                 'Kiểm tra đúng ngân hàng và số tài khoản trước khi gửi. CEO sẽ dùng thông tin này để chuyển hoàn.',
               ),
             ],
-            if (!widget.capNhatHoanTien) ...[
+            if (widget.khieuNaiSanPham) ...[
               const SizedBox(height: 16),
-              const Text(
-                'Bằng chứng yêu cầu hủy *',
+              Text(
+                widget.khieuNaiSanPham
+                    ? 'Ảnh bằng chứng sản phẩm *'
+                    : 'Bằng chứng yêu cầu hủy *',
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
-              const Text(
-                '1–3 ảnh trao đổi/yêu cầu hủy, JPG/PNG, tối đa 5 MB mỗi ảnh.',
+              Text(
+                widget.khieuNaiSanPham
+                    ? '1–3 ảnh sản phẩm và phần bị lỗi, JPG/PNG, tối đa 5 MB/ảnh.'
+                    : '1–3 ảnh trao đổi/yêu cầu hủy, JPG/PNG, tối đa 5 MB mỗi ảnh.',
               ),
               for (int i = 0; i < _anh.length; i++)
                 ListTile(
@@ -292,9 +382,13 @@ class _HoiHuyDonState extends State<_HoiHuyDon> {
                   ),
                 ),
               OutlinedButton.icon(
-                onPressed: _anh.length >= 3 ? null : _chonAnh,
+                onPressed: _anh.length >= 3 || _dangChonAnh ? null : _chonAnh,
                 icon: const Icon(Icons.add_photo_alternate_outlined),
-                label: Text('Thêm ảnh (${_anh.length}/3)'),
+                label: Text(
+                  _dangChonAnh
+                      ? 'Đang đọc ảnh…'
+                      : 'Chọn ảnh (${_anh.length}/3) · Chọn nhiều ảnh',
+                ),
               ),
               if (_loiAnh != null)
                 Text(_loiAnh!, style: const TextStyle(color: Colors.red)),
@@ -306,12 +400,22 @@ class _HoiHuyDonState extends State<_HoiHuyDon> {
     actions: [
       TextButton(
         onPressed: () => Navigator.pop(context),
-        child: Text(widget.capNhatHoanTien ? 'Để sau' : 'Giữ đơn'),
+        child: Text(
+          widget.capNhatHoanTien || widget.khieuNaiSanPham
+              ? 'Để sau'
+              : 'Giữ đơn',
+        ),
       ),
       FilledButton(
-        onPressed: _xacNhan,
+        onPressed: widget.giayConLai != null && widget.giayConLai!() <= 0
+            ? null
+            : _xacNhan,
         child: Text(
-          widget.capNhatHoanTien ? 'Lưu thông tin hoàn tiền' : 'Xác nhận hủy',
+          widget.khieuNaiSanPham
+              ? 'Gửi CEO xem xét'
+              : widget.capNhatHoanTien
+              ? 'Lưu thông tin hoàn tiền'
+              : 'Xác nhận hủy',
         ),
       ),
     ],

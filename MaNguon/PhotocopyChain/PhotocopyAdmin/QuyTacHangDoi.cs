@@ -8,6 +8,8 @@ public static class QuyTacHangDoi
     public static string NhanCho(HangDoiDonDto don)
     {
         if (don.TrangThaiDonHang != "CHO_XAC_NHAN") return "";
+        if (don.KenhDatDon == "APP" && don.TrangThaiThanhToan == "DA_THANH_TOAN")
+            return don.GiayChoTiepNhan > 0 ? "Chờ xác nhận 2 phút" : "Cần tiếp nhận";
         if (don.PhuongThucThanhToan != "VIETQR") return "Cần tiếp nhận";
         return don.TrangThaiThanhToan == "DA_THANH_TOAN"
             ? "Chờ hệ thống tiếp nhận" : "Chờ thanh toán QR";
@@ -16,6 +18,8 @@ public static class QuyTacHangDoi
     public static string LopCho(HangDoiDonDto don)
     {
         if (don.TrangThaiDonHang != "CHO_XAC_NHAN") return "";
+        if (don.KenhDatDon == "APP" && don.TrangThaiThanhToan == "DA_THANH_TOAN")
+            return "hd-cho-tiep-nhan";
         if (don.PhuongThucThanhToan != "VIETQR") return "hd-cho-tiep-nhan";
         return don.TrangThaiThanhToan == "DA_THANH_TOAN"
             ? "hd-cho-tu-dong" : "hd-cho-thanh-toan";

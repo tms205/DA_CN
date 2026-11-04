@@ -1,8 +1,10 @@
--- 018: bằng chứng hủy; khách chỉ hủy trước tiếp nhận và cách giờ hẹn >15 phút.
+﻿-- 018: bằng chứng hủy; khách chỉ hủy trước tiếp nhận và cách giờ hẹn >15 phút.
 -- Thêm một cột JSON nullable, thay hai thủ tục. Không sửa dữ liệu cũ.
 :ON ERROR EXIT
 USE PhotocopyChain;
 GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
 SET XACT_ABORT ON;
 BEGIN TRAN;
 IF COL_LENGTH('dbo.DonHang','BangChungHuyJson') IS NULL

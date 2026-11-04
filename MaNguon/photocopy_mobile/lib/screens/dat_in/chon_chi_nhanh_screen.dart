@@ -69,6 +69,7 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
   int _lanGoi = 0;
 
   bool _dangDatDon = false;
+  bool _dangXemChinhSach = false;
   String? _loiDatDon;
 
   @override
@@ -209,7 +210,36 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
 
   // POST /api/don-hang — F-09: tạo đơn thật
   Future<void> _datDon() async {
-    if (_baoGia == null || _dangTinh || _dangDatDon) return;
+    if (_baoGia == null || _dangTinh || _dangDatDon || _dangXemChinhSach)
+      return;
+    _dangXemChinhSach = true;
+    bool? dongY;
+    try {
+      dongY = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('Chính sách hủy và hoàn tiền'),
+          content: const SingleChildScrollView(
+            child: Text(
+              'Bạn chỉ có thể hủy và yêu cầu hoàn tiền khi đơn chưa tiếp nhận và trong 2 phút sau thanh toán. Nhân viên chưa được tiếp nhận trong 2 phút này. Sau thời hạn, đơn sẽ được nhân viên tiếp nhận và xử lý bình thường.\n\nNếu sản phẩm đã nhận bị lỗi hoặc không hài lòng, gửi mô tả, ảnh bằng chứng và tài khoản ngân hàng tại chi tiết đơn để CEO xem xét. Gửi yêu cầu không đồng nghĩa đã được hoàn tiền.',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('Quay lại'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('Đã hiểu · Tiếp tục'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      _dangXemChinhSach = false;
+    }
+    if (dongY != true || !mounted || _dangDatDon) return;
     setState(() {
       _dangDatDon = true;
       _loiDatDon = null;

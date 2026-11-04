@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;
 using Dapper;
@@ -34,9 +34,9 @@ public class PheDuyetBadgeTests
         await using var db = new SqlConnection(Environment.GetEnvironmentVariable("PHOTOCOPY_APPROVAL_TEST_SQL"));
         await db.OpenAsync();
         await db.ExecuteAsync(@"
-            CREATE TABLE #DonHang(MaDonHang INT, MaChiNhanh INT, MaMayIn INT NULL, TrangThai VARCHAR(30));
+            CREATE TABLE #DonHang(MaDonHang INT, MaChiNhanh INT, MaMayIn INT NULL, TrangThai VARCHAR(30), YeuCauHoanTienJson NVARCHAR(MAX) NULL);
             CREATE TABLE #ThanhToan(MaDonHang INT, TrangThai VARCHAR(30));
-            INSERT INTO #DonHang VALUES (1,1,NULL,'DA_HUY'),(2,1,1,'DA_HUY'),(3,1,NULL,'CHO_XAC_NHAN'),
+            INSERT INTO #DonHang(MaDonHang,MaChiNhanh,MaMayIn,TrangThai) VALUES (1,1,NULL,'DA_HUY'),(2,1,1,'DA_HUY'),(3,1,NULL,'CHO_XAC_NHAN'),
               (4,1,NULL,'DA_HUY'),(5,2,NULL,'DA_HUY'),(6,1,NULL,'DA_HUY');
             INSERT INTO #ThanhToan VALUES (1,'DA_THANH_TOAN'),(2,'DA_THANH_TOAN'),(3,'DA_THANH_TOAN'),
               (4,'CHUA_THANH_TOAN'),(5,'DA_THANH_TOAN'),(6,'DA_HOAN_TIEN');");

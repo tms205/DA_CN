@@ -69,7 +69,12 @@ Color mauNenTrangThai(String trangThai) {
 // Tab "Đơn hàng" của khách (F-12): lọc theo nhóm trạng thái, kéo xuống để tải lại.
 // Figma chưa vẽ màn này nên dựng cùng phong cách màn Cấu hình in.
 class DonHangScreen extends StatefulWidget {
-  const DonHangScreen({super.key, this.nhomBanDau = 'TAT_CA', this.moDatIn, this.taiDanhSach});
+  const DonHangScreen({
+    super.key,
+    this.nhomBanDau = 'TAT_CA',
+    this.moDatIn,
+    this.taiDanhSach,
+  });
 
   final String nhomBanDau; // bộ lọc mở sẵn (màn Tôi truyền sang)
   final Future<KetQuaApi> Function()? taiDanhSach;
@@ -116,7 +121,8 @@ class _DonHangScreenState extends State<DonHangScreen> {
 
   // GET /api/don-hang/cua-toi
   Future<void> _taiDanhSach() async {
-    KetQuaApi kq = await (widget.taiDanhSach?.call() ?? Api.get('/api/don-hang/cua-toi'));
+    KetQuaApi kq =
+        await (widget.taiDanhSach?.call() ?? Api.get('/api/don-hang/cua-toi'));
     if (!mounted) return;
 
     if (!kq.thanhCong) {
@@ -328,6 +334,21 @@ class _DonHangScreenState extends State<DonHangScreen> {
                   ),
                 ],
               ),
+              if (d.nhanHoanTienDonHuy case final nhan?) ...[
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: NhanNho(
+                    nhan,
+                    mau: d.trangThaiThanhToan == 'DA_HOAN_TIEN'
+                        ? AppColors.thanhCong
+                        : AppColors.cbChu,
+                    nen: d.trangThaiThanhToan == 'DA_HOAN_TIEN'
+                        ? AppColors.xanhNhat
+                        : AppColors.cbNen,
+                  ),
+                ),
+              ],
               const SizedBox(height: 9),
               Row(
                 children: [

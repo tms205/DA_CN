@@ -87,7 +87,7 @@ void main() {
             ),
           ),
         );
-        await tester.tap(find.text('Hủy đơn'));
+        await tester.tap(find.text('Hủy đơn & yêu cầu hoàn tiền'));
         await tester.pumpAndSettle();
         expect(find.widgetWithText(TextFormField, 'Ngân hàng'), findsOneWidget);
         expect(
@@ -535,11 +535,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 200));
         await tester.tap(find.text('Hủy đơn'));
         await tester.pump(const Duration(milliseconds: 400));
-        await chayThat(tester, () async {
-          await tester.tap(find.text('Thêm ảnh (0/3)'));
-          await Future<void>.delayed(const Duration(milliseconds: 100));
-        });
-        await tester.pump();
+        expect(find.textContaining('Thêm ảnh'), findsNothing);
         await chayThat(tester, () async {
           await tester.tap(find.text('Xác nhận hủy'));
           await Future<void>.delayed(const Duration(milliseconds: 150));

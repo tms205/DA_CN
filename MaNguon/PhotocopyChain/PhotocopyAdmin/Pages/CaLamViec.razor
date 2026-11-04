@@ -9,7 +9,7 @@
 <PageTitle>Ca làm việc &amp; két tiền · PhotocopyChain</PageTitle>
 
 @* F-24B: mở ca / đóng ca đếm tiền / quản lý xác nhận lệch két.
-   Ba ca 07:30–12:30, 12:30–17:30, 17:30–21:30; hết giờ chờ tổng kết tiền —
+   Ba ca 07:30–12:30, 12:30–17:30, 17:30–21:30; mở từ 21:30 đến trước 07:30 thuộc ca sáng sắp tới, kết thúc 12:30; hết giờ chờ tổng kết tiền —
    Nhân viên/quản lý đăng nhập tự mở ca riêng 200.000đ; CEO chọn chi nhánh rồi mở ca thủ công.
    Hết ca thì đếm tiền rồi bấm Đóng ca.
    Người trực ca không được tự xác nhận ca của chính mình. *@
@@ -47,6 +47,7 @@
         @* ---- Đang trong ca ---- *@
         <section class="the ca-the">
             <div class="ca-dau"><div><h2 class="the-tieu-de nho">@(_ca.TrangThai == "CHO_TONG_KET" ? "Ca hết giờ — chờ tổng kết" : "Ca đang mở")</h2><div class="nv-phu">@_ca.TenNhanVien · @_ca.TenChiNhanh · mở lúc @_ca.GioMoCa.ToString("HH:mm dd/MM")</div></div><span class="nhan-mau @MauTrangThaiCa(_ca.TrangThai)">@TenTrangThaiCa(_ca)</span></div>
+            <p class="goi-y">@_ca.TenCa · Ngày nghiệp vụ @_ca.NgayLamViec.ToString("dd/MM/yyyy") · Tự kết ca lúc @_ca.GioKetThucDuKien.ToString("HH:mm dd/MM/yyyy")</p>
             @if (_ca.TrangThai == "CHO_TONG_KET") { <p class="o-canh-bao">Ca đã ngừng nhận giao dịch từ @_ca.GioDongCa?.ToString("HH:mm dd/MM/yyyy"). Nhập tiền thực đếm và lý do nếu chênh lệch để gửi quản lý đối soát.</p> }
             <div class="ca-so-lieu"><div class="ca-o"><div class="ca-o-nhan">Tiền đầu ca</div><b class="mono">@Tien(_ca.TienDauCa)</b></div><div class="ca-o"><div class="ca-o-nhan">COD đã thu</div><b class="mono">@Tien(_ca.DoanhThuTrongCa)</b></div><div class="ca-o"><div class="ca-o-nhan">VietQR · không vào két</div><b class="mono">@Tien(_ca.DoanhThuVietQr)</b></div><div class="ca-o"><div class="ca-o-nhan">Két phải có</div><b class="mono">@Tien(TienPhaiCo(_ca))</b></div></div>
             <button type="button" class="nut-chinh" @onclick="MoHopCa">Đóng ca &amp; kiểm đếm</button>
@@ -194,7 +195,7 @@
                             <tr>
                                 <td data-nhan="Nhân viên"><div class="nv-ten">@ca.TenNhanVien</div></td>
                                 <td data-nhan="Giờ mở / đóng">
-                                    <div>@ca.GioMoCa.ToString("HH:mm dd/MM")</div>
+                                    <div>@ca.GioMoCa.ToString("HH:mm dd/MM")</div><div class="nv-phu">@ca.TenCa · ngày @ca.NgayLamViec.ToString("dd/MM")</div>
                                     <div class="nv-phu">@(ca.GioDongCa == null ? "chưa đóng" : ca.GioDongCa.Value.ToString("HH:mm dd/MM"))</div>
                                 </td>
                                 <td class="mono" data-nhan="Đầu ca">@Tien(ca.TienDauCa)</td>

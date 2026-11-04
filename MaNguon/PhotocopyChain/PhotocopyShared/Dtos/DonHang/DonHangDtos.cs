@@ -1,4 +1,4 @@
-﻿using PhotocopyShared.KiemTraDuLieu;
+using PhotocopyShared.KiemTraDuLieu;
 using System.ComponentModel.DataAnnotations;
 using PhotocopyShared.Dtos.DatIn;
 using PhotocopyShared.Dtos.Tuan3;
@@ -42,6 +42,7 @@ public sealed class DonHangTomTatDto
 /// <summary>F-13: một dòng trong trung tâm thông báo.</summary>
 public sealed class ThongBaoDto
 {
+    public string TrangThaiXuLy => QuyTacThongBaoXuLy.TrangThai(TieuDe);
     public int MaThongBao { get; set; }
     public int? MaDonHang { get; set; }
     public string? MaDonHangHienThi { get; set; }
@@ -164,6 +165,10 @@ public sealed class MocTienDoDto
 /// <summary>F-11: chi tiết 1 đơn — dùng chung cho App (màn Theo dõi tiến độ) và Web (panel bên phải).</summary>
 public sealed class DonHangChiTietDto
 {
+    public string KenhDatDon { get; set; } = "LEGACY";
+    public double GiayChoTiepNhan { get; set; }
+    public bool ChoHuyKhach { get; set; }
+
     public int? MaMayIn { get; set; }
     public bool DaGuiLenhIn { get; set; }
     public int MaDonHang { get; set; }
@@ -222,6 +227,10 @@ public sealed class DonHangChiTietDto
 /// <summary>Một dòng trong bảng Hàng đợi đơn hàng của Web quản trị (Figma 04-Admin-HangDoiDon).</summary>
 public sealed class HangDoiDonDto
 {
+    public string KenhDatDon { get; set; } = "LEGACY";
+    public double GiayChoTiepNhan { get; set; }
+    public bool ChoHuyKhach { get; set; }
+
     public int? MaMayIn { get; set; }
     public int MaDonHang { get; set; }
     public string MaDonHangHienThi { get; set; } = "";
@@ -322,6 +331,9 @@ public sealed class LienKetPayOSDto
 /// <summary>Một ca làm việc (két tiền) — dùng ở màn Ca làm việc của Web.</summary>
 public sealed class CaLamViecDto
 {
+    public DateTime NgayLamViec => PhotocopyShared.CaLamViec.LichCaLamViec.NgayLamViec(GioMoCa);
+    public DateTime GioKetThucDuKien => PhotocopyShared.CaLamViec.LichCaLamViec.GioKetThuc(GioMoCa);
+    public string TenCa => PhotocopyShared.CaLamViec.LichCaLamViec.TenCa(GioMoCa);
     public int MaCa { get; set; }
     public int MaChiNhanh { get; set; }
     public string TenChiNhanh { get; set; } = "";
@@ -353,6 +365,8 @@ public sealed class CaLamViecDto
 /// <summary>Một đơn đã thanh toán trong khoảng thời gian của ca.</summary>
 public sealed class DonHangTrongCaDto
 {
+    public DateTime NgayLamViec => PhotocopyShared.CaLamViec.LichCaLamViec.NgayLamViec(GioMoCa);
+    public string TenCa => PhotocopyShared.CaLamViec.LichCaLamViec.TenCa(GioMoCa);
     public int MaCa { get; set; }
     public int MaChiNhanh { get; set; }
     public string TenChiNhanh { get; set; } = "";

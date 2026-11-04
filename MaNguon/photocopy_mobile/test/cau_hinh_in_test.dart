@@ -385,6 +385,10 @@ void main() {
       expect(find.textContaining('Giấy ngang'), findsWidgets);
       await tester.tap(find.text('Đặt đơn và chuyển khoản'));
       await tester.pumpAndSettle();
+      expect(don.length, 0, reason: 'Chưa tạo đơn khi chưa đồng ý chính sách');
+      expect(find.text('Chính sách hủy và hoàn tiền'), findsOneWidget);
+      await tester.tap(find.text('Đã hiểu · Tiếp tục'));
+      await tester.pumpAndSettle();
       expect(don.single['fileIn'][0]['huongGiay'], 'NGANG');
     }, () => clientQuyCach(baoGia, don));
   });

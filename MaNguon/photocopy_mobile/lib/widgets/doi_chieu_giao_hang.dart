@@ -248,7 +248,22 @@ class _DoiChieuGiaoHangState extends State<DoiChieuGiaoHang> {
           style: TextStyle(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 6),
-        SelectableText(report['ketLuan'] ?? ''),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFE2F1E8),
+            borderRadius: BorderRadius.circular(9),
+            border: Border.all(color: const Color(0xFF8AB69C)),
+          ),
+          child: SelectableText(
+            report['ketLuan'] ?? '',
+            style: const TextStyle(
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF164E32),
+              height: 1.6,
+            ),
+          ),
+        ),
         Text(
           '${report['tenNguoiXuLy'] ?? 'Cửa hàng'} · ${_gio(report['xuLyLuc'])}',
         ),

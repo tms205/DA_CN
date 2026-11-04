@@ -1,0 +1,40 @@
+@implements IDisposable
+@if (Dong != null)
+{
+    <div class="ht-dem-nho" role="status" aria-live="off">Chờ xác nhận · @(_conLai / 60):@((_conLai % 60).ToString("00"))</div>
+}
+else
+{
+<section class="ht-dem-nguoc" role="status" aria-live="off">
+    <header><div><b>Đơn app đang chờ xác nhận</b><span>Thời gian còn lại để khách hủy đơn</span></div><strong>@(_conLai / 60):@((_conLai % 60).ToString("00"))</strong></header>
+    <progress max="120" value="@_conLai" aria-label="Số giây còn lại trước khi được tiếp nhận"></progress>
+    <p>Chưa tiếp nhận hoặc gửi in trong khoảng này. Hết giờ, nhân viên có thể tiếp nhận và chọn máy in.</p>
+</section>
+}
+@code {
+    [Parameter] public DonHangChiTietDto Don { get; set; }
+    [Parameter] public HangDoiDonDto Dong { get; set; }
+    [Parameter] public EventCallback HetHan { get; set; }
+    private object _mau;
+    private double _banDau;
+    private readonly System.Diagnostics.Stopwatch _dongHo = new();
+    private System.Threading.Timer _timer;
+    private int _conLai;
+    private bool _daBao;
+    protected override void OnParametersSet()
+    {
+        object mau = (object)Don ?? Dong;
+        if (ReferenceEquals(_mau, mau)) return;
+        _mau = mau; _dongHo.Restart(); _daBao = false;
+        _banDau = Don?.GiayChoTiepNhan ?? Dong?.GiayChoTiepNhan ?? 0;
+        _conLai = (int)Math.Ceiling(_banDau);
+        _timer ??= new System.Threading.Timer(async _ => await InvokeAsync(Nhip), null, 1000, 1000);
+    }
+    private async Task Nhip()
+    {
+        _conLai = Math.Max(0, (int)Math.Ceiling(_banDau - _dongHo.Elapsed.TotalSeconds));
+        StateHasChanged();
+        if (_conLai == 0 && !_daBao) { _daBao = true; await HetHan.InvokeAsync(); }
+    }
+    public void Dispose() { _timer?.Dispose(); _dongHo.Stop(); }
+}

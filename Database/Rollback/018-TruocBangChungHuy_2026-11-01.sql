@@ -1,5 +1,7 @@
-USE PhotocopyChain;
+﻿USE PhotocopyChain;
 GO
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
 
 
 CREATE OR ALTER PROCEDURE sp_HuyDonHang

@@ -257,6 +257,15 @@ class DonHang {
 
   String get maHienThi => maDonHangHienThi ?? '#$maDonHang';
 
+  String? get nhanHoanTienDonHuy => trangThaiDonHang != 'DA_HUY'
+      ? null
+      : switch (trangThaiThanhToan) {
+          'DA_THANH_TOAN' => 'Chờ hoàn tiền',
+          'DA_HOAN_TIEN' => 'Đã hoàn tiền',
+          _ => null,
+        };
+
+
   bool get laGiaoTanNoi => hinhThucNhan == 'GIAO_HANG';
 
   // Chỉ VietQR chưa được ghi nhận tiền và đơn chưa bị hủy mới được quay lại màn QR.
@@ -289,6 +298,7 @@ String tenNhomDon(String nhom) {
 
 // ============================================================ Thông báo (ThongBaoDto)
 class ThongBao {
+  String trangThaiXuLy = '';
   int maThongBao = 0;
   int? maDonHang;
   String? maDonHangHienThi;
@@ -302,6 +312,7 @@ class ThongBao {
     maThongBao = json['maThongBao'];
     maDonHang = json['maDonHang'];
     maDonHangHienThi = json['maDonHangHienThi'];
+    trangThaiXuLy = json['trangThaiXuLy'] ?? '';
     tieuDe = json['tieuDe'];
     noiDung = json['noiDung'];
     loaiThongBao = json['loaiThongBao'];
@@ -384,6 +395,16 @@ class MocTienDo {
 
 // ============================================================ Chi tiết 1 đơn (DonHangChiTietDto)
 class DonHangChiTiet {
+  String kenhDatDon = 'LEGACY';
+  bool? choHuyTuMayChu;
+  double _giayChoBanDau = 0;
+  final Stopwatch _dongHoXacNhan = Stopwatch()..start();
+  int get giayChoTiepNhan =>
+      (_giayChoBanDau - _dongHoXacNhan.elapsedMilliseconds / 1000).ceil().clamp(
+        0,
+        120,
+      );
+
   int maDonHang = 0;
   String maDonHangHienThi = '';
   int maChiNhanh = 0;
@@ -425,6 +446,9 @@ class DonHangChiTiet {
   List<MocTienDo> tienDo = [];
 
   DonHangChiTiet.fromJson(Map<String, dynamic> json) {
+    kenhDatDon = json['kenhDatDon'] ?? 'LEGACY';
+    choHuyTuMayChu = json['choHuyKhach'] as bool?;
+    _giayChoBanDau = soThuc(json['giayChoTiepNhan']);
     maDonHang = json['maDonHang'];
     maDonHangHienThi = json['maDonHangHienThi'] ?? '';
     maChiNhanh = json['maChiNhanh'];
@@ -480,7 +504,10 @@ class DonHangChiTiet {
   bool get daTra => trangThaiThanhToan == 'DA_THANH_TOAN';
 
   bool get choPhepHuy =>
-      trangThaiDonHang == 'CHO_XAC_NHAN';
+      trangThaiDonHang == 'CHO_XAC_NHAN' &&
+      (kenhDatDon == 'APP' && daTra
+          ? giayChoTiepNhan > 0
+          : (choHuyTuMayChu ?? true));
 
   String get nhanThanhToan {
     if (trangThaiThanhToan == 'DA_HOAN_TIEN') return 'Đã hoàn tiền';

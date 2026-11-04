@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../api.dart';
 import '../phien.dart';
@@ -30,6 +31,51 @@ class TrangChinhScreen extends StatefulWidget {
 class _TrangChinhScreenState extends State<TrangChinhScreen> {
   // Tab đang mở: DAT_IN / DON_HANG / DON_GIAO / THONG_BAO / TOI
   late String _tab;
+  String get _tabDauTien => Phien.laShipper ? 'DON_GIAO' : 'DAT_IN';
+  bool _choThoat = false;
+  Timer? _hanThoat;
+  ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? _nhacThoat;
+
+  void _huyChoThoat() {
+    _choThoat = false;
+    _hanThoat?.cancel();
+    final nhac = _nhacThoat;
+    _nhacThoat = null;
+    // Có thể chạy khi Navigator đang dựng màn con; đóng snackbar sau frame đó.
+    if (nhac != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) nhac.close();
+      });
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (ModalRoute.of(context)?.isCurrent == false) _huyChoThoat();
+  }
+
+  void _quayLai(bool daPop, Object? ketQua) {
+    if (daPop || ModalRoute.of(context)?.isCurrent != true) return;
+    if (_tab != _tabDauTien) {
+      _chonTab(_tabDauTien);
+      return;
+    }
+    if (_choThoat) {
+      _huyChoThoat();
+      SystemNavigator.pop();
+      return;
+    }
+    _choThoat = true;
+    _hanThoat = Timer(const Duration(seconds: 2), _huyChoThoat);
+    _nhacThoat = ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Quay lại lần nữa để thoát ứng dụng'),
+        duration: Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
 
   // Bộ lọc mở sẵn khi chuyển sang tab Đơn hàng (màn Tôi bấm "Hoàn tất" → mở Đơn hàng lọc Hoàn tất)
   String _locDonHang = 'TAT_CA';
@@ -42,14 +88,21 @@ class _TrangChinhScreenState extends State<TrangChinhScreen> {
   @override
   void initState() {
     super.initState();
-    _tab = widget.tabBanDau ?? (Phien.laShipper ? 'DON_GIAO' : 'DAT_IN');
+    _tab = widget.tabBanDau ?? _tabDauTien;
     _demThongBaoChuaDoc();
     _kiemTraBaoTri();
-    _kiemTraBaoTriTimer = Timer.periodic(const Duration(seconds: 5), (_) => _kiemTraBaoTri());
+    _kiemTraBaoTriTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _kiemTraBaoTri(),
+    );
   }
 
   @override
-  void dispose() { _kiemTraBaoTriTimer?.cancel(); super.dispose(); }
+  void dispose() {
+    _kiemTraBaoTriTimer?.cancel();
+    _hanThoat?.cancel();
+    super.dispose();
+  }
 
   Future<void> _kiemTraBaoTri() async {
     if (_dangKiemTraBaoTri || Phien.token == null) return;
@@ -57,15 +110,26 @@ class _TrangChinhScreenState extends State<TrangChinhScreen> {
     try {
       final status = await Api.get('/api/bao-tri/trang-thai?nenTang=app');
       var invalid = status.thanhCong && status.duLieu['dangBaoTri'] == true;
-      if (!invalid) { final session = await Api.get('/api/bao-tri/phien'); invalid = session.maHttp == 401; }
+      if (!invalid) {
+        final session = await Api.get('/api/bao-tri/phien');
+        invalid = session.maHttp == 401;
+      }
       if (!mounted) return;
       if (invalid) {
         _kiemTraBaoTriTimer?.cancel();
         await Realtime.dung();
         await Phien.dangXuat();
-        if (mounted) Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const DangNhapScreen()), (_) => false);
+        if (mounted) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const DangNhapScreen()),
+            (_) => false,
+          );
+        }
       }
-    } finally { _dangKiemTraBaoTri = false; }
+    } finally {
+      _dangKiemTraBaoTri = false;
+    }
   }
 
   Future<void> _demThongBaoChuaDoc() async {
@@ -76,6 +140,7 @@ class _TrangChinhScreenState extends State<TrangChinhScreen> {
   }
 
   void _chonTab(String tab) {
+    _huyChoThoat();
     setState(() {
       _tab = tab;
       _locDonHang = 'TAT_CA';
@@ -85,6 +150,7 @@ class _TrangChinhScreenState extends State<TrangChinhScreen> {
 
   // Mở tab Đơn hàng với bộ lọc cho trước
   void _moDonHang(String nhom) {
+    _huyChoThoat();
     setState(() {
       _tab = 'DON_HANG';
       _locDonHang = nhom;
@@ -104,7 +170,13 @@ class _TrangChinhScreenState extends State<TrangChinhScreen> {
     if (_tab == 'DANH_GIA' && !Phien.laShipper) return const DanhGiaScreen();
     if (_tab == 'THONG_BAO') {
       return ThongBaoScreen(
-        moDonHang: () => _moDonHang('TAT_CA'),
+        moDonHang: () {
+          if (Phien.laShipper) {
+            _chonTab('DON_GIAO');
+          } else {
+            _moDonHang('TAT_CA');
+          }
+        },
         khiDocThongBao: _demThongBaoChuaDoc,
       );
     }
@@ -124,16 +196,20 @@ class _TrangChinhScreenState extends State<TrangChinhScreen> {
     dsTab.add(_nutTab('THONG_BAO', 'Thông báo', Ico.chuong));
     dsTab.add(_nutTab('TOI', 'Tôi', Ico.nguoi));
 
-    return Scaffold(
-      body: _manHinhCuaTab(),
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: AppColors.trang,
-          border: Border(top: BorderSide(color: AppColors.vach)),
-        ),
-        child: SafeArea(
-          top: false,
-          child: SizedBox(height: 60, child: Row(children: dsTab)),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: _quayLai,
+      child: Scaffold(
+        body: _manHinhCuaTab(),
+        bottomNavigationBar: Container(
+          decoration: const BoxDecoration(
+            color: AppColors.trang,
+            border: Border(top: BorderSide(color: AppColors.vach)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: SizedBox(height: 60, child: Row(children: dsTab)),
+          ),
         ),
       ),
     );

@@ -1,9 +1,10 @@
-using Dapper;
+﻿using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using PhotocopyApi.DuLieu;
 using PhotocopyShared.Constants;
+using PhotocopyShared.Dtos.DonHang;
 using PhotocopyShared.Dtos.Tuan3;
 
 namespace PhotocopyApi.Controllers;
@@ -50,11 +51,32 @@ public class BaoCaoTongQuanController : ControllerBase
         kq.TienLech = ca.TienLech;
         kq.SoPhieuChoDuyet = await ds.ReadSingleAsync<int>();
         int hoanTien = await ds.ReadSingleAsync<int>();
-        // Hoàn tiền thuộc quyền CEO; không đưa số yêu cầu cấp chuỗi vào giao diện quản lý.
-        kq.SoHoanTienChoDuyet = User.IsInRole(VaiTro.SuperAdmin) ? hoanTien : 0;
+        // Cả quản lý và CEO thấy số yêu cầu trong phạm vi; chỉ CEO có quyền quyết định.
+        kq.SoHoanTienChoDuyet = hoanTien;
         kq.DocLuc = docLuc;
         kq.TuNgayKiemDem = tu;
         return Ok(kq);
+    }
+
+    [HttpGet("yeu-cau-hoan-tien")]
+    public async Task<IActionResult> YeuCauHoanTien()
+    {
+        if (!LayPhamVi(out int? maChiNhanh)) return StatusCode(403);
+        Response.Headers.CacheControl = "no-store";
+        using var conn = new SqlConnection(_chuoiKetNoi);
+        var ds = await conn.QueryAsync<CanhBaoHoanTienDto>(@"SELECT dh.MaDonHang,kh.HoTen AS TenKhachHang,cn.TenChiNhanh,tt.SoTien,
+            CASE WHEN dh.TrangThai='DA_HUY' THEN 'HUY_DON' ELSE 'SAN_PHAM' END AS Loai,
+            CASE WHEN dh.TrangThai='DA_HUY' THEN 'CHAP_THUAN' ELSE JSON_VALUE(dh.YeuCauHoanTienJson,'$.TrangThai') END AS TrangThai,
+            COALESCE(TRY_CONVERT(DATETIMEOFFSET,JSON_VALUE(dh.YeuCauHoanTienJson,'$.GuiLuc')),
+                TRY_CONVERT(DATETIMEOFFSET,JSON_VALUE(dh.BangChungHuyJson,'$.GuiLuc')),
+                TODATETIMEOFFSET(dh.NgayDat,'+07:00')) AS GuiLuc
+            FROM DonHang dh JOIN ThanhToan tt ON tt.MaDonHang=dh.MaDonHang
+            JOIN NguoiDung kh ON kh.MaNguoiDung=dh.MaKhachHang JOIN ChiNhanh cn ON cn.MaChiNhanh=dh.MaChiNhanh
+            WHERE tt.TrangThai='DA_THANH_TOAN' AND ((dh.TrangThai='DA_HUY' AND dh.MaMayIn IS NULL)
+                OR JSON_VALUE(dh.YeuCauHoanTienJson,'$.TrangThai') IN ('CHO_DUYET','CHAP_THUAN'))
+              AND (@MaChiNhanh IS NULL OR dh.MaChiNhanh=@MaChiNhanh)
+            ORDER BY GuiLuc DESC,dh.MaDonHang DESC",new{MaChiNhanh=maChiNhanh});
+        return Ok(ds);
     }
 
     private bool LayPhamVi(out int? maChiNhanh)

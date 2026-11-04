@@ -1,4 +1,4 @@
-using PhotocopyShared.KiemTraDuLieu;
+﻿using PhotocopyShared.KiemTraDuLieu;
 using System.ComponentModel.DataAnnotations;
 using PhotocopyShared.Dtos.DatIn;
 
@@ -41,9 +41,8 @@ public sealed class DatDonTaiQuayRequest
 
 public sealed class HuyDonRequest
 {
-    [Required(ErrorMessage="Vui lòng tải ảnh bằng chứng hủy đơn.")]
     [RegularExpression("^[a-f0-9]{32}$",ErrorMessage="Mã bằng chứng không hợp lệ.")]
-    public string MaBangChung {get;set;}="";
+    public string? MaBangChung {get;set;}
     [Required(ErrorMessage = "Vui lòng nhập lý do hủy.")]
     [MaxLength(255, ErrorMessage = "Lý do tối đa 255 ký tự.")]
     public string LyDo { get; set; } = "";
@@ -399,6 +398,8 @@ public sealed class HoanTienChoDuyetDto
     public string TenChiNhanh { get; set; } = "";
     public decimal SoTien { get; set; }
     public string? GhiChu { get; set; }
+    public string KenhDatDon { get; set; } = "LEGACY";
+    public DateTimeOffset? GuiLuc { get; set; }
     public ThongTinHoanTienRequest? ThongTinHoanTien => ThongTinHoanTienRequest.DocGhiChu(GhiChu);
     public DateTime NgayDat { get; set; }
 }

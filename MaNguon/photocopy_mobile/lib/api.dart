@@ -23,6 +23,12 @@ class KetQuaApi {
 //   KetQuaApi kq = await Api.post('/api/auth/login', {'taiKhoan': ..., 'matKhau': ...});
 //   if (kq.thanhCong) { ... kq.duLieu ... } else { ... kq.loi ... }
 class Api {
+  static Future<KetQuaApi> getBienLaiHoanTien(int id, String ma) =>
+      _getAnhGiaoHang('/api/don-hang/$id/bien-lai-hoan-tien/${Uri.encodeComponent(ma)}');
+  static Future<KetQuaApi> guiAnhKhieuNai(int id, List<Map<String,String>> anh) =>
+      _guiAnhGiaoHang('/api/don-hang/$id/khieu-nai-hoan-tien/anh', {}, anh);
+  static Future<KetQuaApi> getAnhKhieuNai(int id, String ma) =>
+      _getAnhGiaoHang('/api/don-hang/$id/khieu-nai-hoan-tien/anh/${Uri.encodeComponent(ma)}');
   static Future<KetQuaApi> guiBangChungGiao(int maGiao,
       Map<String, String> fields, List<Map<String, String>> anh) =>
       _guiAnhGiaoHang('/api/giao-hang/luot/$maGiao/giao-that-bai', fields, anh);

@@ -2929,3 +2929,20 @@ a:hover {
 @media (min-width: 1024px) {
     .dm-khach-hang th:first-child { width: 28%; }
 }
+
+/* Tab hàng đợi: Tất cả giữ màu chủ đạo; cần tiếp nhận là điểm nhấn mạnh nhất. */
+.thanh-loc .chip.hd-tab-trong { background:var(--nen);color:var(--chu-phu);border-color:var(--vien); }
+.thanh-loc .chip.hd-tab-trong.chon { text-decoration:underline;text-underline-offset:3px; }
+.thanh-loc .chip.hd-tab-cho { background:#a44711;color:#fff;border-color:#a44711;font-weight:800; }
+.thanh-loc .chip.hd-tab-cho:hover { background:#81350b;border-color:#81350b; }
+.thanh-loc .chip.hd-tab-cho.chon { background:#81350b;border-color:#81350b;box-shadow:0 0 0 3px #f3d6c4; }
+.thanh-loc .chip.hd-tab-da-nhan { background:#e7effc;color:#1f4e8c;border-color:#bfd0e9; }
+.thanh-loc .chip.hd-tab-dang-in { background:#f0eafa;color:#674298;border-color:#d9caed; }
+.thanh-loc .chip.hd-tab-da-in { background:#e2f2e9;color:#1f6242;border-color:#b7d9c5; }
+.thanh-loc .chip.hd-tab-da-nhan.chon { box-shadow:0 0 0 2px #91aed6; }
+.thanh-loc .chip.hd-tab-dang-in.chon { box-shadow:0 0 0 2px #bba0dc; }
+.thanh-loc .chip.hd-tab-da-in.chon { box-shadow:0 0 0 2px #80b798; }
+.thanh-loc .chip:focus-visible { outline:3px solid var(--accent);outline-offset:3px; }
+
+.nhan-mau.nhan-cho-dam { background:#a44711;border-color:#a44711;color:#fff; }
+.nhan-mau.nhan-tim { background:#f0eafa;border-color:#d9caed;color:#674298; }

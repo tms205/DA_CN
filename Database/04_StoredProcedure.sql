@@ -430,7 +430,9 @@ BEGIN
         DECLARE @Can TABLE (MaVatTu INT, SoLuong INT);
         INSERT INTO @Can
         SELECT MaVatTu, SUM(SoLuong) FROM (
-            SELECT dv.MaVatTu, ct.SoTrang * ct.SoBan AS SoLuong
+            SELECT dv.MaVatTu,
+                   (CASE WHEN dv.MatIn='2_MAT' THEN ct.SoTrang / 2 + ct.SoTrang % 2
+                         ELSE ct.SoTrang END) * ct.SoBan AS SoLuong
             FROM ChiTietDonHang ct JOIN DichVu dv ON dv.MaDichVu = ct.MaDichVu
             WHERE ct.MaDonHang = @MaDonHang AND dv.MaVatTu IS NOT NULL
             UNION ALL

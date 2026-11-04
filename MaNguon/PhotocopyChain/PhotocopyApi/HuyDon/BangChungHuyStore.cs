@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using PhotocopyApi.GiaoHang;
 using PhotocopyShared.Dtos.GiaoHang;
 namespace PhotocopyApi.HuyDon;
@@ -11,6 +11,7 @@ public sealed class HoSoHuyDon
  public int MaNguoiGui {get;set;}
  public DateTimeOffset GuiLuc {get;set;}
  public List<AnhBangChungDto> Anh {get;set;}=new();
+ public PhotocopyShared.Dtos.DonHang.BienLaiHoanTienDto BienLaiHoanTien {get;set;}
  public string LyDo {get;set;}
  public DateTime? NgayDat {get;set;}
  public DateTime? HetHanThanhToan {get;set;}

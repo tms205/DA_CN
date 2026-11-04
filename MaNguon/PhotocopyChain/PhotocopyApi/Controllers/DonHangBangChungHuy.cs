@@ -25,10 +25,10 @@ public partial class DonHangController
  public async Task<IActionResult> TaiBangChungHuy(int maDonHang,[FromForm]AnhHuyRequest req) {
   int actor=int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
   using var conn=new SqlConnection(_chuoiKetNoi);
-  var row=await conn.QueryFirstOrDefaultAsync("SELECT MaKhachHang,MaChiNhanh,TrangThai,CAST(CASE WHEN TrangThai='CHO_XAC_NHAN' AND (NgayHenTra IS NULL OR NgayHenTra>DATEADD(MINUTE,15,GETDATE())) THEN 1 ELSE 0 END AS BIT) AS ChoHuyKhach FROM DonHang WHERE MaDonHang=@maDonHang",new{maDonHang});
+  var row=await conn.QueryFirstOrDefaultAsync("SELECT dh.KenhDatDon,tt.TrangThai AS ThanhToan,dh.MaKhachHang,dh.MaChiNhanh,dh.TrangThai,"+PhotocopyShared.Dtos.DonHang.ChinhSachDonApp.SqlChoHuy+" AS ChoHuyKhach FROM DonHang dh JOIN ThanhToan tt ON tt.MaDonHang=dh.MaDonHang WHERE dh.MaDonHang=@maDonHang",new{maDonHang});
   if(row==null||(User.IsInRole(VaiTro.Customer)?(int)row.MaKhachHang!=actor:!DuocLamViecVoiChiNhanh((int)row.MaChiNhanh)))return NotFound(new{message="Không tìm thấy đơn trong phạm vi của bạn."});
   if(!TrangThaiDonHang.ChoPhepHuy((string)row.TrangThai))return Conflict(new{message="Đơn không còn được hủy; không tải ảnh lên."});
-  if(User.IsInRole(VaiTro.Customer)&&!(bool)row.ChoHuyKhach)return Conflict(new{message="Chỉ hủy khi chưa tiếp nhận và còn hơn 15 phút trước giờ hẹn."});
+  if((User.IsInRole(VaiTro.Customer) || ((string)row.KenhDatDon=="APP" && (string)row.ThanhToan=="DA_THANH_TOAN"))&&!(bool)row.ChoHuyKhach)return Conflict(new{message="Đơn đã tiếp nhận hoặc hết hạn hủy; đơn app đã trả tiền chỉ có 2 phút sau thanh toán."});
   try {var proof=await _bangChungHuy.Luu(maDonHang,actor,req.Anh,HttpContext.RequestAborted);return Ok(new{maBangChung=proof.MaHoSo});}
   catch(ArgumentException ex){return BadRequest(new{message=ex.Message});}
   catch(IOException){return StatusCode(503,new{message="Chưa lưu được bằng chứng. Không hủy đơn; hãy thử lại."});}

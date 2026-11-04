@@ -1,0 +1,68 @@
+﻿@using Microsoft.AspNetCore.SignalR.Client
+@inject HttpClient Http
+@inject IServiceProvider DichVu
+@implements IAsyncDisposable
+@code {
+    [Parameter] public EventCallback ThayDoi { get; set; }
+    [Parameter] public EventCallback<bool> KetNoiDoi { get; set; }
+    private readonly CancellationTokenSource _dung=new();
+    private HubConnection _hub;
+    private Task _ketNoi=Task.CompletedTask, _nhip=Task.CompletedTask, _tai=Task.CompletedTask;
+    private bool _canTai;
+    protected override Task OnInitializedAsync()
+    {
+        var phien=DichVu.GetService(typeof(PhienDangNhap)) as PhienDangNhap;
+        if(phien==null)return Task.CompletedTask;
+        _hub=new HubConnectionBuilder().WithUrl(new Uri(Http.BaseAddress,"hubs/cap-nhat"),
+            o=>o.AccessTokenProvider=()=>Task.FromResult(phien.AccessToken)).WithAutomaticReconnect().Build();
+        foreach(var ten in new[]{HubEvents.RefundChanged,HubEvents.OrderStatusChanged,HubEvents.PaymentConfirmed})
+            _hub.On<System.Text.Json.JsonElement>(ten,_=>YeuCauTai());
+        _hub.Reconnecting += _=>BaoKetNoi(false);
+        _hub.Reconnected += async _=> { await BaoKetNoi(true);await YeuCauTai(); };
+        _hub.Closed += _=>BaoKetNoi(false);
+        _ketNoi=KetNoiAsync();_nhip=NhipAsync();
+        return Task.CompletedTask;
+    }
+    private Task BaoKetNoi(bool ok)=>_dung.IsCancellationRequested?Task.CompletedTask:InvokeAsync(()=>KetNoiDoi.InvokeAsync(ok));
+    private async Task KetNoiAsync()
+    {
+        try {
+            while(!_dung.IsCancellationRequested) {
+                if(_hub.State==HubConnectionState.Disconnected) {
+                    try { await _hub.StartAsync(_dung.Token);await BaoKetNoi(true);await YeuCauTai(); }
+                    catch(OperationCanceledException) when(_dung.IsCancellationRequested) { return; }
+                    catch { await BaoKetNoi(false); }
+                }
+                await Task.Delay(5000,_dung.Token);
+            }
+        } catch(OperationCanceledException) when(_dung.IsCancellationRequested) { }
+    }
+    private async Task NhipAsync()
+    {
+        using var timer=new PeriodicTimer(TimeSpan.FromSeconds(15));
+        try { while(await timer.WaitForNextTickAsync(_dung.Token))await YeuCauTai(); }
+        catch(OperationCanceledException) when(_dung.IsCancellationRequested) { }
+    }
+    private Task YeuCauTai()=>InvokeAsync(()=> {
+        if(_dung.IsCancellationRequested)return Task.CompletedTask;
+        _canTai=true;
+        if(_tai.IsCompleted)_tai=TaiDaGopAsync();
+        return _tai;
+    });
+    private async Task TaiDaGopAsync()
+    {
+        try {
+            do {
+                await Task.Delay(150,_dung.Token);_canTai=false;
+                if(!_dung.IsCancellationRequested)await ThayDoi.InvokeAsync();
+            } while(_canTai&&!_dung.IsCancellationRequested);
+        } catch(OperationCanceledException) when(_dung.IsCancellationRequested) { }
+    }
+    public async ValueTask DisposeAsync()
+    {
+        _dung.Cancel();
+        if(_hub!=null)await _hub.DisposeAsync();
+        await Task.WhenAll(_ketNoi,_nhip,_tai);
+        _dung.Dispose();
+    }
+}

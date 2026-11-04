@@ -5,7 +5,7 @@ internal static class BaoCaoTongQuanSql
 {
     private const string DonHoanTat = @"
         FROM DonHang dh
-        WHERE dh.TrangThai='HOAN_THANH'
+        WHERE dh.TrangThai='HOAN_THANH' AND NOT EXISTS(SELECT 1 FROM ThanhToan tt WHERE tt.MaDonHang=dh.MaDonHang AND tt.TrangThai='DA_HOAN_TIEN')
           AND dh.NgayHoanThanh>=@TuNgay AND dh.NgayHoanThanh<@NgaySau
           AND ISNULL(dh.LoaiPhatSinh,'')<>'IN_LAI_LOI_QUAY'
           AND (@MaChiNhanh IS NULL OR dh.MaChiNhanh=@MaChiNhanh)";
@@ -89,6 +89,6 @@ internal static class BaoCaoTongQuanSql
         SELECT COUNT(*) FROM PhieuNhap WHERE TrangThai='CHO_DUYET'
           AND (@MaChiNhanh IS NULL OR MaChiNhanh=@MaChiNhanh);
         SELECT COUNT(*) FROM DonHang dh JOIN ThanhToan tt ON tt.MaDonHang=dh.MaDonHang
-        WHERE dh.TrangThai='DA_HUY' AND dh.MaMayIn IS NULL AND tt.TrangThai='DA_THANH_TOAN'
+        WHERE tt.TrangThai='DA_THANH_TOAN' AND ((dh.TrangThai='DA_HUY' AND dh.MaMayIn IS NULL) OR JSON_VALUE(dh.YeuCauHoanTienJson,'$.TrangThai') IN ('CHO_DUYET','CHAP_THUAN'))
           AND (@MaChiNhanh IS NULL OR dh.MaChiNhanh=@MaChiNhanh);";
 }

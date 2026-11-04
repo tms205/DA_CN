@@ -22,6 +22,7 @@ const server=http.createServer((req,res)=>{
    let data=[];
    if(p==='/api/bao-tri/trang-thai')data={dangBaoTri:false,tinhNangKhoa:[]};
    else if(p==='/api/bao-tri/phien')data={hopLe:true};
+   else if(p==='/api/auth/admin/login')data={accessToken:'fixture-second',hetHanLuc:'2099-01-01T00:00:00Z',nguoiDung:{maNguoiDung:2,tenVaiTro:'BRANCH_ADMIN',hoTen:'Quản lý khác',maChiNhanh:1,tenChiNhanh:'Cơ sở thử'}};
    else if(p==='/api/ca/cho-tong-ket')return route.fulfill({status:204,headers});
    else if(p==='/api/danh-muc/chi-nhanh')data=[{maChiNhanh:1,tenChiNhanh:'Cơ sở thử',diaChi:'Địa chỉ thử',trangThai:'HOAT_DONG'}];
    else if(p==='/api/danh-muc/bang-gia'){priceReads++;data=[{maDichVu:1,tenDichVu:'In A4',loaiDichVu:'IN_AN',khoGiay:'A4',loaiGiay:'70gsm',matIn:'1_MAT',mauSac:'DEN_TRANG',donGia:300,maVatTu:1},{maDichVu:13,tenDichVu:'Đóng bìa kiếng',loaiDichVu:'GIA_CONG',nhomGiaCong:'DONG_BIA_KIENG',donGia:5000}];}
@@ -34,7 +35,7 @@ const server=http.createServer((req,res)=>{
    else if(p==='/api/thanh-toan/88'){paymentReads++;data={maDonHang:88,maDonHangHienThi:'DH00088',phuongThuc:'VIETQR',trangThai:'DA_THANH_TOAN'};}
    await route.fulfill({status:200,headers,json:data});
   });
-  const base='http://127.0.0.1:'+server.address().port;
+  const base=process.argv[6]||('http://127.0.0.1:'+server.address().port);
   const go=async target=>{await page.evaluate(t=>{const a=document.createElement('a');a.href=t;document.body.append(a);a.click();a.remove();},target);await page.waitForURL('**'+target);};
   const active=()=>page.locator('section.ban-nhap-tac-vu:not([hidden])');
   await page.goto(base+'/lap-don-tai-quay');
@@ -65,6 +66,13 @@ const server=http.createServer((req,res)=>{
   await go('/lap-don-tai-quay?maDonHang=88');await page.waitForFunction(()=>document.querySelector('main')?.textContent.includes('DH00088'));assert.equal(paymentReads,1,'Truy vấn payOS vẫn hoạt động trên trang được giữ');
   assert.equal(await active().locator('#ldq-ban').inputValue(),'3');
   await page.screenshot({path:path.join(out,'counter-draft.png'),fullPage:true});
+  await page.locator('.tb-dang-xuat').click();await page.waitForURL('**/dang-nhap');
+  assert.equal(await page.locator('section.ban-nhap-tac-vu').count(),0,'Đăng xuất xóa các bản nháp khỏi DOM');
+  await page.locator('#tai-khoan').fill('other@gmail.com');await page.locator('#mat-khau').fill('OtherPass123');
+  await page.getByRole('button',{name:/Đăng nhập/}).first().click();await page.waitForURL(u=>!u.pathname.includes('dang-nhap'));
+  await go('/lap-don-tai-quay');await active().getByPlaceholder('Nguyễn Văn An').waitFor();
+  assert.equal(await active().getByPlaceholder('Nguyễn Văn An').inputValue(),'');assert.equal(await active().getByText('tai-lieu.pdf',{exact:true}).count(),0,'Tài khoản mới không thấy file cũ');
+  await go('/nhan-dang-chu');assert.equal(await active().locator('.ocr-file-row').count(),0,'Tài khoản mới không thấy ảnh/văn bản cũ');
   assert.deepEqual(errors,[]);console.log('PASS drafts: name/phone, uploaded file, print options, OCR crop/edit/background, title, Word, payOS query; no duplicate requests');
  }finally{await browser.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

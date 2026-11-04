@@ -62,6 +62,10 @@
                     <NavLink class="tb-muc" href="kho-file" title="Kho file in" @onclick="DongMenu">@((MarkupString)Svg.TaiLieu(18)) <span>Kho file in</span></NavLink>
                     <NavLink class="tb-muc" href="may-in" title="Bảng điều khiển máy in" @onclick="DongMenu">@((MarkupString)Svg.MayIn(18)) <span>Điều khiển máy in</span></NavLink>
                     <NavLink class="tb-muc" href="giao-hang" title="Giao hàng nội bộ" @onclick="DongMenu">@((MarkupString)Svg.XeGiao(18)) <span>Giao hàng nội bộ</span></NavLink>
+                    @if (VaiTroLa("SUPER_ADMIN"))
+                    {
+                        <NavLink class="tb-muc" href="phe-duyet" title="Phê duyệt phiếu nhập và hoàn tiền" @onclick="DongMenu">@((MarkupString)Svg.DuyetHoSo(18)) <span>Phê duyệt</span>@if (!ThongBao.DangBaoTri && ThongBao.SoCho != 0) { <span class="tb-badge" aria-label="@(ThongBao.SoCho == null ? "Số yêu cầu chờ duyệt chưa tải được" : $"{ThongBao.SoCho} yêu cầu chờ duyệt")">@(ThongBao.SoCho?.ToString() ?? "?")</span> }</NavLink>
+                    }
                 </div>
             </section>
 
@@ -105,7 +109,6 @@
                     {
                         <NavLink class="tb-muc" href="khach-hang" title="Khách hàng" @onclick="DongMenu">@((MarkupString)Svg.NguoiMot(18)) <span>Khách hàng</span></NavLink>
                         <NavLink class="tb-muc" href="mau-don" title="Quản lý mẫu đơn in sẵn" @onclick="DongMenu">@((MarkupString)Svg.BieuMau()) <span>Mẫu đơn in sẵn</span></NavLink>
-                        <NavLink class="tb-muc" href="phe-duyet" title="Phê duyệt phiếu nhập và hoàn tiền" @onclick="DongMenu">@((MarkupString)Svg.DuyetHoSo(18)) <span>Phê duyệt</span>@if (!ThongBao.DangBaoTri && ThongBao.SoCho != 0) { <span class="tb-badge" aria-label="@(ThongBao.SoCho == null ? "Số yêu cầu chờ duyệt chưa tải được" : $"{ThongBao.SoCho} yêu cầu chờ duyệt")">@(ThongBao.SoCho?.ToString() ?? "?")</span> }</NavLink>
                     }
                 </div>
             </section>
@@ -289,7 +292,7 @@
                 "dich-vu" => ("Quản lý", "Dịch vụ"),
                 "mau-don" => ("Quản lý", "Mẫu đơn in sẵn"),
                 "danh-gia" => ("Quản lý", "Đánh giá khách hàng"),
-                "phe-duyet" => ("Quản lý", "Phê duyệt"),
+                "phe-duyet" => ("Vận hành", "Phê duyệt"),
                 "bang-gia" => ("Cấu hình", "Bảng giá in ấn"),
                 "khuyen-mai" => ("Cấu hình", "Khuyến mãi"),
                 "quan-tri" => ("Cấu hình", "Chi nhánh & máy in"),
@@ -436,7 +439,7 @@
             _cacNhomDangMo.Add("bao-cao");
         else if (duongDan == "bang-gia" || duongDan == "khuyen-mai" || duongDan == "quan-tri")
             _cacNhomDangMo.Add("cau-hinh");
-        else if (duongDan == "kho-vat-tu" || duongDan == "nhan-vien" || duongDan == "danh-gia" || duongDan == "phe-duyet" || duongDan == "khach-hang" || duongDan == "dich-vu" || duongDan == "mau-don")
+        else if (duongDan == "kho-vat-tu" || duongDan == "nhan-vien" || duongDan == "danh-gia" || duongDan == "khach-hang" || duongDan == "dich-vu" || duongDan == "mau-don")
             _cacNhomDangMo.Add("quan-ly");
         else
             _cacNhomDangMo.Add("van-hanh");

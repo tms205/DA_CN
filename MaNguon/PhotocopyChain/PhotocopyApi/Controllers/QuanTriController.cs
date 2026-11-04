@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.Data;
 using Dapper;
 using Microsoft.AspNetCore.Authorization;
@@ -528,9 +528,10 @@ public partial class QuanTriController : ControllerBase
         using var conn = new SqlConnection(_chuoiKetNoi);
         string sql = $@"SELECT {bieuThucNhom} AS Ngay, dh.MaChiNhanh, cn.TenChiNhanh,
                                dh.TrangThai, COUNT(*) AS SoDon, SUM(dh.TongTien) AS GiaTriDon,
-                               SUM(CASE WHEN dh.TrangThai='HOAN_THANH' AND ISNULL(dh.LoaiPhatSinh,'')<>'IN_LAI_LOI_QUAY' THEN 1 ELSE 0 END) AS SoDonDoanhThu,
-                               SUM(CASE WHEN dh.TrangThai='HOAN_THANH' AND ISNULL(dh.LoaiPhatSinh,'')<>'IN_LAI_LOI_QUAY' THEN dh.TongTien ELSE 0 END) AS DoanhThu
+                               SUM(CASE WHEN dh.TrangThai='HOAN_THANH' AND ISNULL(dh.LoaiPhatSinh,'')<>'IN_LAI_LOI_QUAY' AND ISNULL(tt.TrangThai,'')<>'DA_HOAN_TIEN' THEN 1 ELSE 0 END) AS SoDonDoanhThu,
+                               SUM(CASE WHEN dh.TrangThai='HOAN_THANH' AND ISNULL(dh.LoaiPhatSinh,'')<>'IN_LAI_LOI_QUAY' AND ISNULL(tt.TrangThai,'')<>'DA_HOAN_TIEN' THEN dh.TongTien ELSE 0 END) AS DoanhThu
                         FROM DonHang dh JOIN ChiNhanh cn ON cn.MaChiNhanh=dh.MaChiNhanh
+                        LEFT JOIN ThanhToan tt ON tt.MaDonHang=dh.MaDonHang
                         WHERE COALESCE(dh.NgayHoanThanh,dh.NgayDat)>=@TuNgay
                           AND COALESCE(dh.NgayHoanThanh,dh.NgayDat)<DATEADD(DAY,1,@DenNgay)
                           AND (@TrangThai IS NULL OR dh.TrangThai=@TrangThai)
@@ -585,13 +586,14 @@ public partial class QuanTriController : ControllerBase
         using var conn = new SqlConnection(_chuoiKetNoi);
         var ds = await conn.QueryAsync<HoanTienChoDuyetDto>(
             @"SELECT dh.MaDonHang, 'DH'+RIGHT('00000'+CAST(dh.MaDonHang AS VARCHAR(10)),5) AS MaDonHangHienThi,
-                     kh.HoTen AS TenKhachHang, kh.SoDienThoai, cn.TenChiNhanh, tt.SoTien, dh.GhiChu, dh.NgayDat
+                     kh.HoTen AS TenKhachHang, kh.SoDienThoai, cn.TenChiNhanh, tt.SoTien, dh.GhiChu, dh.NgayDat, dh.KenhDatDon,
+                     TRY_CONVERT(DATETIMEOFFSET,JSON_VALUE(dh.BangChungHuyJson,'$.GuiLuc')) AS GuiLuc
               FROM DonHang dh JOIN ThanhToan tt ON tt.MaDonHang=dh.MaDonHang
               JOIN NguoiDung kh ON kh.MaNguoiDung=dh.MaKhachHang
               JOIN ChiNhanh cn ON cn.MaChiNhanh=dh.MaChiNhanh
               WHERE dh.TrangThai='DA_HUY' AND dh.MaMayIn IS NULL AND tt.TrangThai='DA_THANH_TOAN'
                 AND (@MaChiNhanh IS NULL OR dh.MaChiNhanh=@MaChiNhanh)
-              ORDER BY dh.NgayDat", new { MaChiNhanh = maChiNhanh });
+              ORDER BY GuiLuc DESC, dh.MaDonHang DESC", new { MaChiNhanh = maChiNhanh });
         return Ok(ds);
     }
 

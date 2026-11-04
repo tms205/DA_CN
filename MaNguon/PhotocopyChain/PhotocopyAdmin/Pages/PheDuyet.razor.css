@@ -1,4 +1,4 @@
-.hoan-tien-ghi-chu {
+﻿.hoan-tien-ghi-chu {
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     line-height: 1.6;
@@ -16,3 +16,23 @@
 @container bang-du-lieu (max-width: 540px) {
     .bang tbody tr { grid-template-columns: minmax(0, 1fr); }
 }
+
+.phe-tab-hoan { display:flex;gap:8px;flex-wrap:wrap;padding:16px 20px;border-bottom:1px solid var(--vien); }
+.phe-tab { display:inline-flex;align-items:center;gap:9px;min-height:42px;padding:9px 15px;border:1px solid var(--vien);border-radius:7px;background:var(--trang);color:var(--chu-phu);font:inherit;font-weight:600;cursor:pointer; }
+.phe-tab span { padding:2px 7px;border-radius:5px;background:#edf2f7;font-size:12px; }
+.phe-tab.chon { color:#fff;background:var(--accent,#164c7c);border-color:var(--accent,#164c7c); }
+.phe-tab.chon span { background:#ffffff25; }
+.phe-tab:focus-visible { outline:3px solid #90b9df;outline-offset:2px; }
+.phe-huong-dan { padding:14px 20px;margin:0;color:var(--chu-phu);font-size:13px;line-height:1.6;border-bottom:1px solid var(--vien); }
+.phe-hoan-tien [hidden] { display:none !important; }
+@media (max-width:540px) { .phe-tab-hoan { padding:12px; }.phe-tab { flex:1;justify-content:center; }.phe-huong-dan { padding:12px; } }
+
+.phe-thanh-hoan {display:flex;justify-content:space-between;align-items:center;gap:20px;padding:16px 20px;border-bottom:1px solid var(--vien);}.phe-thanh-hoan p {margin:0;font-size:13px;line-height:1.6;color:var(--chu-phu);max-width:620px;}.phe-thanh-hoan input {width:280px;max-width:100%;}
+.phe-bang-hoan .cot-hanh-dong {text-align:center;min-width:150px;}.phe-bang-hoan .cot-hanh-dong button {white-space:nowrap;}.phe-tien {text-align:right;}.phe-tien strong {font-size:16px;color:var(--accent,#164c7c);}.phe-ly-do {max-width:320px;line-height:1.6;margin-top:7px;overflow-wrap:anywhere;}.phe-nguon {display:block;color:#395d85;font-size:11px;margin-top:6px;}.phe-trang-thai {display:inline-flex;padding:5px 9px;border-radius:6px;font-size:12px;font-weight:700;line-height:1.5;}.phe-trang-thai.cho-chuyen {background:#fff0d8;color:#7f4809;}.phe-trang-thai.thieu {background:#eef2f6;color:#4c5c70;}
+.phe-tom-tat {display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:20px;padding-bottom:18px;border-bottom:1px solid var(--vien);}.phe-tom-tat h3 {font-size:18px;margin:10px 0 6px;}.phe-tom-tat p {margin:0;color:var(--chu-phu);font-size:13px;line-height:1.6;}.phe-tom-tat>div:last-child {display:grid;gap:8px;text-align:right;flex-shrink:0;}.phe-tom-tat>div:last-child span {font-size:12px;color:var(--chu-phu);}.phe-tom-tat strong {font-size:26px;color:var(--accent,#164c7c);}
+.phe-luoi-ho-so {display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px;margin-bottom:16px;}.phe-khoi {border:1px solid var(--vien);padding:18px;border-radius:9px;background:#fff;min-width:0;}.phe-khoi h3 {margin:0 0 14px;font-size:14px;color:#273d58;}.phe-khoi p {line-height:1.7;margin:0 0 12px;overflow-wrap:anywhere;}.phe-khoi dl {margin:0;display:grid;gap:6px;overflow-wrap:anywhere;}.phe-khoi dt {font-size:12px;color:var(--chu-phu);}.phe-khoi dd {font-weight:700;margin:0 0 8px;}.phe-luoi-truong {display:grid;grid-template-columns:1fr 1.4fr;gap:16px;align-items:start;margin-bottom:18px;}.phe-luoi-truong input,.phe-luoi-truong textarea {width:100%;}.phe-luu-y {font-size:12px;color:#4d627a;margin-top:14px!important;}.phe-doi-soat {background:#fbfcfe;}
+@media(max-width:700px) {.phe-thanh-hoan {display:grid;padding:14px;gap:12px;}.phe-thanh-hoan input {width:100%;}.phe-luoi-ho-so,.phe-luoi-truong {grid-template-columns:minmax(0,1fr);}.phe-tom-tat {flex-direction:column;}.phe-tom-tat>div:last-child {text-align:left;}.phe-khoi {padding:14px;}.phe-bang-hoan .phe-tien,.phe-bang-hoan .cot-hanh-dong {text-align:left;}}
+
+.phe-phan-trang {display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 20px;font-size:12px;color:var(--chu-phu);}.phe-phan-trang>div {display:flex;gap:8px;}
+
+.phe-thanh-hoan .sr-only {position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap;}

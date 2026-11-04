@@ -1,24 +1,58 @@
-@inject HttpClient Http
+﻿@inject HttpClient Http
 @if(_error!=null){<p role="alert">@_error</p>}
 else if(_data==null){<p role="status">Đang tải bằng chứng…</p>}
 else {
- <p><b>@(_data.Loai=="TU_DONG"?"Hệ thống tự hủy do hết hạn thanh toán":"Bằng chứng hủy thủ công")</b></p>
+ <p><b>@(_data.Loai=="HUY_TRUOC_TIEP_NHAN"?"Nhật ký hủy trước tiếp nhận":_data.Loai=="TU_DONG"?"Hệ thống tự hủy do hết hạn thanh toán":"Bằng chứng hủy thủ công")</b></p>
  <p>Ghi nhận: @_data.GuiLuc.ToOffset(TimeSpan.FromHours(7)).ToString("dd/MM/yyyy HH:mm:ss") · Người gửi #@_data.MaNguoiGui</p>
- @if(_data.Loai=="TU_DONG"){<p>@_data.LyDo · Thanh toán: @_data.TrangThaiThanhToan</p><p>Hết hạn: @_data.HetHanThanhToan?.ToString("dd/MM/yyyy HH:mm:ss")</p>}
+ @if(_data.Loai is "TU_DONG" or "HUY_TRUOC_TIEP_NHAN"){<p>@_data.LyDo · Thanh toán: @_data.TrangThaiThanhToan</p><p>Hết hạn: @_data.HetHanThanhToan?.ToString("dd/MM/yyyy HH:mm:ss")</p>}
+ <AuthorizeView Roles="SUPER_ADMIN"><AnhBienLaiHoanTien MaDonHang="MaDonHang" BienLai="_data.BienLaiHoanTien" /></AuthorizeView>
  @foreach(var a in _data.Anh){<button class="nut-phu" @onclick="()=>Xem(a.MaAnh)">Xem ảnh @(_data.Anh.IndexOf(a)+1)</button>}
  @if(_anh!=null){<img src="@_anh" alt="Bằng chứng yêu cầu hủy đơn" style="display:block;max-width:100%;max-height:65vh;object-fit:contain;margin:16px auto" />}
 }
+<AuthorizeView Roles="SUPER_ADMIN">
+@if(DaHoanTien && _daTai && _data?.BienLaiHoanTien==null) {
+    <section style="margin-top:20px;padding:16px;border:1px solid #d8e2ee;border-radius:9px;background:#f8fbff">
+        <h3>Bổ sung biên lai cho khoản đã hoàn</h3>
+        <p>Đơn đã ghi nhận hoàn tiền nhưng chưa có biên lai. Gửi ảnh giao dịch và lời nhắn để khách đối chiếu.</p>
+        @if(_loiBoSung!=null){<p class="o-loi" role="alert">@_loiBoSung</p>}
+        @if(_thanhCong!=null){<p class="o-thanh-cong">@_thanhCong</p>}
+        <label class="nhan" for="bill-cu-code">Mã chuyển khoản *</label><input id="bill-cu-code" class="ca-o-loc" maxlength="100" @bind="_maChuyen" />
+        <label class="nhan" for="bill-cu-note">Lời nhắn cho khách (trên 10 ký tự) *</label><textarea id="bill-cu-note" class="ca-o-loc" maxlength="500" rows="3" @bind="_loiNhan"></textarea>
+        <ChonBienLaiHoanTien @ref="_bill" DangGui="_guiBill" ThayDoi="()=>_loiBoSung=null" />
+        <button type="button" class="nut-chinh" disabled="@_guiBill" @onclick="BoSung">@(_guiBill?"Đang gửi…":"Gửi biên lai và lời nhắn")</button>
+    </section>
+}
+</AuthorizeView>
 @code {
  [Parameter]public int MaDonHang{get;set;}
+ [Parameter]public bool DaHoanTien{get;set;}
+ private string _maChuyen="",_loiNhan="",_loiBoSung,_thanhCong;
+ private bool _guiBill,_daTai;
+ private ChonBienLaiHoanTien _bill;
+ private async Task BoSung(){
+  if(_guiBill)return;
+  if(_loiNhan.Trim().Length<11 || string.IsNullOrWhiteSpace(_maChuyen) || _bill?.DaChon!=true){_loiBoSung="Nhập lời nhắn trên 10 ký tự, mã chuyển tiền và ảnh biên lai.";return;}
+  _guiBill=true;_loiBoSung=null;
+  try{
+   using var r=await Http.PostAsJsonAsync($"api/don-hang/{MaDonHang}/bien-lai-hoan-tien/bo-sung",new XacNhanHoanTienRequest {LyDo=_loiNhan.Trim(),MaChuyenKhoan=_maChuyen.Trim(),MaBienLai=await _bill.TaiLen(MaDonHang)});
+   if(!r.IsSuccessStatusCode){_loiBoSung=await DocLoiApi.TuPhanHoiAsync(r,"Chưa gửi được biên lai.");return;}
+   _thanhCong="Đã gửi biên lai và lời nhắn cho khách.";await Tai();
+  }catch(InvalidOperationException ex){_loiBoSung=ex.Message;}
+  catch{_loiBoSung="Chưa xác định kết quả. Mở lại hồ sơ để kiểm tra trước khi gửi lại.";}
+  finally{_guiBill=false;}
+ }
  private HoSo _data;private string _error,_anh;
- protected override async Task OnInitializedAsync(){
+ protected override async Task OnInitializedAsync()=>await Tai();
+ private async Task Tai(){
+  _error=null;
   try{using var r=await Http.GetAsync($"api/don-hang/{MaDonHang}/bang-chung-huy");if(!r.IsSuccessStatusCode){_error="Đơn cũ chưa có bằng chứng hoặc bạn không có quyền xem.";return;}_data=await r.Content.ReadFromJsonAsync<HoSo>();}
   catch{_error="Chưa tải được bằng chứng.";}
+  finally{_daTai=true;}
  }
  private async Task Xem(string id){
   try{using var r=await Http.GetAsync($"api/don-hang/{MaDonHang}/bang-chung-huy/anh/{id}");r.EnsureSuccessStatusCode();var mime=r.Content.Headers.ContentType?.MediaType;
    var bytes=await r.Content.ReadAsByteArrayAsync();if(mime is not("image/png" or "image/jpeg")||bytes.Length>5*1024*1024)throw new InvalidDataException();_anh=$"data:{mime};base64,{Convert.ToBase64String(bytes)}";
   }catch{_error="Không đọc được ảnh bằng chứng. Hãy kiểm tra bản sao lưu.";}
  }
- private sealed class HoSo{public string Loai{get;set;}public int MaNguoiGui{get;set;}public DateTimeOffset GuiLuc{get;set;}public string LyDo{get;set;}public DateTime? HetHanThanhToan{get;set;}public string TrangThaiThanhToan{get;set;}public List<PhotocopyShared.Dtos.GiaoHang.AnhBangChungDto> Anh{get;set;}=new();}
+ private sealed class HoSo{public BienLaiHoanTienDto BienLaiHoanTien{get;set;}public string Loai{get;set;}public int MaNguoiGui{get;set;}public DateTimeOffset GuiLuc{get;set;}public string LyDo{get;set;}public DateTime? HetHanThanhToan{get;set;}public string TrangThaiThanhToan{get;set;}public List<PhotocopyShared.Dtos.GiaoHang.AnhBangChungDto> Anh{get;set;}=new();}
 }

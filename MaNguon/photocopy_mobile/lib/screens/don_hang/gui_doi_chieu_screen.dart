@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../../widgets/chon_anh_bang_chung.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../../api.dart';
@@ -10,10 +11,12 @@ class GuiDoiChieuScreen extends StatefulWidget {
     required this.maGiao,
     required this.lanGiao,
     this.chonAnh,
+    this.chonNhieuAnh,
     this.gui,
   });
   final int maGiao, lanGiao;
   final Future<PlatformFile?> Function()? chonAnh;
+  final Future<List<PlatformFile>> Function()? chonNhieuAnh;
   final Future<KetQuaApi> Function(String, List<Map<String, String>>)? gui;
   @override
   State<GuiDoiChieuScreen> createState() => _GuiDoiChieuScreenState();
@@ -63,28 +66,21 @@ class _GuiDoiChieuScreenState extends State<GuiDoiChieuScreen> {
       _loi = null;
     });
     try {
-      final file =
-          await (widget.chonAnh?.call() ??
-              FilePicker.pickFile(
-                type: FileType.custom,
-                allowedExtensions: ['jpg', 'jpeg', 'png'],
-              ));
-      if (!mounted || file == null) return;
-      if (file.path == null ||
-          !RegExp(r'\.(jpe?g|png)$', caseSensitive: false).hasMatch(file.name)) {
-        throw StateError('Chọn ảnh JPG/PNG.');
-      }
-      final size = await File(file.path!).length();
+      final files = await chonAnhBangChung(
+        daChon: _anh.map((a) => a.path!),
+        chonMot: widget.chonAnh,
+        chonNhieu: widget.chonNhieuAnh,
+      );
       if (!mounted) return;
-      if (size <= 0 || size > 5 * 1024 * 1024) {
-        throw StateError('Mỗi ảnh tối đa 5 MB.');
-      }
-      if (_anh.any((x) => x.path == file.path)) {
-        throw StateError('Ảnh này đã được chọn.');
-      }
-      setState(() => _anh.add(file));
+      setState(() => _anh.addAll(files));
     } catch (e) {
-      if (mounted) _baoLoi(e.toString().replaceFirst('Bad state: ', ''));
+      if (mounted) {
+        _baoLoi(
+          e is FormatException
+              ? e.message.toString()
+              : e.toString().replaceFirst('Bad state: ', ''),
+        );
+      }
     } finally {
       if (mounted) setState(() => _dangChon = false);
     }

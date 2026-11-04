@@ -1,0 +1,111 @@
+﻿@using PhotocopyShared.Dtos.DonHang
+@inject HttpClient Http
+<section class="@(HienTieuDe ? "the the-bang " : "")ht-ho-so" aria-label="Hồ sơ hoàn tiền do sản phẩm">
+    @if (HienTieuDe)
+    {
+    <div class="bang-tieu-de"><div><h2>Hoàn tiền do sản phẩm</h2><p class="bang-mo-ta">Xem bằng chứng, ra quyết định và đối soát khoản hoàn.</p></div><span class="bang-dem">@SoCho chờ xử lý</span></div>
+    }
+    <div class="ht-thanh-cong-cu">
+        <div class="ht-bo-loc" role="group" aria-label="Trạng thái yêu cầu hoàn tiền">
+            <button type="button" class="ht-loc @(_loc=="CHO_DUYET"?"chon":"")" aria-pressed="@(_loc=="CHO_DUYET")" @onclick='()=>Loc("CHO_DUYET")'>Chờ duyệt <b>@Dem("CHO_DUYET")</b></button>
+            <button type="button" class="ht-loc @(_loc=="CHAP_THUAN"?"chon":"")" aria-pressed="@(_loc=="CHAP_THUAN")" @onclick='()=>Loc("CHAP_THUAN")'>Chờ chuyển hoàn <b>@Dem("CHAP_THUAN")</b></button>
+            <button type="button" class="ht-loc @(_loc=="LICH_SU"?"chon":"")" aria-pressed="@(_loc=="LICH_SU")" @onclick='()=>Loc("LICH_SU")'>Lịch sử <b>@Dem("LICH_SU")</b></button>
+        </div>
+        <label class="ht-tim"><span class="sr-only">Tìm hồ sơ hoàn tiền</span><input type="search" placeholder="Mã đơn, khách, chi nhánh…" @bind="_tim" @bind:event="oninput" @bind:after="()=>_trang=1" /></label>
+    </div>
+    @if (_loi!=null) { <div class="o-loi ht-loi" role="alert">@_loi <button type="button" class="nut-nho" @onclick="Tai">Thử lại</button></div> }
+    @if (_ds==null && _loi==null) { <TrangThaiTaiBang NoiDung="Đang tải hồ sơ hoàn tiền…" /> }
+    else if(_ds!=null && DaLoc().Count==0) { <div class="bang-trong">Không có hồ sơ phù hợp trong nhóm đang xem.</div> }
+    else if(_ds!=null) {
+        <div class="bang-cuon"><table class="bang ht-bang">
+            <thead><tr><th scope="col">Đơn / khách hàng</th><th scope="col">Chi nhánh</th><th scope="col">Ngày gửi</th><th scope="col">Số tiền yêu cầu</th><th scope="col">Trạng thái</th><th scope="col" class="cot-hanh-dong">Thao tác</th></tr></thead>
+            <tbody>@foreach(var h in DaLoc().Skip((Math.Min(_trang,TongTrang)-1)*8).Take(8)) {
+                <tr><td data-nhan="Đơn / khách hàng"><b class="mono">@($"DH{h.MaDonHang:D5}")</b><div>@h.TenKhachHang</div></td>
+                <td data-nhan="Chi nhánh">@h.TenChiNhanh</td><td data-nhan="Ngày gửi">@h.GuiLuc.ToOffset(TimeSpan.FromHours(7)).ToString("dd/MM/yyyy")<div class="nv-phu">@h.GuiLuc.ToOffset(TimeSpan.FromHours(7)).ToString("HH:mm")</div></td>
+                <td data-nhan="Số tiền yêu cầu"><b class="mono">@Tien(h.SoTien)</b></td><td data-nhan="Trạng thái"><span class="ht-trang-thai @Mau(h.TrangThai)">@Nhan(h.TrangThai)</span></td>
+                <td data-nhan="Thao tác" class="cot-hanh-dong"><button type="button" class="nut-nho" @onclick="()=>Mo(h)">Xem hồ sơ</button></td></tr>
+            }</tbody>
+        </table></div>
+        <div class="ht-phan-trang"><span>@DaLoc().Count hồ sơ · Trang @Math.Min(_trang,TongTrang)/@TongTrang</span><div><button class="nut-nho" disabled="@(_trang<=1)" @onclick="()=>_trang--">Trước</button><button class="nut-nho" disabled="@(_trang>=TongTrang)" @onclick="()=>_trang++">Sau</button></div></div>
+    }
+</section>
+<HopThoaiQuanTri Mo="@(_chon!=null)" TieuDe="Xem xét yêu cầu hoàn tiền" MoTa="Đối chiếu hồ sơ trước khi ra quyết định" Loi="@_loi" DangLuu="@_gui" Dong="Dong" Rong="true">
+    <NoiDung>@if(_chon is {} h) {
+        <div class="ht-tom-tat"><div><span class="ht-trang-thai @Mau(h.TrangThai)">@Nhan(h.TrangThai)</span><h3>@($"DH{h.MaDonHang:D5}") · @h.TenKhachHang</h3><p>@h.TenChiNhanh · @h.GuiLuc.ToOffset(TimeSpan.FromHours(7)).ToString("HH:mm dd/MM/yyyy")</p></div><div class="ht-so-tien"><span>Yêu cầu hoàn toàn bộ</span><strong>@Tien(h.SoTien)</strong></div></div>
+        <div class="ht-luoi-ho-so">
+            <section class="ht-khoi"><h3>1. Nội dung &amp; bằng chứng</h3><p class="ht-mo-ta">@h.MoTa</p><div class="ht-anh-nho">@foreach(var a in h.Anh) { <button type="button" class="nut-phu" @onclick="()=>XemAnh(h.MaDonHang,a.MaAnh)">@((MarkupString)Svg.TaiLieu(16)) Xem ảnh @(h.Anh.IndexOf(a)+1)</button> }</div>
+                @if(_anh!=null) { <figure class="ht-xem-anh"><img src="@_anh" alt="Bằng chứng sản phẩm do khách gửi" /><figcaption>Ảnh bằng chứng · Đối chiếu với mô tả của khách</figcaption></figure> }
+            </section>
+            <section class="ht-khoi"><h3>2. Tài khoản nhận hoàn</h3><dl class="ht-ngan-hang"><dt>Ngân hàng</dt><dd>@h.NganHang</dd><dt>Số tài khoản</dt><dd class="mono">@h.SoTaiKhoan</dd><dt>Chủ tài khoản</dt><dd>@h.ChuTaiKhoan</dd></dl><p class="ht-chu-y">Kiểm tra đủ tên người nhận, số tài khoản và ngân hàng trước khi chuyển.</p></section>
+        </div>
+        @if(h.LichSu.Count>0) { <section class="ht-khoi ht-lich-su"><h3>Lịch sử xử lý</h3><ol>@foreach(var d in h.LichSu) { <li><div><b>@Nhan(d.TrangThai)</b><time>@d.Luc.ToOffset(TimeSpan.FromHours(7)).ToString("HH:mm dd/MM/yyyy")</time></div><p>@d.LyDo</p>@if(d.MaChuyenKhoan!=null){<p>Mã đối chiếu: <b class="mono">@d.MaChuyenKhoan</b></p>}@if(d.BienLai!=null){<AnhBienLaiHoanTien MaDonHang="h.MaDonHang" BienLai="d.BienLai" />}</li> }</ol></section> }
+        @if(h.TrangThai is "CHO_DUYET" or "CHAP_THUAN") {
+            <section class="ht-khoi ht-quyet-dinh"><h3>3. @(h.TrangThai=="CHO_DUYET"?"Quyết định của CEO":"Đối soát chuyển tiền")</h3><label class="nhan" for="ht-ly-do">Lý do quyết định / ghi chú đối soát <span aria-hidden="true">*</span></label><textarea id="ht-ly-do" class="ca-o-loc" maxlength="500" @bind="_lyDo" rows="3" placeholder="Nêu rõ kết quả đối chiếu và lý do quyết định (trên 10 ký tự)"></textarea>
+                @if(h.TrangThai=="CHAP_THUAN") { <label class="nhan" for="ht-ma-chuyen">Mã đối chiếu chuyển khoản thực tế <span aria-hidden="true">*</span></label><input id="ht-ma-chuyen" class="ca-o-loc" maxlength="100" @bind="_maChuyen" placeholder="Mã giao dịch trên biên lai ngân hàng" /><ChonBienLaiHoanTien @key="h.MaDonHang" @ref="_bienLai" DangGui="_gui" ThayDoi="()=>_loi=null" /><p class="ht-chu-y">Chỉ xác nhận sau khi đã chuyển đủ tiền. Hệ thống ghi nhận kết quả, không tự chuyển tiền.</p> }
+                else { <p class="ht-chu-y">Chấp thuận sẽ đưa hồ sơ sang chờ chuyển tiền; chưa đánh dấu đã hoàn.</p> }
+            </section>
+        }
+    }</NoiDung>
+    <Chan><button type="button" class="nut-phu" disabled="@_gui" @onclick="Dong">Đóng</button>
+        @if(_chon?.TrangThai=="CHO_DUYET") { <button type="button" class="nut-phu nguy-hiem" disabled="@_gui" @onclick='()=>Gui("TU_CHOI")'>Từ chối</button><button type="button" class="nut-chinh" disabled="@_gui" @onclick='()=>Gui("CHAP_THUAN")'>Chấp thuận hoàn toàn bộ</button> }
+        else if(_chon?.TrangThai=="CHAP_THUAN") { <button type="button" class="nut-chinh" disabled="@_gui" @onclick='()=>Gui("DA_HOAN_TIEN")'>Xác nhận đã chuyển hoàn</button> }
+    </Chan>
+</HopThoaiQuanTri>
+<XacNhanThaoTac @ref="_xacNhan" />
+@code {
+    [Parameter] public int? MaDonCanMo { get; set; }
+    private int? _maDaMo;
+    protected override void OnParametersSet()=>MoTheoLienKet();
+    private void MoTheoLienKet() { if(MaDonCanMo==null)_maDaMo=null; if(MaDonCanMo!=_maDaMo && MaDonCanMo is int id && _ds?.FirstOrDefault(x=>x.MaDonHang==id) is {} h) { _maDaMo=id;Mo(h); } }
+    [Parameter] public bool HienTieuDe { get; set; } = true;
+    [Parameter] public EventCallback<int> SoChoThayDoi { get; set; }
+    private List<HoSoKhieuNaiDto> _ds;
+    private HoSoKhieuNaiDto _chon;
+    private string _loi, _anh, _lyDo = "", _maChuyen = "";
+    private bool _gui;
+    private string _loc="CHO_DUYET", _tim="";
+    private int _trang=1;
+    private int Dem(string loc)=>_ds?.Count(x=>loc=="LICH_SU"?x.TrangThai is "TU_CHOI" or "DA_HOAN_TIEN":x.TrangThai==loc)??0;
+    private List<HoSoKhieuNaiDto> DaLoc()=> (_ds??new()).Where(x=>(_loc=="LICH_SU"?x.TrangThai is "TU_CHOI" or "DA_HOAN_TIEN":x.TrangThai==_loc)
+        &&($"DH{x.MaDonHang:D5} {x.TenKhachHang} {x.TenChiNhanh}".Contains(_tim.Trim(),StringComparison.CurrentCultureIgnoreCase))).ToList();
+    private int TongTrang=>Math.Max(1,(DaLoc().Count+7)/8);
+    private void Loc(string loc) { _loc=loc;_trang=1; }
+    private static string Tien(decimal n)=>n.ToString("#,##0",new System.Globalization.NumberFormatInfo{NumberGroupSeparator=".",NumberDecimalSeparator=","})+"₫";
+    private static string Mau(string s)=>s switch {"CHO_DUYET"=>"cho","CHAP_THUAN"=>"chap-thuan","TU_CHOI"=>"tu-choi",_=>"hoan-tat"};
+    private XacNhanThaoTac _xacNhan;
+    private ChonBienLaiHoanTien _bienLai;
+    private int SoCho => _ds?.Count(x=>x.TrangThai is "CHO_DUYET" or "CHAP_THUAN") ?? 0;
+    protected override async Task OnInitializedAsync() => await Tai();
+    public async Task Tai()
+    {
+        try { _loi=null; _ds = await Http.GetFromJsonAsync<List<HoSoKhieuNaiDto>>("api/don-hang/khieu-nai-hoan-tien"); if(_chon!=null && !_gui && _ds?.FirstOrDefault(x=>x.MaDonHang==_chon.MaDonHang) is {} moi && moi.TrangThai!=_chon.TrangThai) { _chon=moi;_lyDo=_maChuyen=""; }
+            MoTheoLienKet();await SoChoThayDoi.InvokeAsync(SoCho); }
+        catch { _loi = "Không tải được hồ sơ hoàn tiền. Hãy làm mới để thử lại."; }
+    }
+    private void Mo(HoSoKhieuNaiDto h) { _chon=h; _anh=null; _loi=null; _lyDo=""; _maChuyen=""; }
+    private void Dong() { if(!_gui) _chon=null; }
+    private static string Nhan(string s) => s switch { "CHO_DUYET"=>"Chờ CEO xét duyệt", "CHAP_THUAN"=>"Chấp thuận · Chờ chuyển tiền", "TU_CHOI"=>"Đã từ chối", "DA_HOAN_TIEN"=>"Đã chuyển hoàn", _=>s };
+    private async Task Gui(string s)
+    {
+        if (_gui || _lyDo.Trim().Length<11) { _loi="Nhập lý do trên 10 ký tự."; return; }
+        if(s=="DA_HOAN_TIEN" && string.IsNullOrWhiteSpace(_maChuyen)) { _loi="Nhập mã đối chiếu chuyển tiền."; return; }
+        if(s=="DA_HOAN_TIEN" && _bienLai?.DaChon!=true) { _loi="Chọn ảnh biên lai chuyển khoản trước khi xác nhận."; return; }
+        if(!await _xacNhan.HoiAsync($"{Nhan(s)} cho DH{_chon.MaDonHang:D5}, số tiền {Tien(_chon.SoTien)}?", "Xác nhận quyết định", "Xác nhận", s=="TU_CHOI")) return;
+        _gui=true; _loi=null;
+        try {
+            using var r=await Http.PostAsJsonAsync($"api/don-hang/{_chon.MaDonHang}/khieu-nai-hoan-tien/quyet-dinh", new QuyetDinhHoanTienRequest { TrangThai=s,LyDo=_lyDo.Trim(),MaChuyenKhoan=_maChuyen.Trim(),MaBienLai=s=="DA_HOAN_TIEN"?await _bienLai.TaiLen(_chon.MaDonHang):null });
+            if(!r.IsSuccessStatusCode) { var e=await r.Content.ReadFromJsonAsync<KetQuaDto>(); _loi=e?.Message??"Không lưu được quyết định."; return; }
+            _chon=null;_loc=s=="CHAP_THUAN"?"CHAP_THUAN":"LICH_SU";_trang=1;await Tai();
+        } catch (InvalidOperationException ex) { _loi=ex.Message; }
+        catch { _loi="Chưa xác định kết quả. Làm mới hồ sơ trước khi thử lại."; }
+        finally { _gui=false; }
+    }
+    private async Task XemAnh(int id,string ma)
+    {
+        try { using var r=await Http.GetAsync($"api/don-hang/{id}/khieu-nai-hoan-tien/anh/{ma}"); r.EnsureSuccessStatusCode();
+            var mime=r.Content.Headers.ContentType?.MediaType; var data=await r.Content.ReadAsByteArrayAsync();
+            if(mime is not("image/jpeg" or "image/png") || data.Length>5*1024*1024)throw new InvalidDataException();
+            _anh=$"data:{mime};base64,{Convert.ToBase64String(data)}";
+        } catch { _loi="Không tải được ảnh bằng chứng."; }
+    }
+}

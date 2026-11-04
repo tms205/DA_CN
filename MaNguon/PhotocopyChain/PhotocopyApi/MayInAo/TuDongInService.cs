@@ -45,7 +45,7 @@ public sealed class TuDongInService
         await using var giaoDich = (SqlTransaction)await conn.BeginTransactionAsync();
         DonCanXepIn don = await conn.QueryFirstOrDefaultAsync<DonCanXepIn>(
             @"SELECT dh.MaDonHang, dh.MaChiNhanh, dh.MaKhachHang, dh.MaMayIn,
-                     dh.TrangThai, tt.PhuongThuc, tt.TrangThai AS TrangThaiThanhToan
+                     dh.KenhDatDon, dh.TrangThai, tt.PhuongThuc, tt.TrangThai AS TrangThaiThanhToan
               FROM DonHang dh WITH (UPDLOCK, HOLDLOCK)
               JOIN ThanhToan tt ON tt.MaDonHang = dh.MaDonHang
               WHERE dh.MaDonHang = @MaDonHang",
@@ -62,6 +62,9 @@ public sealed class TuDongInService
             return new KetQuaXepIn(true, "Đơn đã được đưa vào quy trình in.");
         if (don.TrangThai is not ("CHO_XAC_NHAN" or "DA_XAC_NHAN"))
             return new KetQuaXepIn(false, "Đơn không còn ở bước chờ in.");
+
+        if (don.KenhDatDon == "APP")
+            return new KetQuaXepIn(false, "Đơn app chờ 2 phút sau thanh toán, sau đó nhân viên tiếp nhận và chọn máy in thủ công.");
 
         bool vuaXacNhan = don.TrangThai == "CHO_XAC_NHAN";
         if (vuaXacNhan)
@@ -202,6 +205,7 @@ public sealed class TuDongInService
 
     private sealed class DonCanXepIn
     {
+        public string KenhDatDon { get; set; } = "LEGACY";
         public int MaDonHang { get; set; }
         public int MaChiNhanh { get; set; }
         public int MaKhachHang { get; set; }

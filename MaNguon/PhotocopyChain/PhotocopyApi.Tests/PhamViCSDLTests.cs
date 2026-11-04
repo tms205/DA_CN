@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Dapper;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -94,7 +94,7 @@ public class PhamViCSDLTests
         using var cache = new MemoryCache(new MemoryCacheOptions());
         var controller = new DonHangController(CauHinh(), cache, null);
         CEOChonChiNhanh(controller, 2);
-        Assert.Equal(403, Assert.IsType<ObjectResult>(await controller.HoanTien(6)).StatusCode);
+        Assert.Equal(403, Assert.IsType<ObjectResult>(await controller.HoanTien(6, new XacNhanHoanTienRequest { LyDo="Đã kiểm tra chuyển khoản",MaChuyenKhoan="TEST-ONLY",MaBienLai=Guid.NewGuid().ToString("N") })).StatusCode);
     }
 
     [KiemThuCSDL]

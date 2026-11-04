@@ -1,4 +1,5 @@
-﻿namespace PhotocopyApi.DuLieu;
+using PhotocopyShared.Dtos.DonHang;
+namespace PhotocopyApi.DuLieu;
 
 // Chỉ tập trung các câu SELECT dài để Controller dễ đọc:
 // Controller giữ luồng HTTP + quyền + nghiệp vụ, file này giữ chi tiết lấy dữ liệu.
@@ -49,6 +50,11 @@ internal static class TruyVanSql
 
         public const string ChiTiet = @"
             SELECT dh.MaDonHang, dh.MaMayIn,
+                   dh.KenhDatDon,
+                   CASE WHEN dh.KenhDatDon='APP' AND tt.TrangThai='DA_THANH_TOAN' AND dh.TrangThai='CHO_XAC_NHAN'
+                     AND tt.NgayThanhToan IS NOT NULL AND GETDATE()<DATEADD(SECOND,120,tt.NgayThanhToan)
+                     THEN DATEDIFF_BIG(MILLISECOND,GETDATE(),DATEADD(SECOND,120,tt.NgayThanhToan))/1000.0 ELSE 0 END AS GiayChoTiepNhan,
+                   " + ChinhSachDonApp.SqlChoHuy + @" AS ChoHuyKhach,
                    'DH' + RIGHT('00000' + CAST(dh.MaDonHang AS VARCHAR(10)), 5) AS MaDonHangHienThi,
                    dh.MaDonHangGoc,
                    CASE WHEN dh.MaDonHangGoc IS NULL THEN NULL
@@ -106,6 +112,11 @@ internal static class TruyVanSql
 
         public const string HangDoi = @"
             SELECT dh.MaDonHang, dh.MaMayIn,
+                   dh.KenhDatDon,
+                   CASE WHEN dh.KenhDatDon='APP' AND tt.TrangThai='DA_THANH_TOAN' AND dh.TrangThai='CHO_XAC_NHAN'
+                     AND tt.NgayThanhToan IS NOT NULL AND GETDATE()<DATEADD(SECOND,120,tt.NgayThanhToan)
+                     THEN DATEDIFF_BIG(MILLISECOND,GETDATE(),DATEADD(SECOND,120,tt.NgayThanhToan))/1000.0 ELSE 0 END AS GiayChoTiepNhan,
+                   " + ChinhSachDonApp.SqlChoHuy + @" AS ChoHuyKhach,
                    'DH' + RIGHT('00000' + CAST(dh.MaDonHang AS VARCHAR(10)), 5) AS MaDonHangHienThi,
                    dh.MaDonHangGoc,
                    CASE WHEN dh.MaDonHangGoc IS NULL THEN NULL
@@ -314,8 +325,9 @@ internal static class TruyVanSql
               -- STAFF bị khóa ở tầng dữ liệu: chỉ đọc đơn do chính mình tiếp nhận.
               AND (@MaNhanVien IS NULL OR dh.MaNhanVien = @MaNhanVien)
               AND tt.TrangThai = 'DA_THANH_TOAN'
-              AND tt.NgayThanhToan >= @TuNgay
-              AND tt.NgayThanhToan < DATEADD(DAY, 1, @DenNgay)
+              AND (CASE WHEN CAST(COALESCE(ca.GioMoCa,tt.NgayThanhToan) AS TIME)>='21:30'
+                   THEN DATEADD(DAY,1,CAST(COALESCE(ca.GioMoCa,tt.NgayThanhToan) AS DATE))
+                   ELSE CAST(COALESCE(ca.GioMoCa,tt.NgayThanhToan) AS DATE) END) BETWEEN @TuNgay AND @DenNgay
             ORDER BY tt.NgayThanhToan DESC, tt.MaThanhToan DESC";
     }
 

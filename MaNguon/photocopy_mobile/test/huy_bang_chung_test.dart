@@ -10,45 +10,72 @@ import 'package:photocopy_mobile/theme.dart';
 
 void main() {
   setUp(() => AppTheme.dungGoogleFonts = false);
-  testWidgets('Thiếu ảnh không gửi hủy; màn nhỏ không tràn', (t) async {
-    t.view.physicalSize = const Size(320, 800);
+  testWidgets('Hủy đơn chưa tiếp nhận không có ô ảnh và không gọi upload', (
+    t,
+  ) async {
+    t.view.physicalSize = const Size(320, 760);
     t.view.devicePixelRatio = 1;
     addTearDown(t.view.resetPhysicalSize);
     addTearDown(t.view.resetDevicePixelRatio);
-    int called = 0;
-    await t.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: NutHuyDon(
-            maDonHang: 15,
-            daHuy: () async {
-              called++;
-            },
+    int cancelled = 0, uploads = 0;
+    await http.runWithClient(
+      () async {
+        await t.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: NutHuyDon(
+                maDonHang: 15,
+                daHuy: () async {
+                  cancelled++;
+                },
+                guiAnh: (_, _) async {
+                  uploads++;
+                  return KetQuaApi();
+                },
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+        await t.tap(find.text('Hủy đơn'));
+        await t.pumpAndSettle();
+        expect(find.textContaining('Bằng chứng yêu cầu'), findsNothing);
+        await t.tap(find.text('Xác nhận hủy'));
+        await t.pumpAndSettle();
+        expect(cancelled, 1);
+        expect(uploads, 0);
+        expect(t.takeException(), isNull);
+        await t.pumpWidget(const SizedBox());
+      },
+      () => MockClient((req) async {
+        expect(req.url.path, '/api/don-hang/15/huy');
+        expect(jsonDecode(req.body).containsKey('maBangChung'), false);
+        return http.Response(
+          jsonEncode({'message': 'Đã hủy đơn.'}),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
     );
-    await t.tap(find.text('Hủy đơn'));
-    await t.pumpAndSettle();
-    await t.tap(find.text('Xác nhận hủy'));
-    await t.pumpAndSettle();
-    expect(find.text('Vui lòng chọn ảnh bằng chứng hủy đơn.'), findsOneWidget);
-    expect(called, 0);
-    expect(t.takeException(), isNull);
-    await t.pumpWidget(const SizedBox());
   });
-  testWidgets('Tải ảnh lỗi thì giữ bản nhập, không gọi hủy', (t) async {
+  testWidgets('Khiếu nại lỗi ảnh giữ bản nhập và không gửi yêu cầu hoàn', (
+    t,
+  ) async {
     int calls = 0;
     await t.pumpWidget(
       MaterialApp(
         home: Scaffold(
           body: NutHuyDon(
             maDonHang: 15,
+            daThanhToan: true,
+            khieuNaiSanPham: true,
             daHuy: () async {
               calls++;
             },
             thongTinHoanTien: {
-              'lyDo': 'Khách yêu cầu hủy',
+              'lyDo': 'Sản phẩm có nhiều trang bị nhòe cần kiểm tra',
+              'nganHang': 'Ngân hàng thử',
+              'soTaiKhoan': '123456',
+              'chuTaiKhoan': 'Khách thử',
               'anhBangChung': [
                 {'path': '/fixture.png', 'name': 'proof.png'},
               ],
@@ -58,19 +85,15 @@ void main() {
         ),
       ),
     );
-    await t.tap(find.text('Hủy đơn'));
+    await t.tap(find.text('Yêu cầu hoàn tiền do sản phẩm'));
     await t.pumpAndSettle();
-    await t.tap(find.text('Xác nhận hủy'));
+    await t.tap(find.text('Gửi CEO xem xét'));
     await t.pumpAndSettle();
     expect(calls, 0);
     expect(find.text('Chưa lưu được ảnh.'), findsOneWidget);
-    await t.tap(find.text('Hủy đơn'));
+    await t.tap(find.text('Yêu cầu hoàn tiền do sản phẩm'));
     await t.pumpAndSettle();
     expect(find.text('proof.png'), findsOneWidget);
-    expect(
-      t.widget<TextFormField>(find.byType(TextFormField)).controller!.text,
-      'Khách yêu cầu hủy',
-    );
     await t.pumpWidget(const SizedBox());
   });
   test('Transport gửi ảnh đúng đơn và đọc mã bằng chứng từ backend', () async {

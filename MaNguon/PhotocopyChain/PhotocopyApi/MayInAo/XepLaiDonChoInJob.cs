@@ -37,7 +37,7 @@ public sealed class XepLaiDonChoInJob : BackgroundService
                         @"SELECT dh.MaDonHang FROM DonHang dh
                           JOIN ThanhToan tt ON tt.MaDonHang=dh.MaDonHang
                           WHERE dh.TrangThai IN ('CHO_XAC_NHAN', 'DA_XAC_NHAN')
-                            AND tt.PhuongThuc='VIETQR' AND tt.TrangThai='DA_THANH_TOAN'
+                            AND dh.KenhDatDon<>'APP' AND tt.PhuongThuc='VIETQR' AND tt.TrangThai='DA_THANH_TOAN'
                           ORDER BY dh.InGap DESC, dh.NgayDat, dh.MaDonHang");
                     var xepIn = scope.ServiceProvider.GetRequiredService<TuDongInService>();
                     foreach (int maDon in ds)

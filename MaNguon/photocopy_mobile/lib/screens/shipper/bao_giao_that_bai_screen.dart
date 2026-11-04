@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../../widgets/chon_anh_bang_chung.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../../api.dart';
@@ -12,12 +13,14 @@ class BaoGiaoThatBaiScreen extends StatefulWidget {
     required this.don,
     this.layGps,
     this.chonAnh,
+    this.chonNhieuAnh,
     this.traDiaChi,
     this.guiBaoCao,
   });
   final DonGiao don;
   final Future<DiemGps> Function()? layGps;
   final Future<PlatformFile?> Function()? chonAnh;
+  final Future<List<PlatformFile>> Function()? chonNhieuAnh;
   final Future<KetQuaApi> Function(Map<String, dynamic>)? traDiaChi;
   final Future<KetQuaApi> Function(
     Map<String, String>,
@@ -127,7 +130,9 @@ class _BaoGiaoThatBaiScreenState extends State<BaoGiaoThatBaiScreen> {
       if (mounted) {
         setState(() {
           _gps = null;
-          _loiGps = e.toString().replaceFirst('Bad state: ', '');
+          _loiGps = e is FormatException
+              ? e.message.toString()
+              : e.toString().replaceFirst('Bad state: ', '');
         });
       }
     } finally {
@@ -142,32 +147,20 @@ class _BaoGiaoThatBaiScreenState extends State<BaoGiaoThatBaiScreen> {
       _loi = null;
     });
     try {
-      final file =
-          await (widget.chonAnh?.call() ??
-              FilePicker.pickFile(
-                type: FileType.custom,
-                allowedExtensions: ['jpg', 'jpeg', 'png'],
-              ));
-      if (!mounted || file == null) return;
-      if (file.path == null ||
-          !RegExp(
-            r'\.(jpe?g|png)$',
-            caseSensitive: false,
-          ).hasMatch(file.name)) {
-        throw StateError('Chọn ảnh JPG/PNG từ điện thoại.');
-      }
-      final size = await File(file.path!).length();
-      if (size <= 0 || size > 5 * 1024 * 1024) {
-        throw StateError('Mỗi ảnh tối đa 5 MB.');
-      }
+      final files = await chonAnhBangChung(
+        daChon: _anh.map((a) => a.path!),
+        chonMot: widget.chonAnh,
+        chonNhieu: widget.chonNhieuAnh,
+      );
       if (!mounted) return;
-      if (_anh.any((a) => a.path == file.path)) {
-        throw StateError('Ảnh này đã được chọn.');
-      }
-      setState(() => _anh.add(file));
+      setState(() => _anh.addAll(files));
     } catch (e) {
       if (mounted) {
-        setState(() => _loi = e.toString().replaceFirst('Bad state: ', ''));
+        setState(
+          () => _loi = e is FormatException
+              ? e.message.toString()
+              : e.toString().replaceFirst('Bad state: ', ''),
+        );
       }
     } finally {
       if (mounted) setState(() => _dangChon = false);

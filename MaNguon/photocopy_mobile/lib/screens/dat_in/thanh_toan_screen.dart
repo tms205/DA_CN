@@ -277,8 +277,7 @@ class _ThanhToanScreenState extends State<ThanhToanScreen>
           ],
         ),
       );
-    } else if (_tt!.trangThaiDonHang == 'DA_HUY' &&
-        (_tt!.daTra || _tt!.trangThai == 'DA_HOAN_TIEN')) {
+    } else if (_tt!.trangThaiDonHang == 'DA_HUY') {
       final daHoan = _tt!.trangThai == 'DA_HOAN_TIEN';
       noiDung = SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -287,11 +286,19 @@ class _ThanhToanScreenState extends State<ThanhToanScreen>
           children: [
             _theMaDon(),
             const SizedBox(height: 16),
-            HopThongBao(daHoan ? 'Đã hoàn tiền' : 'Đơn đã hủy · Chờ hoàn tiền'),
+            HopThongBao(
+              daHoan
+                  ? 'Đã hoàn tiền'
+                  : _tt!.daTra
+                  ? 'Đơn đã hủy · Chờ hoàn tiền'
+                  : 'Đơn đã hủy',
+            ),
             const SizedBox(height: 12),
             Text(
               daHoan
                   ? 'Cửa hàng đã xác nhận chuyển hoàn tiền. Đơn hàng vẫn được giữ ở trạng thái đã hủy.'
+                  : !_tt!.daTra
+                  ? 'Đơn đã hủy và chưa ghi nhận thanh toán. Không chuyển tiền cho đơn này.'
                   : 'Cửa hàng đã ghi nhận tiền cho đơn đã hủy và sẽ xử lý hoàn đủ tiền. Đơn không được đưa trở lại in.',
             ),
             const SizedBox(height: 16),
@@ -623,7 +630,7 @@ class _ThanhToanScreenState extends State<ThanhToanScreen>
           Text(
             laTienMat
                 ? 'Đơn đã vào hàng đợi in của chi nhánh. Bạn trả ${tien(tt.soTien)} khi nhận tài liệu.'
-                : 'Chi nhánh đã nhận được ${tien(tt.soTien)} và bắt đầu xử lý đơn của bạn.',
+                : 'Chi nhánh đã nhận được ${tien(tt.soTien)}. Bạn có 2 phút từ lúc ghi nhận thanh toán để hủy/hoàn khi chưa tiếp nhận. Xem thời gian còn lại tại chi tiết đơn; sau đó nhân viên tiếp nhận thủ công.',
             textAlign: TextAlign.center,
             style: AppTheme.font(
               size: 12.5,

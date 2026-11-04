@@ -215,6 +215,25 @@ void main() {
     });
   });
 
+  testWidgets('Đơn hủy chưa trả tiền không còn nút kiểm tra hoặc vùng QR', (
+    tester,
+  ) async {
+    final api = MayChuThanhToan()..daHuy = true;
+    await thu(tester, api, () async {
+      expect(find.text('Đơn đã hủy'), findsOneWidget);
+      expect(find.text('Kiểm tra thanh toán'), findsNothing);
+      expect(find.byKey(const ValueKey('payos-qr')), findsNothing);
+      expect(find.text('Xem chi tiết đơn'), findsOneWidget);
+      expect(api.soLanTaoLink, 0);
+      // Tiền đến muộn vẫn được đối soát, không làm sống lại đơn đã hủy.
+      api.daTra = true;
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pump();
+      expect(find.text('Đơn đã hủy · Chờ hoàn tiền'), findsOneWidget);
+      expect(find.text('Thanh toán thành công'), findsNothing);
+    });
+  });
+
   for (final refunded in [false, true]) {
     testWidgets(
       'QR đơn đã hủy có tiền không báo đặt đơn thành công: $refunded',

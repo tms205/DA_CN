@@ -1,0 +1,61 @@
+﻿@inject HttpClient Http
+@inject IServiceProvider DichVu
+@implements IDisposable
+<TheoDoiHoanTien ThayDoi="TaiAsync" KetNoiDoi="ok=>_trucTiep=ok" />
+@if (_loi != null)
+{
+    <TrangThaiTaiDuLieu DangBaoTri="_baoTri" TieuDe="Yêu cầu hoàn tiền" NoiDung="@_loi" ThuLai="TaiAsync" />
+}
+else if (_ds is { Count: > 0 })
+{
+    <section class="ht-canh-bao" aria-label="Yêu cầu hoàn tiền cần xử lý" aria-live="polite">
+        <header><div><span class="ht-nhan">@((MarkupString)Svg.ChamThan()) CẦN XỬ LÝ HOÀN TIỀN</span><h2>@_ds.Count yêu cầu đang chờ · <span class="mono">@Tien(_ds.Sum(x=>x.SoTien))</span></h2>
+            <p>@(LaCeo ? "Đơn đã hủy chờ chuyển hoàn; yêu cầu do sản phẩm cần xem xét riêng." : "Yêu cầu của chi nhánh đang chờ CEO xử lý. Theo dõi kết quả tại từng đơn.")</p></div>
+            <button type="button" class="nut-phu" disabled="@_dangTai" @onclick="TaiAsync">Làm mới</button></header>
+        <div class="ht-tom-luoc"><span>Đơn đã hủy <b>@_ds.Count(x=>x.Loai=="HUY_DON")</b></span><span>Do sản phẩm <b>@_ds.Count(x=>x.Loai!="HUY_DON")</b></span><small>@(_trucTiep?"● Trực tiếp":"Tự cập nhật") · @_lucTai.ToString("HH:mm:ss")</small></div>
+        <ul>
+            @foreach (var d in _ds.OrderByDescending(x=>x.Loai=="HUY_DON").ThenByDescending(x=>x.GuiLuc).Take(5))
+            {
+                <li class="@(_moi.Contains(d.MaDonHang)?"ht-moi":"")"><div><b>@($"DH{d.MaDonHang:D5}") · @d.TenKhachHang @if(_moi.Contains(d.MaDonHang)){<em>Mới</em>}</b><span>@d.TenChiNhanh · @(d.Loai=="HUY_DON" ? "Hủy trước tiếp nhận" : "Khiếu nại sản phẩm")</span><span>Gửi lúc @d.GuiLuc.ToOffset(TimeSpan.FromHours(7)).ToString("HH:mm dd/MM/yyyy")</span></div>
+                    <div class="ht-so-tien"><b class="mono">@Tien(d.SoTien)</b><strong class="ht-trang-thai">@(d.Loai=="HUY_DON" || d.TrangThai=="CHAP_THUAN" ? "Chờ chuyển hoàn" : "Chờ CEO duyệt")</strong></div>
+                    <a class="nut-nho" href="@(LaCeo ? $"phe-duyet?hoan={(d.Loai=="HUY_DON"?"don-huy":"san-pham")}&don={d.MaDonHang}#hoan-tien" : $"/?xemDon={d.MaDonHang}")">@(LaCeo ? "Xử lý hoàn tiền" : "Xem đơn") →</a></li>
+            }
+        </ul>
+        @if (_ds.Count>5) { <p class="ht-them">Hiển thị 5 yêu cầu, ưu tiên đơn đã hủy. Tổng cộng @_ds.Count yêu cầu đang chờ.</p> }
+    </section>
+}
+@code {
+    private List<CanhBaoHoanTienDto> _ds;
+    private HashSet<int> _moi=new();
+    private string _loi;
+    private bool _baoTri, _dangTai, _canTaiLai, _trucTiep;
+    private DateTime _lucTai;
+    private readonly CancellationTokenSource _dung=new();
+    private PhienDangNhap Phien => DichVu.GetService(typeof(PhienDangNhap)) as PhienDangNhap;
+    private bool LaCeo => Phien?.NguoiDung?.TenVaiTro=="SUPER_ADMIN";
+    private static string Tien(decimal n)=>n.ToString("#,##0",new System.Globalization.NumberFormatInfo {NumberGroupSeparator=".",NumberDecimalSeparator=","})+"₫";
+    protected override async Task OnInitializedAsync()=>await TaiAsync();
+    private async Task TaiAsync()
+    {
+        if(_dung.IsCancellationRequested)return;
+        if(_dangTai) { _canTaiLai=true;return; }
+        _dangTai=true;
+        try {
+            do {
+                _canTaiLai=false;
+                try {
+                    var ds=await Http.DocJsonAsync<List<CanhBaoHoanTienDto>>("api/quan-tri/bao-cao/yeu-cau-hoan-tien",_dung.Token)??new();
+                    _moi=_ds==null?new():ds.Select(x=>x.MaDonHang).Except(_ds.Select(x=>x.MaDonHang)).ToHashSet();
+                    var soCu=_ds?.Count;
+                    _ds=ds;_loi=null;_baoTri=false;_lucTai=DateTime.Now;
+                    if(LaCeo && soCu.HasValue && soCu!=ds.Count && DichVu.GetService(typeof(ThongBaoPheDuyet)) is ThongBaoPheDuyet badge)await badge.TaiAsync();
+                }
+                catch(NgoaiLeBaoTri ex) { _loi=ex.Message;_baoTri=true; }
+                catch(OperationCanceledException) when(_dung.IsCancellationRequested) { return; }
+                catch { _loi="Chưa tải được yêu cầu hoàn tiền. Bấm thử lại để kiểm tra.";_baoTri=false; }
+            } while(_canTaiLai&&!_dung.IsCancellationRequested);
+        } finally { _dangTai=false; }
+        if(!_dung.IsCancellationRequested)StateHasChanged();
+    }
+    public void Dispose() { _dung.Cancel();_dung.Dispose(); }
+}

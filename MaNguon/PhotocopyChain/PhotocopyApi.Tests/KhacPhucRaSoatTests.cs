@@ -120,10 +120,10 @@ public class KhacPhucRaSoatTests
     [InlineData(7,29)]
     [InlineData(21,30)]
     [InlineData(23,59)]
-    public void NgoaiGioKhongMoCaMoi_CaCuNgoaiGioDungNgay(int hour,int minute)
+    public void NgoaiGioThuocCaSangSapToi_KetThuc1230(int hour,int minute)
     {
         var open = new DateTime(2026,10,29,hour,minute,0);
         Assert.False(LichCa.TrongGio(open));
-        Assert.Equal(open, LichCa.GioKetThuc(open));
+        Assert.Equal(open.Date.AddDays(hour>=21?1:0).AddMinutes(750), LichCa.GioKetThuc(open));
     }
 }

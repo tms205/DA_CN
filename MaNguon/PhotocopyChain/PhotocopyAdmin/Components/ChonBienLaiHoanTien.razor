@@ -1,0 +1,45 @@
+﻿@inject HttpClient Http
+<div class="bien-lai-chon">
+    <label class="nhan">Ảnh biên lai chuyển khoản <span aria-hidden="true">*</span></label>
+    <div class="bien-lai-o @(DangGui?"bien-lai-khoa":"")">
+        <InputFile id="@_id" class="sr-only" OnChange="Chon" accept=".jpg,.jpeg,.png" disabled="@DangGui" />
+        <label for="@_id"><span class="bien-lai-bieu-tuong">@((MarkupString)Svg.TaiLieu(24))</span><span><b>@(_bytes==null?"Chọn ảnh biên lai":"Đổi ảnh biên lai")</b><small>@(_ten??"Ảnh chụp giao dịch chuyển khoản thành công")</small></span></label>
+    </div>
+    <p class="chu-mo">Chọn 1 ảnh JPG/PNG, tối đa 5 MB. Kiểm tra người nhận và số tiền trên biên lai.</p>
+    @if (_loi != null) { <p class="o-loi" role="alert">@_loi</p> }
+    @if (_bytes != null) { <img src="@($"data:{_mime};base64,{Convert.ToBase64String(_bytes)}")" alt="Biên lai chuyển khoản đang chọn" style="display:block;max-width:100%;max-height:240px;object-fit:contain;margin:12px auto" /> }
+</div>
+@code {
+    [Parameter] public bool DangGui { get; set; }
+    [Parameter] public EventCallback ThayDoi { get; set; }
+    private readonly string _id="bien-lai-"+Guid.NewGuid().ToString("N");
+    private byte[] _bytes;
+    private string _ten, _mime, _loi, _ma;
+    public bool DaChon => _bytes != null;
+    private async Task Chon(InputFileChangeEventArgs e)
+    {
+        _bytes=null; _ten=null; _ma=null; _loi=null;
+        await ThayDoi.InvokeAsync();
+        var f=e.File;
+        var ext=Path.GetExtension(f.Name).ToLowerInvariant();
+        if (f.Size is <=0 or >5*1024*1024 || ext is not(".jpg" or ".jpeg" or ".png")) { _loi="Chọn ảnh JPG/PNG không quá 5 MB."; return; }
+        try {
+            await using var stream=f.OpenReadStream(5*1024*1024);
+            using var memory=new MemoryStream(); await stream.CopyToAsync(memory);
+            _bytes=memory.ToArray(); _ten=f.Name; _mime=ext==".png"?"image/png":"image/jpeg";
+        } catch { _loi="Không đọc được ảnh. Hãy chọn lại biên lai."; }
+    }
+    public async Task<string> TaiLen(int id)
+    {
+        if (!DaChon) throw new InvalidOperationException("Vui lòng chọn ảnh biên lai chuyển khoản.");
+        if (_ma != null) return _ma;
+        using var form=new MultipartFormDataContent();
+        var image=new ByteArrayContent(_bytes); image.Headers.ContentType=new(_mime);
+        form.Add(image,"Anh",_ten);
+        using var r=await Http.PostAsync($"api/don-hang/{id}/bien-lai-hoan-tien",form);
+        if (!r.IsSuccessStatusCode) throw new InvalidOperationException(await DocLoiApi.TuPhanHoiAsync(r,"Không tải được biên lai; chưa xác nhận hoàn tiền."));
+        var result=await r.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        _ma=result.GetProperty("maBangChung").GetString();
+        return _ma;
+    }
+}

@@ -117,7 +117,7 @@ public partial class AuthController : ControllerBase
         if (lichCa != null && QuyTacCaDangNhap.CanTuDongMoCa(laWeb, nd.VaiTro))
             await lichCa.ChotHetGioAsync(nd.MaNguoiDung, HttpContext.RequestAborted);
         bool choTongKet = lichCa != null && await lichCa.ConCaChuaTongKetAsync(nd.MaNguoiDung, HttpContext.RequestAborted);
-        if (QuyTacCaDangNhap.CanTuDongMoCa(laWeb, nd.VaiTro) && LichCa.TrongGio(LichCa.BayGio(TimeProvider.System)) && !choTongKet)
+        if (QuyTacCaDangNhap.CanTuDongMoCa(laWeb, nd.VaiTro) && !choTongKet)
         {
             var thamSo = new DynamicParameters();
             thamSo.Add("@MaNhanVien", nd.MaNguoiDung);

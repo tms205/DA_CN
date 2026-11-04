@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Components.Web;
@@ -28,12 +28,18 @@ public class ThongTinHoanTienWebTests
         await using var renderer = new HtmlRenderer(provider, provider.GetRequiredService<ILoggerFactory>());
         string raw = await renderer.Dispatcher.InvokeAsync(async () => (await renderer.RenderComponentAsync<PheDuyet>()).ToHtmlString());
         string html = WebUtility.HtmlDecode(raw);
-        var button = Regex.Match(html, @"<button[^>]*>Đã chuyển hoàn</button>");
+        Assert.Single(Regex.Matches(html, "<h2[^>]*>Hoàn tiền</h2>"));
+        Assert.DoesNotContain("Đơn hàng chờ xác nhận hoàn tiền", html);
+        Assert.Contains("Loại yêu cầu hoàn tiền", html);
+        Assert.Matches("Đơn đã hủy <span[^>]*>1</span>", html);
+        Assert.Matches("Sản phẩm <span[^>]*>0</span>", html);
+        Assert.Matches("id=\"phe-san-pham\"[^>]*hidden", html);
+        var button = Regex.Match(html, @"<button[^>]*>"+(coThongTin?"Xử lý hoàn tiền":"Xem hồ sơ")+"</button>");
         Assert.True(button.Success);
-        Assert.Equal(!coThongTin, button.Value.Contains("disabled"));
+        Assert.DoesNotContain("disabled", button.Value);
         if (coThongTin) {
-            Assert.Contains("Ngân hàng: Vietcombank\nSố tài khoản: 001234567890", html);
-            Assert.Contains("hoan-tien-ghi-chu", html);
+            Assert.Contains("Vietcombank", html);
+            Assert.Contains("Chờ chuyển hoàn", html);
         }
         else Assert.Contains("Chờ khách bổ sung", html);
         Assert.DoesNotContain("<script>", raw);

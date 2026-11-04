@@ -9,9 +9,7 @@ public static class LichCa
 {
     public static DateTime GioKetThuc(DateTime gioMo)
     {
-        TimeSpan t = gioMo.TimeOfDay;
-        return t < new TimeSpan(7,30,0) || t >= new TimeSpan(21,30,0) ? gioMo
-            : gioMo.Date.AddMinutes(t < new TimeSpan(12,30,0) ? 750 : t < new TimeSpan(17,30,0) ? 1050 : 1290);
+        return PhotocopyShared.CaLamViec.LichCaLamViec.GioKetThuc(gioMo);
     }
     public static bool TrongGio(DateTime ngay) => ngay.TimeOfDay >= new TimeSpan(7,30,0) && ngay.TimeOfDay < new TimeSpan(21,30,0);
     public static DateTime BayGio(TimeProvider clock) => TimeZoneInfo.ConvertTimeFromUtc(clock.GetUtcNow().UtcDateTime,
@@ -28,7 +26,8 @@ public sealed class LichCaService(IConfiguration config, TimeProvider clock)
             WHEN CAST(ca.GioMoCa AS TIME)>='07:30' AND CAST(ca.GioMoCa AS TIME)<'12:30' THEN DATEADD(MINUTE,750,CAST(CAST(ca.GioMoCa AS DATE) AS DATETIME))
             WHEN CAST(ca.GioMoCa AS TIME)>='12:30' AND CAST(ca.GioMoCa AS TIME)<'17:30' THEN DATEADD(MINUTE,1050,CAST(CAST(ca.GioMoCa AS DATE) AS DATETIME))
             WHEN CAST(ca.GioMoCa AS TIME)>='17:30' AND CAST(ca.GioMoCa AS TIME)<'21:30' THEN DATEADD(MINUTE,1290,CAST(CAST(ca.GioMoCa AS DATE) AS DATETIME))
-            ELSE ca.GioMoCa END AS KetThuc) kt
+            WHEN CAST(ca.GioMoCa AS TIME)>='21:30' THEN DATEADD(MINUTE,2190,CAST(CAST(ca.GioMoCa AS DATE) AS DATETIME))
+            ELSE DATEADD(MINUTE,750,CAST(CAST(ca.GioMoCa AS DATE) AS DATETIME)) END AS KetThuc) kt
         WHERE ca.TrangThai='DANG_MO' AND @BayGio>=kt.KetThuc
           AND (@MaNhanVien IS NULL OR ca.MaNhanVien=@MaNhanVien);";
 

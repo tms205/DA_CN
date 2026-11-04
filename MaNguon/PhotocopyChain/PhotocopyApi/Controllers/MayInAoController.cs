@@ -20,6 +20,26 @@ namespace PhotocopyApi.Controllers;
 [Route("api/may-in-ao")]
 public sealed partial class MayInAoController : ControllerBase
 {
+    // Cùng thứ tự với tạo in lại: khóa đơn gốc trước, rồi mới khóa đơn con.
+    public const string KhoaDonGocTruocHoanTatSql = @"
+        DECLARE @MaGoc INT;
+        SELECT @MaGoc=MaDonHangGoc FROM DonHang
+        WHERE MaDonHang=@MaDonHang AND LoaiPhatSinh='IN_LAI_LOI_QUAY';
+        IF @MaGoc IS NOT NULL
+            SELECT MaDonHang FROM DonHang WITH (UPDLOCK,HOLDLOCK) WHERE MaDonHang=@MaGoc;";
+
+    // In lại hoàn tất chỉ kết thúc việc in nội bộ; đơn gốc phải bàn giao riêng qua sp_GiaoTaiQuay.
+    public const string HoanTatInLaiSql = @"
+        UPDATE DonHang SET TrangThai='HOAN_THANH',NgayHoanThanh=GETDATE()
+        WHERE MaDonHang=@MaDonHang AND MaDonHangGoc=@MaDonHangGoc AND LoaiPhatSinh='IN_LAI_LOI_QUAY';
+        DELETE FROM ThongBao WHERE MaDonHang=@MaDonHang;
+        INSERT INTO ThongBao(MaNguoiDung,MaDonHang,TieuDe,NoiDung)
+        SELECT dh.MaKhachHang,dh.MaDonHang,N'Bản in lại đã sẵn sàng',
+            CASE WHEN tt.TrangThai='CHUA_THANH_TOAN'
+                THEN N'Bản in lại miễn phí đã xong. Đơn gốc vẫn chờ thu tiền và bàn giao.'
+                ELSE N'Bản in lại miễn phí đã xong. Đơn gốc vẫn chờ bàn giao, không thu lại khoản đã thanh toán.' END
+        FROM DonHang dh LEFT JOIN ThanhToan tt ON tt.MaDonHang=dh.MaDonHang
+        WHERE dh.MaDonHang=@MaDonHangGoc;";
     public const string DieuKienNhanLenhSql = @"((tt.PhuongThuc='VIETQR' AND tt.TrangThai='DA_THANH_TOAN')
         OR (tt.PhuongThuc='COD' AND dh.HinhThucNhan='TAI_QUAY'
             AND tt.TrangThai IN ('CHUA_THANH_TOAN','DA_THANH_TOAN')
@@ -246,6 +266,7 @@ public sealed partial class MayInAoController : ControllerBase
         using var conn = new SqlConnection(_chuoiKetNoi);
         await conn.OpenAsync();
         await using var giaoDich = await conn.BeginTransactionAsync();
+        await conn.ExecuteAsync(KhoaDonGocTruocHoanTatSql, new { MaDonHang = maDonHang }, giaoDich);
         DonDangIn don = await conn.QueryFirstOrDefaultAsync<DonDangIn>(
             @"SELECT MaDonHang, MaChiNhanh, MaKhachHang, MaMayIn, TrangThai, LoaiPhatSinh, MaDonHangGoc
               FROM DonHang WITH (UPDLOCK, HOLDLOCK) WHERE MaDonHang = @MaDonHang",
@@ -292,21 +313,11 @@ public sealed partial class MayInAoController : ControllerBase
             if (don.LoaiPhatSinh == "IN_LAI_LOI_QUAY" && don.MaDonHangGoc != null)
             {
                 // Giữ nghiệp vụ in lại miễn phí khi chuyển việc hoàn tất sang connector.
-                await conn.ExecuteAsync("UPDATE DonHang SET TrangThai='HOAN_THANH', NgayHoanThanh=GETDATE() WHERE MaDonHang=@MaDonHang",
-                    new { MaDonHang = maDonHang }, giaoDich);
+                await conn.ExecuteAsync(HoanTatInLaiSql,
+                    new { MaDonHang = maDonHang, don.MaDonHangGoc }, giaoDich);
                 don.TrangThai = "HOAN_THANH";
-                await conn.ExecuteAsync(@"UPDATE dh SET TrangThai='HOAN_THANH', NgayHoanThanh=GETDATE()
-                    FROM DonHang dh JOIN ThanhToan tt ON tt.MaDonHang=dh.MaDonHang
-                    WHERE dh.MaDonHang=@MaDonHangGoc AND dh.TrangThai='DA_IN' AND tt.TrangThai='DA_THANH_TOAN'",
-                    new { don.MaDonHangGoc }, giaoDich);
                 donGoc = await conn.QuerySingleOrDefaultAsync<DonDangIn>(
                     "SELECT MaDonHang,MaChiNhanh,MaKhachHang,TrangThai FROM DonHang WHERE MaDonHang=@ma", new { ma = don.MaDonHangGoc }, giaoDich);
-                await conn.ExecuteAsync("DELETE FROM ThongBao WHERE MaDonHang=@MaDonHang", new { MaDonHang = maDonHang }, giaoDich);
-                await conn.ExecuteAsync(@"INSERT INTO ThongBao(MaNguoiDung,MaDonHang,TieuDe,NoiDung)
-                    SELECT MaKhachHang,MaDonHang,N'Bản in lại đã sẵn sàng',
-                        CASE WHEN TrangThai='HOAN_THANH' THEN N'Quầy đã xử lý bản in lại miễn phí và hoàn tất đơn gốc.'
-                        ELSE N'Bản in lại miễn phí đã xong. Đơn gốc vẫn chờ thu COD và bàn giao.' END
-                    FROM DonHang WHERE MaDonHang=@MaDonHangGoc", new { don.MaDonHangGoc }, giaoDich);
             }
             else don.TrangThai = "DA_IN";
             await giaoDich.CommitAsync();
@@ -321,7 +332,7 @@ public sealed partial class MayInAoController : ControllerBase
         _quyenNhanLenh.HoanTat(req.MaMayIn, maDonHang, ConnectorId(), req.MaLenh);
         _trangThai.CapNhat(req.MaMayIn, "SAN_SANG");
         await GuiCapNhat(don, "Máy in đã hoàn thành đơn hàng");
-        if (donGoc != null) await GuiCapNhat(donGoc, "Bản in lại đã sẵn sàng; tiền COD vẫn thu khi bàn giao đơn gốc");
+        if (donGoc != null) await GuiCapNhat(donGoc, "Bản in lại đã sẵn sàng; đơn gốc vẫn chờ bàn giao");
         return Ok(new KetQuaDto { Message = "Đã ghi nhận máy in hoàn thành." });
     }
 

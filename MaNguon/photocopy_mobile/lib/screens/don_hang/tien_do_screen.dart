@@ -1,3 +1,4 @@
+import '../../widgets/khieu_nai_hoan_tien.dart';
 import '../../widgets/bang_chung_huy_don.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -33,11 +34,26 @@ class _TienDoScreenState extends State<TienDoScreen> {
   Future<void>? _dangTaiDon;
   bool _canTaiLai = false;
   Timer? _nhipTienDo;
+  Timer? _nhipXacNhan;
+  bool _daHienThiHetHan = false;
+  int _lanDocHoanTien = 0;
 
   @override
   void initState() {
     super.initState();
     _taiDon();
+    _nhipXacNhan = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted &&
+          _don?.kenhDatDon == 'APP' &&
+          _don?.trangThaiDonHang == 'CHO_XAC_NHAN' &&
+          _don?.daTra == true &&
+          !_daHienThiHetHan &&
+          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+        setState(() {
+          _daHienThiHetHan = _don!.giayChoTiepNhan == 0;
+        });
+      }
+    });
     Realtime.dangKyNghe(_khiCoTin);
     // Chỉ màn đơn đang in, đang mở và app ở foreground mới làm mới 10 giây/lần.
     // _taiDon đã gộp request đang chạy, nên không tạo nhiều truy vấn chồng nhau.
@@ -55,6 +71,7 @@ class _TienDoScreenState extends State<TienDoScreen> {
   void dispose() {
     Realtime.boNghe(_khiCoTin);
     _nhipTienDo?.cancel();
+    _nhipXacNhan?.cancel();
     _canTaiLai = false;
     super.dispose();
   }
@@ -82,12 +99,21 @@ class _TienDoScreenState extends State<TienDoScreen> {
           } else {
             _loi = null;
             _don = DonHangChiTiet.fromJson(kq.duLieu);
+            _lanDocHoanTien++;
+            _daHienThiHetHan = false;
           }
         });
       } while (_canTaiLai && mounted);
     } finally {
       _dangTaiDon = null;
     }
+  }
+
+  Future<void> _sauKhiHuy() async {
+    if (mounted && _don != null) {
+      setState(() => _don!.trangThaiDonHang = 'DA_HUY');
+    }
+    await _taiDon();
   }
 
   // Máy chủ báo đơn này vừa đổi trạng thái
@@ -123,17 +149,44 @@ class _TienDoScreenState extends State<TienDoScreen> {
           children: [
             _theDon(),
             if (_don!.trangThaiDonHang == 'DA_HUY')
-              BangChungHuyDon(maDonHang: widget.maDonHang),
+              BangChungHuyDon(
+                maDonHang: widget.maDonHang,
+                trangThaiThanhToan: _don!.trangThaiThanhToan,
+                lanCapNhat: _lanDocHoanTien,
+              ),
+            if (_don!.kenhDatDon == 'APP' &&
+                _don!.daTra &&
+                _don!.trangThaiDonHang == 'CHO_XAC_NHAN') ...[
+              const SizedBox(height: 12),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Text(
+                    _don!.giayChoTiepNhan > 0
+                        ? 'Còn ${_don!.giayChoTiepNhan ~/ 60}:${(_don!.giayChoTiepNhan % 60).toString().padLeft(2, '0')} để hủy và yêu cầu hoàn tiền. Nhân viên chưa tiếp nhận trong thời gian này.'
+                        : 'Đã hết 2 phút hủy/hoàn thông thường. Đơn đang chờ nhân viên tiếp nhận.',
+                    style: TextStyle(
+                      color: _don!.giayChoTiepNhan > 0
+                          ? Colors.red.shade700
+                          : AppColors.chuPhu,
+                    ),
+                  ),
+                ),
+              ),
+            ],
             if (_don!.choPhepHuy) ...[
               const SizedBox(height: 12),
               NutHuyDon(
                 maDonHang: widget.maDonHang,
                 daThanhToan: _don!.daTra,
-                daHuy: _taiDon,
+                giayConLai: _don!.kenhDatDon == 'APP' && _don!.daTra
+                    ? () => _don!.giayChoTiepNhan
+                    : null,
+                daHuy: _sauKhiHuy,
               ),
               const SizedBox(height: 6),
               Text(
-                'Chỉ hủy khi chưa tiếp nhận và còn hơn 15 phút trước giờ hẹn. Yêu cầu cần lý do và ảnh bằng chứng.',
+                'Đơn app đã trả tiền: chỉ hủy khi chưa tiếp nhận và trong 2 phút sau thanh toán. Không cần ảnh; cung cấp lý do và thông tin nhận hoàn khi đã trả tiền.',
                 style: AppTheme.font(size: 11.5, color: AppColors.chuPhu),
               ),
             ],
@@ -175,6 +228,14 @@ class _TienDoScreenState extends State<TienDoScreen> {
                 nhan: 'Đánh giá dịch vụ',
                 iconTruoc: Ico.dauTich,
                 onPressed: _danhGia,
+              ),
+            ],
+            if (_don!.trangThaiDonHang == 'HOAN_THANH' ||
+                _don!.trangThaiDonHang == 'DA_GIAO') ...[
+              const SizedBox(height: 14),
+              KhieuNaiHoanTien(
+                maDonHang: widget.maDonHang,
+                key: ValueKey(_don),
               ),
             ],
             if (_don!.laGiaoTanNoi && _don!.soDienThoaiShipper != null) ...[

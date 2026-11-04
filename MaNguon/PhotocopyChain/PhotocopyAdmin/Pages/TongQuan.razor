@@ -1,4 +1,4 @@
-﻿@page "/tong-quan"
+@page "/tong-quan"
 @attribute [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN")]
 @inject HttpClient Http
 
@@ -6,6 +6,7 @@
 <TieuDeTrang TieuDe="Tổng quan" MoTa="Theo dõi kinh doanh và công việc cần xử lý" />
 
 <div class="than-trang tq-trang">
+    <CanhBaoHoanTien />
     <div class="tq-tab" role="tablist" aria-label="Nội dung tổng quan">
         <button id="tab-kinh-doanh" type="button" role="tab" aria-controls="panel-kinh-doanh" aria-selected="@(_phan == "kinh-doanh" ? "true" : "false")" tabindex="@(_phan == "kinh-doanh" ? 0 : -1)" @ref="_nutKinhDoanh" @onclick='() => DoiPhan("kinh-doanh")' @onkeydown="PhimTab">Kinh doanh</button>
         <button id="tab-van-hanh" type="button" role="tab" aria-controls="panel-van-hanh" aria-selected="@(_phan == "van-hanh" ? "true" : "false")" tabindex="@(_phan == "van-hanh" ? 0 : -1)" @ref="_nutVanHanh" @onclick='() => DoiPhan("van-hanh")' @onkeydown="PhimTab">Vận hành</button>
