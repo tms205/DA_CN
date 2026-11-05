@@ -47,6 +47,7 @@ class DonGiao {
       trangThai = json['trangThaiDonHang'] ?? '',
       trangThaiGiao = json['trangThaiGiao'],
       lyDo = json['lyDo'],
+      lyDoTuChoi = json['lyDoTuChoi'],
       soLan = json['soLanGiao'] ?? 0,
       lanGiao = json['lanGiao'],
       tongTien = (json['tongTien'] as num? ?? 0).toDouble(),
@@ -61,6 +62,8 @@ class DonGiao {
   final String trangThai;
   final String? trangThaiGiao;
   final String? lyDo;
+  // Lý do cửa hàng từ chối lần báo giao thất bại trước; shipper phải giao tiếp.
+  final String? lyDoTuChoi;
   final int soLan;
   final int? lanGiao;
   final double tongTien;

@@ -88,10 +88,17 @@ class Api {
   }
 
   // Ảnh xem trước lấy từ PDF có sẵn trên máy chủ; gửi token trong header, không đưa vào URL.
-  static Future<KetQuaApi> getAnhMau(String maMau, int soTrang, {int? phienBan}) async {
+  static Future<KetQuaApi> getAnhMau(String maMau, int soTrang, {int? phienBan}) =>
+      _getAnhPng('/api/file-in/mau/${Uri.encodeComponent(maMau)}/trang/$soTrang${phienBan == null ? '' : '?phienBan=$phienBan'}');
+
+  // Ảnh một trang của file khách đã tải lên (bản PDF sẽ được in) để xem trước khi tạo đơn.
+  static Future<KetQuaApi> getAnhTrangFile(int maFileIn, int soTrang) =>
+      _getAnhPng('/api/file-in/$maFileIn/trang/$soTrang');
+
+  static Future<KetQuaApi> _getAnhPng(String duongDan) async {
     try {
       final res = await http.get(
-        Uri.parse('$diaChiApi/api/file-in/mau/${Uri.encodeComponent(maMau)}/trang/$soTrang${phienBan == null ? '' : '?phienBan=$phienBan'}'),
+        Uri.parse('$diaChiApi$duongDan'),
         headers: _taoHeader(),
       ).timeout(const Duration(seconds: 30));
       if (res.statusCode != 200) {

@@ -160,12 +160,12 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
       });
       return;
     }
-    // Chưa có điểm nhận xác thực từ GPS thì không tính phí theo địa chỉ cũ.
+    // Chưa chọn được điểm nhận có tọa độ từ máy chủ thì không tính phí theo địa chỉ cũ.
     if (_hinhThucNhan == 'GIAO_HANG' && !_diaChiNhan.daChon) {
       setState(() {
         _baoGia = null;
         _loiBaoGia =
-            'Bấm Dùng vị trí hiện tại để lấy địa chỉ nhận hàng và tính phí giao hàng.';
+            'Chọn điểm nhận hàng (địa chỉ đã lưu, địa chỉ khác hoặc vị trí hiện tại) để tính phí giao hàng.';
       });
       return;
     }
@@ -331,6 +331,8 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
               const SizedBox(height: 12),
               DiaChiGiao(
                 giaTri: _diaChiNhan,
+                diaChiDaLuu: Phien.nguoiDung?.diaChiMacDinh,
+                maChiNhanh: _maChiNhanh,
                 onChanged: (diaChi) => _doiLuaChon(() => _diaChiNhan = diaChi),
               ),
               const SizedBox(height: 8),

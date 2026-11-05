@@ -7,6 +7,8 @@ public sealed class DiaChiGiaoRequest : IValidatableObject
     [MaxLength(255)] public string? DiaChi { get; set; }
     [Range(typeof(decimal), "-90", "90")] public decimal? ViDo { get; set; }
     [Range(typeof(decimal), "-180", "180")] public decimal? KinhDo { get; set; }
+    // Chi nhánh khách đang chọn: tìm theo chữ chỉ lấy kết quả quanh chi nhánh này.
+    [Range(1, int.MaxValue)] public int? MaChiNhanh { get; set; }
     public IEnumerable<ValidationResult> Validate(ValidationContext context)
     {
         if ((ViDo == null) != (KinhDo == null)) yield return new ValidationResult("Cần cả vĩ độ và kinh độ.");
@@ -61,6 +63,8 @@ public sealed class DonGiaoDto
     public int? LanGiao { get; set; }
     public string? TrangThaiGiao { get; set; }
     public string? LyDo { get; set; }
+    // Lý do cửa hàng từ chối lần báo giao thất bại gần nhất của lượt đang giao.
+    public string? LyDoTuChoi { get; set; }
     public DateTime NgayDat { get; set; }
     public DateTime? NgayNhan { get; set; }
     public DateTime? NgayGiao { get; set; }
@@ -125,6 +129,16 @@ public sealed class BangChungGiaoDto
     public DateTimeOffset? ThoiDiemBaoCao { get; set; }
     public string? DiaChi { get; set; }
     public List<AnhBangChungDto> Anh { get; set; } = new();
+    // Để cửa hàng so vị trí GPS của shipper với nơi phải giao.
+    public string? DiaChiGiao { get; set; }
+    public string? TrangThaiGiao { get; set; }
+}
+
+public sealed class TuChoiThatBaiRequest
+{
+    [Required(ErrorMessage = "Vui lòng ghi lý do từ chối.")]
+    [StringLength(255, MinimumLength = 5, ErrorMessage = "Lý do từ chối cần từ 5 đến 255 ký tự.")]
+    public string LyDo { get; set; } = "";
 }
 
 public sealed class PhanHoiGiaoHangDto

@@ -45,6 +45,7 @@
                             @if (don.NgayNhan != null) { <div class="nv-phu">Nhận: @don.NgayNhan.Value.ToString("dd/MM HH:mm")</div> }
                             @if (don.NgayGiao != null) { <div class="nv-phu">Kết quả: @don.NgayGiao.Value.ToString("dd/MM HH:mm")</div> }
                             @if (!string.IsNullOrWhiteSpace(don.LyDo)) { <div class="gh-ly-do">@don.LyDo</div> }
+                            @if (_nhom == "DANG_GIAO" && don.TrangThaiGiao == "DANG_GIAO" && !string.IsNullOrWhiteSpace(don.LyDoTuChoi)) { <div class="nv-phu">Đã từ chối báo thất bại: @don.LyDoTuChoi</div> }
                             @if (_nhom == "THAT_BAI" && don.SoLanGiao >= 3) { <div class="gh-can-xu-ly">Đã hết 3 lượt giao. Liên hệ khách để thống nhất xử lý.</div> }
                         </td>
                         <td data-nhan="Shipper / thao tác">
@@ -53,6 +54,10 @@
                             @if (_nhom is "CHO_GIAO" or "THAT_BAI" && don.SoLanGiao < 3)
                             {
                                 <button class="nut-nho chinh gh-nut-giao" disabled="@_dangGui" @onclick="() => MoXacNhan(don)">@(_nhom == "THAT_BAI" ? "Phân công giao lại" : "Bàn giao đi giao")</button>
+                            }
+                            @if (_nhom == "DANG_GIAO" && don.TrangThaiGiao == "CHO_XAC_NHAN" && don.MaGiaoHang != null)
+                            {
+                                <button class="nut-nho chinh gh-nut-giao" disabled="@_dangGui" @onclick="() => MoXacNhanThatBai(don)">Xem báo cáo &amp; xác nhận</button>
                             }
                             @if (don.SoLanGiao > 0 && Phien.NguoiDung?.TenVaiTro is "SUPER_ADMIN" or "BRANCH_ADMIN")
                             {
@@ -80,6 +85,26 @@
         <p>Chỉ xác nhận khi đã bàn giao đúng tài liệu cho shipper. Đơn chuyển sang Đang giao, không thu COD.</p>
     </NoiDung>
     <Chan><button type="button" class="nut-phu" disabled="@_dangGui" @onclick="DongPhanCong">Hủy</button><button type="button" class="nut-chinh" disabled="@(_dangGui || ShipperChon(_donGiao?.MaDonHang ?? 0) == 0)" @onclick="() => PhanCong(_donGiao)">Xác nhận bàn giao</button></Chan>
+</HopThoaiQuanTri>
+<HopThoaiQuanTri Mo="@(_donThatBai != null)" TieuDe="Xác nhận báo giao thất bại" Rong="true" Loi="@(_baoTri ? null : _loiThatBai)" DangLuu="@_dangGui" Dong="DongXacNhanThatBai">
+    <NoiDung>
+        @if (_donThatBai != null)
+        {
+            <p><b>@_donThatBai.MaDonHangHienThi · @_donThatBai.TenKhachHang</b> · Shipper @_donThatBai.TenShipper</p>
+            <BangChungGiaoHang @key="_donThatBai.MaGiaoHang" MaGiaoHang="_donThatBai.MaGiaoHang.Value" />
+            <section>
+                <p><b>Kết luận của cửa hàng</b></p>
+                <p>Shipper đúng ở nơi giao và bằng chứng hợp lý thì <b>xác nhận giao thất bại</b>: đơn chuyển sang Giao thất bại, khách được báo. Sai vị trí thì <b>từ chối</b>: lượt giao trở lại Đang giao và shipper phải tiếp tục giao.</p>
+                <label class="nhan" for="gh-ly-do-tu-choi">Lý do từ chối (chỉ cần khi từ chối)</label>
+                <textarea id="gh-ly-do-tu-choi" class="ca-o-loc" rows="2" maxlength="255" disabled="@_dangGui" placeholder="Ví dụ: Vị trí GPS cách địa chỉ giao khoảng 3 km" @bind="_lyDoTuChoi" @bind:event="oninput"></textarea>
+            </section>
+        }
+    </NoiDung>
+    <Chan>
+        <button type="button" class="nut-phu" disabled="@_dangGui" @onclick="DongXacNhanThatBai">Đóng</button>
+        <button type="button" class="nut-phu" disabled="@(_dangGui || (_lyDoTuChoi ?? "").Trim().Length < 5)" @onclick="TuChoiThatBai">Từ chối báo cáo</button>
+        <button type="button" class="nut-chinh" disabled="@_dangGui" @onclick="XacNhanThatBai">Xác nhận giao thất bại</button>
+    </Chan>
 </HopThoaiQuanTri>
 <HopThoaiQuanTri Mo="@(_donLichSu != null)" TieuDe="Lịch sử giao hàng & đối chiếu" Rong="true" Dong="() => _donLichSu = null">
     <NoiDung>
@@ -148,6 +173,37 @@
     private void ChonShipper(int ma, object giaTri) { _daChon[ma] = int.TryParse(giaTri?.ToString(), out int sp) ? sp : 0; }
     private void MoXacNhan(DonGiaoDto don) { if (_dangGui) return; _donGiao = don; _loi = _thongBao = null; }
 
+    // Sơ đồ 4.10: cửa hàng xem bằng chứng rồi xác nhận / từ chối báo giao thất bại của shipper.
+    private DonGiaoDto _donThatBai;
+    private string _lyDoTuChoi, _loiThatBai;
+    private void MoXacNhanThatBai(DonGiaoDto don) { if (_dangGui) return; _donThatBai = don; _lyDoTuChoi = ""; _loiThatBai = _thongBao = null; }
+    private void DongXacNhanThatBai() { if (!_dangGui) { _donThatBai = null; _loiThatBai = null; } }
+
+    private Task XacNhanThatBai() => XuLyThatBai("xac-nhan-that-bai", null);
+    private Task TuChoiThatBai() => XuLyThatBai("tu-choi-that-bai", new TuChoiThatBaiRequest { LyDo = (_lyDoTuChoi ?? "").Trim() });
+
+    private async Task XuLyThatBai(string hanhDong, TuChoiThatBaiRequest req)
+    {
+        if (_dangGui || _donThatBai?.MaGiaoHang == null) return;
+        _dangGui = true; _loiThatBai = null; _thongBao = null;
+        try
+        {
+            string url = "api/giao-hang/luot/" + _donThatBai.MaGiaoHang + "/" + hanhDong;
+            using var res = req == null ? await Http.PostAsync(url, null) : await Http.PostAsJsonAsync(url, req);
+            await DocDuLieuApi.KiemTraBaoTriAsync(res);
+            if (!res.IsSuccessStatusCode) _loiThatBai = await Loi(res);
+            else
+            {
+                _thongBao = (await res.Content.ReadFromJsonAsync<ApiError>())?.Message ?? "Đã xử lý báo giao thất bại.";
+                _donThatBai = null;
+                await TaiAsync();
+            }
+        }
+        catch (NgoaiLeBaoTri ex) { _baoTri = true; _loiThatBai = ex.Message; }
+        catch { _loiThatBai = "Chưa xác nhận được kết quả. Hãy tải lại để kiểm tra trước khi thử lại."; }
+        finally { _dangGui = false; }
+    }
+
     private async Task PhanCong(DonGiaoDto don)
     {
         if (_dangGui || don == null || ShipperChon(don.MaDonHang) == 0) return;
@@ -168,8 +224,8 @@
         $"{x.MaDonHangHienThi} {x.TenKhachHang} {x.SdtNhan} {x.DiaChiGiao} {x.TenShipper}".Contains(_tim.Trim(), StringComparison.OrdinalIgnoreCase));
     private string TenTrangThai(DonGiaoDto don) => _nhom is "LICH_SU" or "THAT_BAI" or "THANH_CONG"
         ? don.TrangThaiGiao == "THANH_CONG" ? "Giao thành công" : "Giao thất bại"
-        : TrangThaiDonHang.TenHienThi(don.TrangThaiDonHang);
-    private static string MauTrangThai(DonGiaoDto don) => don.TrangThaiGiao switch { "THAT_BAI" => "gh-nhan-cam", "THANH_CONG" => "gh-nhan-xanh", "DANG_GIAO" => "gh-nhan-xanh-duong", _ => "gh-nhan-xam" };
+        : don.TrangThaiGiao == "CHO_XAC_NHAN" ? "Chờ xác nhận thất bại" : TrangThaiDonHang.TenHienThi(don.TrangThaiDonHang);
+    private static string MauTrangThai(DonGiaoDto don) => don.TrangThaiGiao switch { "THAT_BAI" or "CHO_XAC_NHAN" => "gh-nhan-cam", "THANH_CONG" => "gh-nhan-xanh", "DANG_GIAO" => "gh-nhan-xanh-duong", _ => "gh-nhan-xam" };
     private string NhanLuot(DonGiaoDto don) => don.SoLanGiao == 0 ? "Chưa giao lần nào" : $"Lượt {(_nhom == "LICH_SU" ? don.LanGiao ?? don.SoLanGiao : don.SoLanGiao)}/3";
     private static string Tien(decimal tien) => tien.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("vi-VN")) + "₫";
     private static string BanDo(DonGiaoDto don) => "https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=" + Uri.EscapeDataString(don.DiaChiGiao.Split(" · ")[0]);

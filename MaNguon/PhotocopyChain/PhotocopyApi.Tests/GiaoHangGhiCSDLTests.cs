@@ -124,15 +124,39 @@ public class GiaoHangGhiCSDLTests
                 int a = await Luot(failed);
                 Assert.IsType<BadRequestObjectResult>(await shipApi.BaoKetQua(a, new KetQuaGiaoRequest { ThanhCong=false, LyDo="TEST: khách không nghe máy" }));
                 Assert.Equal("DANG_GIAO",await TrangThai(failed));
+                const string demBaoKhach = "SELECT COUNT(*) FROM ThongBao WHERE MaDonHang=@failed AND MaNguoiDung=@customer AND TieuDe=N'Giao hàng chưa thành công'";
+                int baoKhachTruoc = await conn.ExecuteScalarAsync<int>(demBaoKhach, new { failed, customer });
                 Assert.IsType<OkObjectResult>(await shipApi.BaoGiaoThatBai(a, BangChung()));
+                // Sơ đồ 4.10: báo thất bại chỉ đưa lượt sang chờ cửa hàng xác nhận; đơn vẫn đang giao, khách chưa được báo.
+                Assert.Equal("DANG_GIAO", await TrangThai(failed));
+                Assert.Equal("CHO_XAC_NHAN", await conn.ExecuteScalarAsync<string>("SELECT TrangThai FROM GiaoHang WHERE MaGiaoHang=@a", new { a }));
+                Assert.Equal(baoKhachTruoc, await conn.ExecuteScalarAsync<int>(demBaoKhach, new { failed, customer }));
+                var staffApi = Api(VaiTro.Staff, ceo, branch);
+                Assert.IsType<NotFoundObjectResult>(await Api(VaiTro.Staff, ceo, otherBranch).XacNhanThatBai(a));
+                if (n == 1)
+                {
+                    // Từ chối: lượt về đang giao, không tính thêm lượt, shipper báo lại được.
+                    Assert.IsType<OkObjectResult>(await staffApi.TuChoiThatBai(a, new TuChoiThatBaiRequest { LyDo = "TEST: vị trí cách địa chỉ giao 3 km" }));
+                    Assert.Equal("DANG_GIAO", await conn.ExecuteScalarAsync<string>("SELECT TrangThai FROM GiaoHang WHERE MaGiaoHang=@a", new { a }));
+                    Assert.Equal("TEST: vị trí cách địa chỉ giao 3 km", await conn.ExecuteScalarAsync<string>("SELECT LyDoTuChoi FROM GiaoHang WHERE MaGiaoHang=@a", new { a }));
+                    Assert.IsType<ConflictObjectResult>(await staffApi.TuChoiThatBai(a, new TuChoiThatBaiRequest { LyDo = "TEST: lần hai" }));
+                    Assert.Equal(1, await Dem("GiaoHang", failed));
+                    Assert.IsType<OkObjectResult>(await shipApi.BaoGiaoThatBai(a, BangChung()));
+                    Assert.Null(await conn.ExecuteScalarAsync<string>("SELECT LyDoTuChoi FROM GiaoHang WHERE MaGiaoHang=@a", new { a }));
+                }
+                Assert.IsType<OkObjectResult>(await staffApi.XacNhanThatBai(a));
                 Assert.Equal("GIAO_THAT_BAI", await TrangThai(failed));
+                Assert.IsType<ConflictObjectResult>(await staffApi.XacNhanThatBai(a));
                 string proof = await conn.ExecuteScalarAsync<string>("SELECT AnhBangChungJson FROM GiaoHang WHERE MaGiaoHang=@a",new { a });
                 var view = Assert.IsType<OkObjectResult>(await shipApi.XemBangChung(a));
                 var saved = Assert.IsType<BangChungGiaoDto>(view.Value);
                 Assert.Single(saved.Anh); Assert.Equal(10.7m,saved.ViDo);
                 Assert.Null(saved.DiaChi); // Geoapify lỗi vẫn lưu GPS/bằng chứng.
+                Assert.Equal("THAT_BAI", saved.TrangThaiGiao);
+                Assert.Equal("ĐỊA CHỈ TEST KHÔNG GIAO THẬT", saved.DiaChiGiao);
                 var image = Assert.IsType<FileStreamResult>(await shipApi.XemAnhBangChung(a,saved.Anh[0].MaAnh));
                 await image.FileStream.DisposeAsync();
+                Assert.IsType<OkObjectResult>(await staffApi.XemBangChung(a));
                 Assert.IsType<NotFoundObjectResult>(await Api(VaiTro.BranchAdmin,ceo,otherBranch).XemBangChung(a));
                 int before = await Dem("ThongBao", failed);
                 Assert.IsType<OkObjectResult>(await shipApi.BaoGiaoThatBai(a, BangChung()));

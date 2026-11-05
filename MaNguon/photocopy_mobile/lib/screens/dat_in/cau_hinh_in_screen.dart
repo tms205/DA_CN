@@ -10,6 +10,7 @@ import '../../theme.dart';
 import '../../widgets/icons.dart';
 import '../../widgets/widgets.dart';
 import 'chon_chi_nhanh_screen.dart';
+import 'xem_truoc_file_screen.dart';
 
 // Một lựa chọn trong nút chọn "viên thuốc" (Mặt in, Màu sắc)
 class LuaChon {
@@ -617,6 +618,25 @@ class _CauHinhInScreenState extends State<CauHinhInScreen> {
                     ),
                   ],
                 ),
+                // Xem đúng bản PDF sẽ in trước khi tạo đơn.
+                if ((f.soTrang ?? 0) > 0)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(0, 36),
+                      ),
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => XemTruocFileScreen(file: f),
+                        ),
+                      ),
+                      icon: const Icon(Icons.visibility_outlined, size: 16),
+                      label: const Text('Xem trước bản in'),
+                    ),
+                  ),
                 const SizedBox(height: 3),
                 GestureDetector(
                   onTap: _suaGhiChu,

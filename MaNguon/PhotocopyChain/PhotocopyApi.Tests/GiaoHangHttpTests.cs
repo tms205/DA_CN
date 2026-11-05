@@ -58,6 +58,11 @@ public class GiaoHangHttpTests
     [InlineData("CUSTOMER","PUT","/api/giao-hang/luot/1/doi-chieu/xu-ly",HttpStatusCode.Forbidden)]
     [InlineData("SHIPPER","PUT","/api/giao-hang/luot/1/doi-chieu/xu-ly",HttpStatusCode.Forbidden)]
     [InlineData("BRANCH_ADMIN","PUT","/api/giao-hang/luot/1/doi-chieu/xu-ly",HttpStatusCode.BadRequest)]
+    [InlineData(null,"POST","/api/giao-hang/luot/1/xac-nhan-that-bai",HttpStatusCode.Unauthorized)]
+    [InlineData("SHIPPER","POST","/api/giao-hang/luot/1/xac-nhan-that-bai",HttpStatusCode.Forbidden)]
+    [InlineData("CUSTOMER","POST","/api/giao-hang/luot/1/tu-choi-that-bai",HttpStatusCode.Forbidden)]
+    [InlineData("SHIPPER","POST","/api/giao-hang/luot/1/tu-choi-that-bai",HttpStatusCode.Forbidden)]
+    [InlineData("STAFF","POST","/api/giao-hang/luot/1/tu-choi-that-bai",HttpStatusCode.BadRequest)]
     public async Task Middleware_ChanSaiQuyenVaDuLieuTruocKhiGoiDatabase(string role, string method, string path, HttpStatusCode status)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });

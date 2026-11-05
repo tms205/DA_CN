@@ -1385,7 +1385,7 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
                 new { MaDonMoi = maDonMoi }, giaoDich);
             ketQua.Message = mienPhi
                 ? $"Đã tạo việc in lại {ketQua.MaDonHangHienThi}; cửa hàng chịu toàn bộ chi phí."
-                : $"Đã tạo đơn bổ sung {ketQua.MaDonHangHienThi}; khách thanh toán {ketQua.TongTien:#,##0}₫ khi nhận.";
+                : $"Đã tạo đơn bổ sung {ketQua.MaDonHangHienThi}; khách thanh toán {ketQua.TongTien.ToString("#,##0", new System.Globalization.NumberFormatInfo { NumberGroupSeparator = "." })}₫ khi nhận.";
 
             await giaoDich.CommitAsync();
 

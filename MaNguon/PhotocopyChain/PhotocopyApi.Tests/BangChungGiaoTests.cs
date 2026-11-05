@@ -200,9 +200,12 @@ public class BangChungGiaoTests
     [Theory]
     [InlineData("BaoGiaoThatBai", "SHIPPER")]
     [InlineData("DinhViShipper", "SHIPPER")]
-    [InlineData("XemBangChung", "SUPER_ADMIN,BRANCH_ADMIN,SHIPPER")]
-    [InlineData("XemAnhBangChung", "SUPER_ADMIN,BRANCH_ADMIN,SHIPPER")]
-    public void BangChung_KhongCapQuyenChoKhachHayNhanVienQuay(string name, string roles) =>
+    // Sơ đồ 4.10: nhân viên in xem bằng chứng để xác nhận / từ chối báo giao thất bại; khách không xem được.
+    [InlineData("XemBangChung", "SUPER_ADMIN,BRANCH_ADMIN,STAFF,SHIPPER")]
+    [InlineData("XemAnhBangChung", "SUPER_ADMIN,BRANCH_ADMIN,STAFF,SHIPPER")]
+    [InlineData("XacNhanThatBai", "SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
+    [InlineData("TuChoiThatBai", "SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
+    public void BangChung_KhongCapQuyenChoKhach_CuaHangXacNhanThatBai(string name, string roles) =>
         Assert.Equal(roles, typeof(GiaoHangController).GetMethod(name)
             .GetCustomAttributes(typeof(AuthorizeAttribute), true).Cast<AuthorizeAttribute>().Single().Roles);
 }

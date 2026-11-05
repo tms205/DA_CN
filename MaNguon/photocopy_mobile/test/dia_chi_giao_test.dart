@@ -27,9 +27,7 @@ void main() {
       },
     ];
 
-  testWidgets('Bỏ tìm bằng chữ, GPS tự điền và chọn điểm nhận từ API', (
-    tester,
-  ) async {
+  testWidgets('GPS tự điền và chọn điểm nhận từ API', (tester) async {
     DiaChiNhan giaTri = const DiaChiNhan();
     Map<String, dynamic>? daGui;
     await mo(
@@ -44,11 +42,8 @@ void main() {
         },
       ),
     );
-    expect(find.text('Tìm địa chỉ'), findsNothing);
-    expect(
-      tester.widget<TextField>(find.byType(TextField).first).readOnly,
-      isTrue,
-    );
+    // Không có địa chỉ đã lưu thì không tự gọi tìm, cũng không có nút dùng địa chỉ đã lưu.
+    expect(find.text('Dùng địa chỉ đã lưu'), findsNothing);
     expect(daGui, isNull);
     await tester.tap(find.text('Dùng vị trí hiện tại'));
     await tester.pumpAndSettle();
@@ -287,6 +282,148 @@ void main() {
       '140 Lê Trọng Tấn, TP Hồ Chí Minh',
     );
     expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('Địa chỉ đã lưu tự tìm vị trí khi mở, một kết quả thì chọn luôn', (
+    tester,
+  ) async {
+    DiaChiNhan giaTri = const DiaChiNhan(diaChi: '140 Lê Trọng Tấn, Tân Phú');
+    final daGui = <Map<String, dynamic>>[];
+    await mo(
+      tester,
+      DiaChiGiao(
+        giaTri: giaTri,
+        diaChiDaLuu: '140 Lê Trọng Tấn, Tân Phú',
+        onChanged: (v) => giaTri = v,
+        timDiaChi: (req) async {
+          daGui.add(req);
+          return timDuoc();
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(daGui, [
+      {'diaChi': '140 Lê Trọng Tấn, Tân Phú'},
+    ]);
+    expect(giaTri.daChon, isTrue);
+    expect(giaTri.maViTriGiao, 'fixture-vi-tri');
+    expect(find.text('Dùng địa chỉ đã lưu'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets(
+    'Gõ địa chỉ khác: nhiều kết quả phải tự chọn, sửa chữ thì bỏ điểm đã chọn',
+    (tester) async {
+      DiaChiNhan giaTri = const DiaChiNhan();
+      await mo(
+        tester,
+        DiaChiGiao(
+          giaTri: giaTri,
+          onChanged: (v) => giaTri = v,
+          timDiaChi: (req) async => KetQuaApi()
+            ..thanhCong = true
+            ..duLieu = [
+              {
+                'diaChi': '12 Nguyễn Huệ, Quận 1, TP Hồ Chí Minh',
+                'viDo': 10.77,
+                'kinhDo': 106.70,
+                'maViTriGiao': 'vi-tri-1',
+              },
+              {
+                'diaChi': '12 Nguyễn Huệ, Thủ Đức, TP Hồ Chí Minh',
+                'viDo': 10.85,
+                'kinhDo': 106.75,
+                'maViTriGiao': 'vi-tri-2',
+              },
+            ],
+        ),
+      );
+      await tester.enterText(
+        find.byType(TextField).first,
+        '12 Nguyễn Huệ, TP Hồ Chí Minh',
+      );
+      await tester.tap(find.text('Tìm địa chỉ này'));
+      await tester.pumpAndSettle();
+      // Hai kết quả: chưa được tự chọn, khách phải chọn đúng nơi giao.
+      expect(find.text('Chọn đúng nơi giao:'), findsOneWidget);
+      expect(giaTri.daChon, isFalse);
+      await tester.tap(find.text('12 Nguyễn Huệ, Thủ Đức, TP Hồ Chí Minh'));
+      await tester.pumpAndSettle();
+      expect(giaTri.daChon, isTrue);
+      expect(giaTri.maViTriGiao, 'vi-tri-2');
+      // Sửa lại chữ thì điểm cũ không còn đúng, phải tìm lại.
+      await tester.enterText(
+        find.byType(TextField).first,
+        '15 Nguyễn Huệ, TP Hồ Chí Minh',
+      );
+      await tester.pump();
+      expect(giaTri.daChon, isFalse);
+      expect(find.text('Chọn đúng nơi giao:'), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets('Tìm theo chữ gửi kèm chi nhánh và giữ số hẻm ở ô chi tiết', (
+    tester,
+  ) async {
+    DiaChiNhan giaTri = const DiaChiNhan();
+    Map<String, dynamic>? daGui;
+    await mo(
+      tester,
+      DiaChiGiao(
+        giaTri: giaTri,
+        maChiNhanh: 1,
+        onChanged: (v) => giaTri = v,
+        timDiaChi: (req) async {
+          daGui = req;
+          return timDuoc();
+        },
+      ),
+    );
+    await tester.enterText(
+      find.byType(TextField).first,
+      '320/42 Ấp Chiến Lược quận Bình Tân',
+    );
+    await tester.tap(find.text('Tìm địa chỉ này'));
+    await tester.pumpAndSettle();
+    expect(daGui, {'diaChi': '320/42 Ấp Chiến Lược quận Bình Tân', 'maChiNhanh': 1});
+    expect(giaTri.daChon, isTrue);
+    expect(giaTri.chiTiet, 'Số nhà 320/42');
+    // Tìm địa chỉ khác: thay dòng số nhà App tự điền, không để số nhà cũ sót lại.
+    await tester.enterText(find.byType(TextField).first, '140 Lê Trọng Tấn, Tân Phú');
+    await tester.tap(find.text('Tìm địa chỉ này'));
+    await tester.pumpAndSettle();
+    expect(giaTri.chiTiet, 'Số nhà 140');
+    // Khách tự gõ chi tiết thì giữ nguyên.
+    await tester.enterText(find.byType(TextField).at(1), 'Tầng 3, phòng 302');
+    await tester.enterText(find.byType(TextField).first, '5 Nguyễn Huệ, Quận 1, TP Hồ Chí Minh');
+    await tester.tap(find.text('Tìm địa chỉ này'));
+    await tester.pumpAndSettle();
+    expect(giaTri.chiTiet, 'Tầng 3, phòng 302');
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('Địa chỉ quá ngắn thì nhắc nhập đủ, không gọi máy chủ', (
+    tester,
+  ) async {
+    bool daGoi = false;
+    await mo(
+      tester,
+      DiaChiGiao(
+        giaTri: const DiaChiNhan(),
+        onChanged: (_) {},
+        timDiaChi: (_) async {
+          daGoi = true;
+          return timDuoc();
+        },
+      ),
+    );
+    await tester.enterText(find.byType(TextField).first, 'Quận 1');
+    await tester.tap(find.text('Tìm địa chỉ này'));
+    await tester.pump();
+    expect(daGoi, isFalse);
+    expect(find.textContaining('Nhập đủ địa chỉ'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
   });
 }

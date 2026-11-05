@@ -241,6 +241,44 @@ public class FileInController : ControllerBase
         return Ok(fileIn);
     }
 
+    // GET api/file-in/12/trang/1 — ảnh PNG một trang của bản PDF sẽ in, để khách xem trước khi tạo đơn.
+    // Chỉ xem được file của chính mình; vẽ từ đúng file PDF máy in sẽ nhận.
+    [HttpGet("{maFileIn}/trang/{soTrang:int}")]
+    [Authorize(Roles = "CUSTOMER")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> XemTrangFile([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maFileIn, int soTrang)
+    {
+        int maKhachHang = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
+
+        using var conn = new SqlConnection(_chuoiKetNoi);
+        var file = await conn.QueryFirstOrDefaultAsync<(string DuongDan, int? SoTrang, string TrangThai)>(
+            "SELECT DuongDan, SoTrang, TrangThai FROM FileIn WHERE MaFile = @MaFile AND MaKhachHang = @MaKhachHang",
+            new { MaFile = maFileIn, MaKhachHang = maKhachHang });
+        if (file.DuongDan == null)
+            return NotFound(new { message = "Không tìm thấy file." });
+        if (file.TrangThai != "SAN_SANG" || !System.IO.File.Exists(file.DuongDan))
+            return BadRequest(new { message = "File chưa sẵn sàng để xem trước, vui lòng tải lại." });
+        if (soTrang < 1 || soTrang > (file.SoTrang ?? 0))
+            return BadRequest(new { message = $"Trang cần xem phải từ 1 đến {file.SoTrang}." });
+
+        try
+        {
+            using var pdf = System.IO.File.OpenRead(file.DuongDan);
+            // 100 dpi đủ đọc chữ trên điện thoại, ảnh nhẹ hơn nhiều so với bản in.
+            using var bitmap = PDFtoImage.Conversion.ToImage(pdf, page: soTrang - 1, options: new PDFtoImage.RenderOptions(Dpi: 100));
+            using var anh = bitmap.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
+            byte[] bytes = anh.ToArray();
+            if (bytes.Length > 4 * 1024 * 1024)
+                return BadRequest(new { message = "Trang này quá phức tạp để xem trước trên điện thoại." });
+            return File(bytes, "image/png");
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            _logger.LogWarning(ex, "Không vẽ được trang {SoTrang} của file {MaFile}.", soTrang, maFileIn);
+            return BadRequest(new { message = "Không tạo được bản xem trước của trang này." });
+        }
+    }
+
     // Xóa file vừa tải nhưng chưa dùng để đặt đơn. Dùng khi người dùng chọn nhầm file
     // hoặc đổi khách trên màn Lập đơn tại quầy, tránh để PDF mồ côi trên ổ đĩa.
     [HttpDelete("{maFileIn}")]

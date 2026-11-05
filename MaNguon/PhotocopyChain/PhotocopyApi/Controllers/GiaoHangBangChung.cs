@@ -43,7 +43,7 @@ public partial class GiaoHangController
                     WHERE gh.MaGiaoHang=@maGiaoHang AND gh.MaShipper=@MaNguoiDung AND dh.MaChiNhanh=@MaChiNhanh",
                     new { maGiaoHang, MaNguoiDung, MaChiNhanh = ChiNhanh });
                 if (trangThai == null) return NotFound(new { message = "Không tìm thấy lượt giao của bạn." });
-                if (trangThai == "THAT_BAI") return Ok(new { message = "Báo cáo lượt giao này đã được ghi nhận; không thay bằng chứng cũ." });
+                if (trangThai is "THAT_BAI" or "CHO_XAC_NHAN") return Ok(new { message = "Báo cáo lượt giao này đã được gửi; không thay bằng chứng cũ." });
                 if (trangThai != "DANG_GIAO") return Conflict(new { message = "Lượt giao không còn đang thực hiện. Hãy tải lại." });
             }
             var viTri = req.DocViTri();
@@ -78,8 +78,9 @@ public partial class GiaoHangController
         { _log.LogWarning("Chưa tra được địa chỉ bằng chứng giao; vẫn giữ tọa độ GPS."); return null; }
     }
 
+    // Nhân viên in cũng xem được để xác nhận / từ chối báo giao thất bại (sơ đồ 4.10).
     [HttpGet("luot/{maGiaoHang:int:min(1)}/bang-chung")]
-    [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN,SHIPPER")]
+    [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN,STAFF,SHIPPER")]
     public async Task<IActionResult> XemBangChung(int maGiaoHang)
     {
         Response.Headers.CacheControl = "no-store";
@@ -90,11 +91,12 @@ public partial class GiaoHangController
         return Ok(new BangChungGiaoDto { MaGiaoHang = row.MaGiaoHang, MaDonHang = row.MaDonHang,
             LanGiao = row.LanGiao, TenShipper = row.TenShipper, LyDo = row.LyDo,
             ViDo = row.ViDoBaoGiao, KinhDo = row.KinhDoBaoGiao, DoChinhXac = row.DoChinhXacGps,
-            ThoiDiemGps = row.ThoiDiemGps, ThoiDiemBaoCao = row.ThoiDiemBaoCao, DiaChi = row.DiaChiBaoGiao, Anh = anh });
+            ThoiDiemGps = row.ThoiDiemGps, ThoiDiemBaoCao = row.ThoiDiemBaoCao, DiaChi = row.DiaChiBaoGiao, Anh = anh,
+            DiaChiGiao = row.DiaChiGiao, TrangThaiGiao = row.TrangThai });
     }
 
     [HttpGet("luot/{maGiaoHang:int:min(1)}/bang-chung/anh/{maAnh}")]
-    [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN,SHIPPER")]
+    [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN,STAFF,SHIPPER")]
     public async Task<IActionResult> XemAnhBangChung(int maGiaoHang, string maAnh)
     {
         Response.Headers.CacheControl = "no-store";
@@ -137,7 +139,7 @@ public partial class GiaoHangController
         int? shipper = User.IsInRole(VaiTro.Shipper) ? MaNguoiDung : null;
         return await conn.QueryFirstOrDefaultAsync(@"SELECT gh.MaGiaoHang,gh.MaDonHang,gh.LanGiao,gh.LyDo,
             sp.HoTen AS TenShipper,gh.ViDoBaoGiao,gh.KinhDoBaoGiao,gh.DoChinhXacGps,gh.ThoiDiemGps,
-            gh.ThoiDiemBaoCao,gh.DiaChiBaoGiao,gh.AnhBangChungJson
+            gh.ThoiDiemBaoCao,gh.DiaChiBaoGiao,gh.AnhBangChungJson,gh.TrangThai,dh.DiaChiGiao
             FROM GiaoHang gh JOIN DonHang dh ON dh.MaDonHang=gh.MaDonHang JOIN NguoiDung sp ON sp.MaNguoiDung=gh.MaShipper
             WHERE gh.MaGiaoHang=@maGiaoHang AND (@MaChiNhanh IS NULL OR dh.MaChiNhanh=@MaChiNhanh)
                 AND (@MaShipper IS NULL OR gh.MaShipper=@MaShipper)", new { maGiaoHang, MaChiNhanh = ChiNhanh, MaShipper = shipper });

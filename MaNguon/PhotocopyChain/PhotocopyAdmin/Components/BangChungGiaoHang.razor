@@ -7,11 +7,15 @@
 else if (_loi != null) { <div class="o-loi" role="alert">@_loi</div><button class="nut-phu" @onclick="Tai">Thử lại</button> }
 else if (_data != null)
 {
-    <div class="bc-cong-cu" role="group" aria-label="Bên cung cấp bằng chứng">
-        <button type="button" class="nut-nho @(!_phanHoi ? "chinh" : "")" aria-pressed="@(!_phanHoi ? "true":"false")" @onclick="() => _phanHoi=false">Bằng chứng shipper</button>
-        <button type="button" class="nut-nho @(_phanHoi ? "chinh" : "")" aria-pressed="@(_phanHoi ? "true":"false")" @onclick="() => _phanHoi=true">Phản hồi khách hàng</button>
-    </div>
-    @if (_phanHoi) { <DoiChieuKhachHang MaGiaoHang="MaGiaoHang" DaXuLy="DaDoiChieu" /> }
+    @* Phản hồi của khách chỉ có sau khi cửa hàng đã xác nhận thất bại. *@
+    @if (_data.TrangThaiGiao != "CHO_XAC_NHAN")
+    {
+        <div class="bc-cong-cu" role="group" aria-label="Bên cung cấp bằng chứng">
+            <button type="button" class="nut-nho @(!_phanHoi ? "chinh" : "")" aria-pressed="@(!_phanHoi ? "true":"false")" @onclick="() => _phanHoi=false">Bằng chứng shipper</button>
+            <button type="button" class="nut-nho @(_phanHoi ? "chinh" : "")" aria-pressed="@(_phanHoi ? "true":"false")" @onclick="() => _phanHoi=true">Phản hồi khách hàng</button>
+        </div>
+    }
+    @if (_phanHoi && _data.TrangThaiGiao != "CHO_XAC_NHAN") { <DoiChieuKhachHang MaGiaoHang="MaGiaoHang" DaXuLy="DaDoiChieu" /> }
     else {
     <div class="bc-thong-tin">
         <div><span>Đơn / lượt giao</span><strong>@($"DH{_data.MaDonHang:D5}") · Lượt @_data.LanGiao/3</strong></div>
@@ -19,7 +23,7 @@ else if (_data != null)
         <div><span>Server ghi nhận</span><strong>@Gio(_data.ThoiDiemBaoCao)</strong></div>
         <div><span>Thời điểm GPS</span><strong>@Gio(_data.ThoiDiemGps)</strong></div>
     </div>
-    <section class="bc-ly-do"><h3>Lý do giao thất bại</h3><p>@_data.LyDo</p></section>
+    <section class="bc-ly-do"><h3>Lý do shipper báo giao thất bại</h3><p>@_data.LyDo</p></section>
     <section>
         <h3>Vị trí ghi nhận</h3>
         @if (_data.ViDo != null)
@@ -30,6 +34,18 @@ else if (_data != null)
         }
         else { <p>Lượt giao cũ chưa ghi nhận GPS.</p> }
     </section>
+    @if (!string.IsNullOrWhiteSpace(_data.DiaChiGiao))
+    {
+        <section>
+            <h3>Xác định vị trí shipper</h3>
+            <p>Địa chỉ phải giao: @_data.DiaChiGiao</p>
+            @if (_data.ViDo != null)
+            {
+                <p class="nv-phu">So vị trí GPS ở trên với địa chỉ phải giao. Bản đồ vẽ đường từ chỗ shipper đứng tới địa chỉ giao: càng gần thì shipper càng đúng nơi.</p>
+                <a href="@SoViTri()" target="_blank" rel="noopener noreferrer">So vị trí shipper với địa chỉ giao ↗</a>
+            }
+        </section>
+    }
     <section class="bc-anh">
         <h3>Ảnh nhật ký cuộc gọi</h3>
         @if (_data.Anh.Count == 0) { <p>Lượt giao cũ chưa có ảnh bằng chứng. Lịch sử trước khi nâng cấp được giữ nguyên.</p> }
@@ -95,5 +111,9 @@ else if (_data != null)
     private static string Gio(DateTimeOffset? value) => value?.ToOffset(TimeSpan.FromHours(7)).ToString("dd/MM/yyyy HH:mm:ss") ?? "Chưa ghi nhận";
     private string BanDo() => "https://www.google.com/maps/search/?api=1&query=" + Uri.EscapeDataString(
         _data.ViDo.Value.ToString(CultureInfo.InvariantCulture) + "," + _data.KinhDo.Value.ToString(CultureInfo.InvariantCulture));
+    // Bỏ phần "Chi tiết / Ghi chú giao" khi tìm tuyến, giống nút Mở đường đi của trang giao hàng.
+    private string SoViTri() => "https://www.google.com/maps/dir/?api=1&travelmode=walking&origin=" + Uri.EscapeDataString(
+        _data.ViDo.Value.ToString(CultureInfo.InvariantCulture) + "," + _data.KinhDo.Value.ToString(CultureInfo.InvariantCulture))
+        + "&destination=" + Uri.EscapeDataString(_data.DiaChiGiao.Split(" · ")[0]);
     public void Dispose() { _lanAnh++; _dung.Cancel(); _dung.Dispose(); }
 }

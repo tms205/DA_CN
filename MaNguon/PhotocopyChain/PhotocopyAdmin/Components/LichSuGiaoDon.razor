@@ -36,7 +36,7 @@
                     <div><span>Nhận giao</span><b>@Gio(chon.NgayNhan)</b></div>
                     <div><span>Kết quả giao</span><b>@Gio(chon.NgayGiao)</b></div>
                 </div>
-                @if (chon.TrangThai == "THAT_BAI")
+                @if (chon.TrangThai is "THAT_BAI" or "CHO_XAC_NHAN")
                 {
                     <BangChungGiaoHang @key="chon.MaGiaoHang" MaGiaoHang="chon.MaGiaoHang"
                         MoPhanHoi="@(chon.TrangThaiDoiChieu != null)" DaDoiChieu="SauDoiChieu" />
@@ -82,7 +82,8 @@
     private static string Gio(DateTime? value) => value?.ToString("dd/MM/yyyy HH:mm") ?? "Chưa ghi nhận";
     private static string TenTrangThai(string value) => value switch
     {
-        "THAT_BAI" => "Giao thất bại", "THANH_CONG" => "Giao thành công", "DANG_GIAO" => "Đang giao", _ => value
+        "THAT_BAI" => "Giao thất bại", "THANH_CONG" => "Giao thành công", "DANG_GIAO" => "Đang giao",
+        "CHO_XAC_NHAN" => "Chờ cửa hàng xác nhận thất bại", _ => value
     };
     private static string TenDoiChieu(LuotLichSuGiaoDto luot) => luot.TrangThaiDoiChieu switch
     {

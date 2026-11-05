@@ -44,25 +44,57 @@ public sealed class GeoapifyService
     }
     private sealed record ViTriDaLuu(int MaKhach, string DiaChi, decimal ViDo, decimal KinhDo);
 
-    public async Task<List<DiaChiGiaoDto>> TimDiaChi(string diaChi, decimal? viDo, decimal? kinhDo, CancellationToken dung = default)
+    // ganChiNhanh: khi tìm theo chữ, chỉ lấy kết quả trong vòng 50 km quanh chi nhánh và ưu tiên điểm gần,
+    // vì Geoapify hay trả địa chỉ trùng tên ở tỉnh khác. Không khoanh sát bán kính giao: khoanh sát thì Geoapify
+    // trả bừa một chỗ gần cho địa chỉ ở xa; để tìm đúng chỗ xa rồi bước báo giá báo "ngoài bán kính".
+    public async Task<List<DiaChiGiaoDto>> TimDiaChi(string diaChi, decimal? viDo, decimal? kinhDo, CancellationToken dung = default,
+        ChiNhanh ganChiNhanh = null)
     {
         if ((viDo == null) != (kinhDo == null) || viDo is < -90 or > 90 || kinhDo is < -180 or > 180)
             throw new InvalidOperationException("Tọa độ giao hàng không hợp lệ.");
-        string query;
+        var dsQuery = new List<string>();
         if (viDo != null)
-            query = $"geocode/reverse?lat={So(viDo.Value)}&lon={So(kinhDo.Value)}&lang=vi&limit=1";
+            dsQuery.Add($"geocode/reverse?lat={So(viDo.Value)}&lon={So(kinhDo.Value)}&lang=vi&limit=1");
         else
         {
             if (string.IsNullOrWhiteSpace(diaChi) || diaChi.Trim().Length < 10 || diaChi.Length > 255)
                 throw new InvalidOperationException("Nhập đủ địa chỉ (ít nhất 10, tối đa 255 ký tự) để tìm vị trí.");
-            query = "geocode/search?text=" + Uri.EscapeDataString(diaChi.Trim()) + "&filter=countrycode:vn&lang=vi&limit=5";
+            string loc = "&filter=countrycode:vn";
+            if (ganChiNhanh?.ViDo != null && ganChiNhanh.KinhDo != null)
+            {
+                string tam = So(ganChiNhanh.KinhDo.Value) + "," + So(ganChiNhanh.ViDo.Value);
+                loc = "&filter=circle:" + tam + ",50000&bias=proximity:" + tam;
+            }
+            // Geoapify không hiểu số hẻm kiểu "320/42": không ra thì thử lại với cách viết gọn hơn.
+            foreach (string cachViet in QuyTacGiaoHang.CachVietDiaChi(diaChi))
+                dsQuery.Add("geocode/search?text=" + Uri.EscapeDataString(cachViet) + "&lang=vi&limit=5" + loc);
         }
-        using JsonDocument json = await GoiBanDo(query, dung);
         var ds = new List<DiaChiGiaoDto>();
+        foreach (string query in dsQuery)
+        {
+            using JsonDocument json = await GoiBanDo(query, dung);
+            DocKetQua(json, ds, boQuaChungChung: viDo == null);
+            if (ds.Count > 0) break;
+        }
+        if (ds.Count == 0 && ganChiNhanh != null && viDo == null)
+            throw new InvalidOperationException("Chưa tìm thấy địa chỉ này. Hãy ghi rõ số nhà, tên đường, phường, quận hoặc dùng vị trí hiện tại.");
+        if (ds.Count == 0) throw new InvalidOperationException("Chưa tìm thấy địa chỉ tại Việt Nam. Hãy nhập rõ số nhà, đường, phường/xã, tỉnh/thành.");
+        return ds;
+    }
+
+    // boQuaChungChung: tìm theo chữ thì bỏ kết quả cả tỉnh/thành phố, vì tính phí tới giữa thành phố là sai.
+    private static void DocKetQua(JsonDocument json, List<DiaChiGiaoDto> ds, bool boQuaChungChung)
+    {
         foreach (var feature in json.RootElement.GetProperty("features").EnumerateArray())
         {
             if (feature.ValueKind != JsonValueKind.Object || !feature.TryGetProperty("properties", out var p) ||
                 p.ValueKind != JsonValueKind.Object) continue;
+            if (boQuaChungChung && p.TryGetProperty("result_type", out var loai) && loai.ValueKind == JsonValueKind.String &&
+                loai.GetString() is "country" or "state" or "county" or "city" or "postcode") continue;
+            // Geoapify chấm độ tin cậy 0–1: kết quả đúng thường > 0,6; kết quả "đoán bừa" chỉ 0–0,1.
+            if (boQuaChungChung && p.TryGetProperty("rank", out var hang) && hang.ValueKind == JsonValueKind.Object &&
+                hang.TryGetProperty("confidence", out var tinCay) && tinCay.ValueKind == JsonValueKind.Number &&
+                tinCay.GetDouble() < 0.4) continue;
             if (!p.TryGetProperty("country_code", out var country) || country.ValueKind != JsonValueKind.String || country.GetString() != "vn") continue;
             if (!p.TryGetProperty("lat", out var lat) || !p.TryGetProperty("lon", out var lon) ||
                 !p.TryGetProperty("formatted", out var text)) continue;
@@ -71,8 +103,6 @@ public sealed class GeoapifyService
                 text.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(text.GetString()) || text.GetString().Length > 255) continue;
             ds.Add(new DiaChiGiaoDto { DiaChi = text.GetString(), ViDo = vi, KinhDo = kinh });
         }
-        if (ds.Count == 0) throw new InvalidOperationException("Chưa tìm thấy địa chỉ tại Việt Nam. Hãy nhập rõ số nhà, đường, phường/xã, tỉnh/thành.");
-        return ds;
     }
 
     public async Task<KetQuaPhiGiaoHang> TinhPhi(ChiNhanh chiNhanh, string diaChi, decimal? viDo, decimal? kinhDo, CancellationToken dung = default)
@@ -100,7 +130,9 @@ public sealed class GeoapifyService
             !p.TryGetProperty("time", out var time) || time.ValueKind != JsonValueKind.Number || !time.TryGetDouble(out double giay) || !double.IsFinite(giay) || giay < 0 || giay > int.MaxValue)
             throw new InvalidOperationException("Bản đồ trả về quãng đường/thời gian không hợp lệ. Vui lòng thử lại.");
         decimal km = met / 1000;
-        if (km > chiNhanh.BanKinhGiao) throw new InvalidOperationException($"Địa chỉ nằm ngoài bán kính giao {chiNhanh.BanKinhGiao:0.##} km của chi nhánh.");
+        if (km > chiNhanh.BanKinhGiao)
+            throw new InvalidOperationException($"Địa chỉ cách chi nhánh khoảng {Math.Ceiling(km * 10) / 10:0.#} km đường đi, " +
+                $"ngoài bán kính giao {chiNhanh.BanKinhGiao:0.##} km của chi nhánh. Hãy chọn chi nhánh khác gần hơn hoặc chọn Nhận tại quầy.");
         return new KetQuaPhiGiaoHang(Math.Ceiling(km * 100) / 100, QuyTacGiaoHang.TinhPhi(km, _config), (int)Math.Ceiling(giay));
     }
 

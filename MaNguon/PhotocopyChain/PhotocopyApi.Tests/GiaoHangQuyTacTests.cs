@@ -14,6 +14,21 @@ public class GiaoHangQuyTacTests
         return type;
     }
 
+    [Fact]
+    public void CachVietDiaChi_SoHem_ThemDauPhay_RoiBoSoNha()
+    {
+        Assert.Equal(new List<string>
+        {
+            "320/42 Ấp Chiến Lược quận Bình Tân Thành Phố Hồ Chí Minh",
+            "320 Ấp Chiến Lược, quận Bình Tân, Thành Phố Hồ Chí Minh",
+            "Ấp Chiến Lược, quận Bình Tân, Thành Phố Hồ Chí Minh",
+        }, PhotocopyApi.GiaoHang.QuyTacGiaoHang.CachVietDiaChi("  320/42 Ấp Chiến Lược   quận Bình Tân Thành Phố Hồ Chí Minh "));
+        // Địa chỉ đã đủ dấu phẩy, không có hẻm: chỉ thêm cách bỏ số nhà.
+        Assert.Equal(new List<string> { "140 Lê Trọng Tấn, Tân Phú, Hồ Chí Minh", "Lê Trọng Tấn, Tân Phú, Hồ Chí Minh" },
+            PhotocopyApi.GiaoHang.QuyTacGiaoHang.CachVietDiaChi("140 Lê Trọng Tấn, Tân Phú, Hồ Chí Minh"));
+        Assert.Empty(PhotocopyApi.GiaoHang.QuyTacGiaoHang.CachVietDiaChi("   "));
+    }
+
     [Theory]
     [InlineData(0, 15000)]
     [InlineData(2, 15000)]

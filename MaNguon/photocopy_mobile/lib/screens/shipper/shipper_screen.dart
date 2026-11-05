@@ -146,7 +146,7 @@ class _ShipperScreenState extends State<ShipperScreen>
       if (mounted && daGui == true) {
         hienThongBaoNhanh(
           context,
-          'Đã lưu báo cáo và bằng chứng giao thất bại.',
+          'Đã gửi báo cáo giao thất bại. Chờ cửa hàng xác nhận.',
         );
         await _tai();
       }
@@ -239,8 +239,28 @@ class _ShipperScreenState extends State<ShipperScreen>
                     : 'Giao thất bại',
               ),
             ),
-          if ((_nhom == 'LICH_SU' || _nhom == 'THAT_BAI') &&
-              don.trangThaiGiao == 'THAT_BAI' &&
+          if (_nhom == 'DANG_GIAO' &&
+              don.trangThaiGiao == 'DANG_GIAO' &&
+              don.lyDoTuChoi != null &&
+              don.lyDoTuChoi!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: HopThongBao(
+                'Cửa hàng từ chối báo giao thất bại: ${don.lyDoTuChoi}. Hãy tiếp tục giao đơn này.',
+                loai: LoaiThongBao.canhBao,
+              ),
+            ),
+          if (_nhom == 'DANG_GIAO' && don.trangThaiGiao == 'CHO_XAC_NHAN')
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: HopThongBao(
+                'Đã gửi báo giao thất bại. Chờ cửa hàng xác nhận vị trí và bằng chứng.',
+                loai: LoaiThongBao.canhBao,
+              ),
+            ),
+          if (((_nhom == 'LICH_SU' || _nhom == 'THAT_BAI') &&
+                  don.trangThaiGiao == 'THAT_BAI' ||
+              don.trangThaiGiao == 'CHO_XAC_NHAN') &&
               don.maGiaoHang != null)
             OutlinedButton.icon(
               onPressed: () => Navigator.push(
@@ -291,7 +311,8 @@ class _ShipperScreenState extends State<ShipperScreen>
                 child: Text(_dangGui ? 'Đang xử lý…' : 'Nhận tài liệu đi giao'),
               ),
           ],
-          if (_nhom == 'DANG_GIAO') ...[
+          // Lượt đang chờ cửa hàng xác nhận thì chưa báo kết quả lại được.
+          if (_nhom == 'DANG_GIAO' && don.trangThaiGiao != 'CHO_XAC_NHAN') ...[
             const SizedBox(height: 8),
             FilledButton(
               onPressed: _dangGui ? null : () => _ketQua(don, true),
