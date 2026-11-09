@@ -1,4 +1,4 @@
-﻿@page "/lap-don-tai-quay"
+@page "/lap-don-tai-quay"
 @attribute [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
 @inject HttpClient Http
 @inject PhienDangNhap Phien
@@ -10,7 +10,6 @@
 <TieuDeTrang TieuDe="Lập đơn tại quầy" MoTa="Khách chọn quét QR payOS hoặc COD · thanh toán khi nhận tài liệu" />
 
 <div class="than-trang khoi-doc">
-    @if (_loi != null) { <div class="o-loi"><span>@_loi</span></div> }
     @if (_thongBao != null) { <div class="o-thanh-cong the-rong"><span>@_thongBao</span></div> }
 
     @if (_thanhToanVuaLap != null && _thanhToanVuaLap.PhuongThuc == "VIETQR")
@@ -328,13 +327,13 @@
     }
 </div>
 <XacNhanThaoTac @ref="_xacNhan" />
+<ThongBaoLoi @bind-NoiDung="_loi" />
 <dialog class="mau-xem-truoc" @ref="_hopMau" aria-label="Bản xem trước mẫu đơn" aria-labelledby="mau-xem-tieu-de">
     @if (_mauDangXem != null)
     {
         <div class="mau-thanh-cong-cu">
         <h3 id="mau-xem-tieu-de">@_mauDangXem.TenMau · @_mauDangXem.SoTrang trang</h3>
         <p>@_mauDangXem.PhamVi</p>
-        @if (_loi != null) { <div class="o-loi" role="alert">@_loi</div> }
         <button class="nut-nho chinh" disabled="@(_dangGui || _dangTaiFile || _dangXemMau || _mauXem == null)" @onclick="() => ChonMauAsync(_mauDangXem)">Chọn mẫu này để in</button>
         <button class="nut-nho" autofocus @onclick="DongXemMauAsync">Đóng bản xem trước</button>
         <div class="mau-dieu-khien">
@@ -518,7 +517,7 @@
         }
         catch { _loi = "Không tạo được file mẫu đơn."; }
         finally { _dangTaiFile = false; }
-        if (_dsFile.Count > 0) await BaoGiaAsync();
+        if (_loi == null && _dsFile.Count > 0) await BaoGiaAsync();
     }
     private string _huongGiay = "DUNG";
     private List<DichVuDto> _dsDichVu = new();
@@ -662,9 +661,15 @@
     private async Task TaiFileAsync(InputFileChangeEventArgs e)
     {
         if (_khach == null || _dangGui || _dangTaiFile) return;
+        if (e.FileCount > 10)
+        {
+            _loi = "Chỉ chọn tối đa 10 file mỗi lần tải lên.";
+            return;
+        }
         int soFileTruoc = _dsFile.Count;
         XoaBaoGia();
         _dangTaiFile = true; _loi = null;
+        var loiTaiFile = new List<string>();
         foreach (IBrowserFile file in e.GetMultipleFiles(10))
         {
             try
@@ -677,14 +682,16 @@
                 if (LaAnhThe) uri += "&kichThuocAnh=" + _kichThuocAnh + "&soLuongAnh=" + _soLuongAnh;
                 var res = await Http.PostAsync(uri, form);
                 if (res.IsSuccessStatusCode) _dsFile.Add(await res.Content.ReadFromJsonAsync<FileInDto>());
-                else _loi = (await res.Content.ReadFromJsonAsync<ApiError>()).Message;
+                else loiTaiFile.Add(file.Name + " · " + await DocLoiApi.TuPhanHoiAsync(res, "Không tải được file."));
             }
-            catch { _loi = "Không tải được file " + file.Name + "."; }
+            catch { loiTaiFile.Add("Không tải được file " + file.Name + "."); }
         }
         _dangTaiFile = false;
         if (_dsFile.Count > soFileTruoc) _cuonToiQuyCach = true;
         KiemTraKimGoc();
         if (_dsFile.Count > 0) await BaoGiaAsync();
+        if (_loi != null) loiTaiFile.Add(_loi);
+        if (loiTaiFile.Count > 0) _loi = string.Join("\n", loiTaiFile);
     }
 
     private async Task XoaFileAsync(FileInDto file)
@@ -815,6 +822,11 @@
     {
         if (_dangGui || _dangTaiFile || _baoGia == null) return;
         if (_khach == null) { _loi = "Vui lòng chọn khách hàng."; return; }
+        if (_baoGia.TongTien < QuyTacIn.TongTienDonToiThieu)
+        {
+            _loi = QuyTacIn.LoiTongTienDonToiThieu;
+            return;
+        }
         var req = new DatDonTaiQuayRequest { MaKhachHang = _khach.MaKhachHang, PhuongThucThanhToan = _phuongThucThanhToan, InGap = _inGap, MaCodeKhuyenMai = _maCode, GhiChu = _ghiChu, FileIn = TaoDongIn() };
         string noiDung=System.Text.Json.JsonSerializer.Serialize(req);
         if(_noiDungYeuCauTao!=noiDung || _maYeuCauTao==Guid.Empty) {
@@ -837,7 +849,7 @@
                 else _thanhToanVuaLap = null;
                 _dsFile.Clear(); XoaBaoGia(); _ghiChu = "";
             }
-            else _loi = (await res.Content.ReadFromJsonAsync<ApiError>()).Message;
+            else _loi = await DocLoiApi.TuPhanHoiAsync(res, "Không lập được đơn.");
         }
         catch { _loi = "Chưa xác nhận được kết quả. Giữ nguyên thông tin và bấm lại để kiểm tra cùng yêu cầu, tránh lập thêm đơn."; }
         _dangGui = false;
@@ -868,7 +880,7 @@
                 _loi = (await res.Content.ReadFromJsonAsync<ApiError>()).Message;
         }
         catch { _loi = "Không tạo được mã QR payOS."; }
-        await TaiLaiThanhToanAsync();
+        if (_loi == null) await TaiLaiThanhToanAsync();
     }
 
     private static readonly System.Globalization.NumberFormatInfo KieuSoVietNam = new() { NumberGroupSeparator = ".", NumberDecimalSeparator = "," };

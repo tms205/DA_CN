@@ -12,9 +12,10 @@ namespace PhotocopyApi.Tests;
 public class PopupQuanTriTests
 {
     [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public async Task PopupChiRenderFormKhiMo_VaHienLoiBusyTrongPopup(bool mo)
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public async Task PopupChiRenderFormKhiMo_VaLoiCoHopThoaiRieng(bool mo, bool dangLuu)
     {
         var type = typeof(MauDon).Assembly.GetType("PhotocopyAdmin.Components.HopThoaiQuanTri");
         Assert.NotNull(type);
@@ -24,7 +25,7 @@ public class PopupQuanTriTests
         await using var renderer = new HtmlRenderer(sp, sp.GetRequiredService<ILoggerFactory>());
         string html = await renderer.Dispatcher.InvokeAsync(async () => {
             var root = await renderer.RenderComponentAsync(type, ParameterView.FromDictionary(new Dictionary<string, object> {
-                ["Mo"] = mo, ["TieuDe"] = "Thêm & sửa bản ghi", ["Loi"] = "Lỗi kiểm thử", ["DangLuu"] = true,
+                ["Mo"] = mo, ["TieuDe"] = "Thêm & sửa bản ghi", ["Loi"] = "Lỗi kiểm thử", ["DangLuu"] = dangLuu,
                 ["NoiDung"] = (RenderFragment)(b => b.AddContent(0, "NOI_DUNG_FORM")),
                 ["Chan"] = (RenderFragment)(b => b.AddContent(0, "CAC_NUT_FORM"))
             }));
@@ -33,8 +34,16 @@ public class PopupQuanTriTests
         Assert.Contains("<dialog", html);
         Assert.Equal(mo, html.Contains("NOI_DUNG_FORM"));
         Assert.Equal(mo, html.Contains("CAC_NUT_FORM"));
-        Assert.Equal(mo, html.Contains("Lỗi kiểm thử"));
-        if (mo) { Assert.Contains("role=\"alert\"", html); Assert.Contains("disabled", html); Assert.Contains("Thêm & sửa bản ghi", html); }
+        if (mo) Assert.Contains("Thêm & sửa bản ghi", html);
+        if (dangLuu) Assert.Contains("disabled", html);
+        Assert.Equal(mo && !dangLuu, html.Contains("Lỗi kiểm thử"));
+        if (mo && !dangLuu)
+        {
+            int sauForm = html.IndexOf("</dialog>", StringComparison.Ordinal);
+            Assert.DoesNotContain("Lỗi kiểm thử", html[..sauForm]);
+            Assert.Contains("role=\"alertdialog\"", html[sauForm..]);
+            Assert.Contains("Đã hiểu", html[sauForm..]);
+        }
     }
 
     private sealed class JsKhongChay : IJSRuntime

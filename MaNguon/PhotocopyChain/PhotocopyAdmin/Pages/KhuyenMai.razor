@@ -8,12 +8,9 @@
 <TieuDeTrang TieuDe="Quản lý khuyến mãi" MoTa="@MoTaPhamVi()" />
 
 <div class="than-trang khoi-doc">
-    @if (_loi != null && !_moForm)
+    @if (!_moForm)
     {
-        <div class="o-loi" role="alert">
-            @((MarkupString)Svg.ChamThan())
-            <span>@_loi</span>
-        </div>
+        <ThongBaoLoi @bind-NoiDung="_loi" />
     }
     @if (_thongBao != null)
     {
@@ -42,7 +39,7 @@
 
     <HopThoaiQuanTri Mo="@(_moForm && CoTheSua())" TieuDe="@(_dangSua == null ? "Tạo mã khuyến mãi mới" : "Chỉnh sửa khuyến mãi #" + _dangSua.MaKhuyenMai)"
                     MoTa="Chương trình chỉ áp dụng tại chi nhánh đang chọn. Kiểm tra thời hạn và số lượng trước khi lưu."
-                    Loi="@_loi" DangLuu="@_dangLuu" Dong="DongForm" Rong="true">
+                    @bind-Loi="_loi" DangLuu="@_dangLuu" Dong="DongForm" Rong="true">
         <NoiDung>
         <form id="khuyen-mai-form" @onsubmit="LuuAsync" @onsubmit:preventDefault>
             <div class="ca-loc-luoi">

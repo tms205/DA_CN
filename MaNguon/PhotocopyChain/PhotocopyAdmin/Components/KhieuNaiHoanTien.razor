@@ -1,4 +1,4 @@
-﻿@using PhotocopyShared.Dtos.DonHang
+@using PhotocopyShared.Dtos.DonHang
 @inject HttpClient Http
 <section class="@(HienTieuDe ? "the the-bang " : "")ht-ho-so" aria-label="Hồ sơ hoàn tiền do sản phẩm">
     @if (HienTieuDe)
@@ -29,7 +29,7 @@
         <div class="ht-phan-trang"><span>@DaLoc().Count hồ sơ · Trang @Math.Min(_trang,TongTrang)/@TongTrang</span><div><button class="nut-nho" disabled="@(_trang<=1)" @onclick="()=>_trang--">Trước</button><button class="nut-nho" disabled="@(_trang>=TongTrang)" @onclick="()=>_trang++">Sau</button></div></div>
     }
 </section>
-<HopThoaiQuanTri Mo="@(_chon!=null)" TieuDe="Xem xét yêu cầu hoàn tiền" MoTa="Đối chiếu hồ sơ trước khi ra quyết định" Loi="@_loi" DangLuu="@_gui" Dong="Dong" Rong="true">
+<HopThoaiQuanTri Mo="@(_chon!=null)" TieuDe="Xem xét yêu cầu hoàn tiền" MoTa="Đối chiếu hồ sơ trước khi ra quyết định" @bind-Loi="_loi" DangLuu="@_gui" Dong="Dong" Rong="true">
     <NoiDung>@if(_chon is {} h) {
         <div class="ht-tom-tat"><div><span class="ht-trang-thai @Mau(h.TrangThai)">@Nhan(h.TrangThai)</span><h3>@($"DH{h.MaDonHang:D5}") · @h.TenKhachHang</h3><p>@h.TenChiNhanh · @h.GuiLuc.ToOffset(TimeSpan.FromHours(7)).ToString("HH:mm dd/MM/yyyy")</p></div><div class="ht-so-tien"><span>Yêu cầu hoàn toàn bộ</span><strong>@Tien(h.SoTien)</strong></div></div>
         <div class="ht-luoi-ho-so">

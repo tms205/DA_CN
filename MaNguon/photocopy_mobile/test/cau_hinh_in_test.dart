@@ -348,13 +348,14 @@ void main() {
     }
     if (req.url.path == '/api/bao-gia') {
       baoGia.add(Map<String, dynamic>.from(jsonDecode(req.body)));
+      final tienIn = don == null ? 600 : 1200;
       return traJson({
-        'tienIn': 600,
+        'tienIn': tienIn,
         'tienGiaCong': 0,
         'phuPhiGap': 0,
         'phiShip': 0,
         'giamGia': 0,
-        'tongTien': 600,
+        'tongTien': tienIn,
         'tongSoTrang': 2,
       });
     }

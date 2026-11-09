@@ -25,10 +25,7 @@
                 }
             </ol>
         }
-        @if (_loi != null)
-        {
-            <div class="o-loi" role="alert">@((MarkupString)Svg.ChamThan())<span>@_loi</span></div>
-        }
+        <ThongBaoLoi @bind-NoiDung="_loi" />
         @if (_thongBao != null)
         {
             <div class="o-thanh-cong" role="status">@((MarkupString)Svg.DauTich(15))<span>@_thongBao</span></div>

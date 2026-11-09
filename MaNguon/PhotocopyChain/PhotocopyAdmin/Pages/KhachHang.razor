@@ -6,7 +6,10 @@
 <TieuDeTrang TieuDe="Khách hàng" MoTa="Quản lý tài khoản và thống kê đơn trong phạm vi đang chọn. Khóa tài khoản áp dụng toàn hệ thống." />
 
 <div class="than-trang khoi-doc">
-    @if (_loi != null && _doiTrangThai == null && _sua == null) { <div class="o-loi" role="alert">@_loi</div> }
+    @if (_doiTrangThai == null && _sua == null)
+    {
+        <ThongBaoLoi @bind-NoiDung="_loi" />
+    }
     @if (_thongBao != null) { <div class="o-thanh-cong" role="status">@_thongBao</div> }
     <section class="the the-bang" aria-label="Danh sách khách hàng">
         <div class="bang-tieu-de"><div><h2>Danh sách khách hàng</h2><p class="bang-mo-ta">Tổng chi tiêu chỉ tính đơn hoàn tất, không tính đơn in lại lỗi quầy.</p></div><button class="nut-phu" @onclick="TaiAsync" disabled="@_dangTai">Làm mới</button></div>
@@ -43,7 +46,7 @@
             <div class="bang-tieu-de"><span>Trang @_trang / @SoTrang · @DaLoc.Count khách hàng</span><div class="xac-nhan-o"><button class="nut-phu" disabled="@(_trang <= 1)" @onclick="() => _trang--">Trước</button><button class="nut-phu" disabled="@(_trang >= SoTrang)" @onclick="() => _trang++">Sau</button></div></div>
         }
     </section>
-    <HopThoaiQuanTri Mo="@(_sua != null)" TieuDe="Sửa khách hàng" MoTa="Cập nhật thông tin liên hệ; không đổi email đăng nhập, mật khẩu hay quyền tài khoản." Loi="@_loi" DangLuu="@_dangLuu" Dong="DongSua">
+    <HopThoaiQuanTri Mo="@(_sua != null)" TieuDe="Sửa khách hàng" MoTa="Cập nhật thông tin liên hệ; không đổi email đăng nhập, mật khẩu hay quyền tài khoản." @bind-Loi="_loi" DangLuu="@_dangLuu" Dong="DongSua">
     <NoiDung>
         <EditForm id="kh-form-sua" Model="_formSua" OnValidSubmit="LuuKhachHangAsync" class="dn-form">
             <DataAnnotationsValidator />
@@ -78,7 +81,7 @@
         </section>
     </NoiDung>
     </HopThoaiQuanTri>
-    <HopThoaiQuanTri Mo="@(_doiTrangThai != null)" TieuDe="Xác nhận trạng thái tài khoản" Loi="@_loi" DangLuu="@_dangLuu" Dong="DongTrangThai">
+    <HopThoaiQuanTri Mo="@(_doiTrangThai != null)" TieuDe="Xác nhận trạng thái tài khoản" @bind-Loi="_loi" DangLuu="@_dangLuu" Dong="DongTrangThai">
     <NoiDung>
         <section class="the the-rong" aria-label="Xác nhận trạng thái khách hàng">
             <h2 class="the-tieu-de nho">@(_doiTrangThai.TrangThai == "KHOA" ? "Mở khóa" : "Khóa") tài khoản @_doiTrangThai.HoTen?</h2>

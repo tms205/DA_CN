@@ -626,6 +626,23 @@ class NhanNho extends StatelessWidget {
       );
 }
 
+Future<void> hienThongBaoLoi(BuildContext context, String noiDung) {
+  return showDialog<void>(
+    context: context,
+    builder: (hop) => AlertDialog(
+      icon: Icon(Icons.error_outline, color: Theme.of(hop).colorScheme.error),
+      title: const Text('Không thực hiện được'),
+      content: SingleChildScrollView(child: Text(noiDung)),
+      actions: [
+        FilledButton(
+          onPressed: () => Navigator.pop(hop),
+          child: const Text('Đã hiểu'),
+        ),
+      ],
+    ),
+  );
+}
+
 // Hiện 1 dòng thông báo ngắn dưới đáy màn hình (SnackBar)
 void hienThongBaoNhanh(BuildContext context, String noiDung) {
   ScaffoldMessenger.of(context).hideCurrentSnackBar();

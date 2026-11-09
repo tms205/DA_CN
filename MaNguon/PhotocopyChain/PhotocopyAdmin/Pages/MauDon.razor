@@ -7,7 +7,10 @@
 <TieuDeTrang TieuDe="Mẫu đơn in sẵn" MoTa="Thư viện dùng chung toàn chuỗi. Tải PDF lên một lần, chọn để in trên web và app." />
 
 <div class="than-trang khoi-doc">
-    @if (_loi != null && !_moForm) { <div class="o-loi" role="alert">@_loi</div> }
+    @if (!_moForm)
+    {
+        <ThongBaoLoi @bind-NoiDung="_loi" />
+    }
     @if (_thongBao != null) { <div class="o-thanh-cong" role="status">@_thongBao</div> }
     <div class="xac-nhan-o">
         <button type="button" class="nut-chinh" disabled="@_dangLuu" @onclick="ThemMoi">Tải mẫu lên</button>
@@ -64,7 +67,7 @@
                 <button type="button" class="mau-dong-form" data-dong-form-mau aria-label="Đóng form mẫu đơn" disabled="@_dangLuu" @onclick="YeuCauDongForm">×</button>
             </header>
             <div class="mau-form-noi-dung">
-                @if (_loi != null) { <div class="mau-form-loi o-loi" role="alert">@_loi</div> }
+                <ThongBaoLoi @bind-NoiDung="_loi" />
                 <div class="mau-form-luoi">
                     <section class="mau-thong-tin" aria-labelledby="mau-nhan-thong-tin">
                         <div class="mau-muc-dau"><h3 id="mau-nhan-thong-tin">Thông tin mẫu</h3><span>* Bắt buộc</span></div>

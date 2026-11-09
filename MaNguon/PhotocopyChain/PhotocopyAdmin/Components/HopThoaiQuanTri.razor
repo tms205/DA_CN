@@ -8,18 +8,19 @@
             <button type="button" class="qt-popup-dong" data-dong-popup aria-label="Đóng hộp thoại" disabled="@DangLuu" @onclick="DongAsync">×</button>
         </header>
         <div class="qt-popup-than">
-            @if (!string.IsNullOrWhiteSpace(Loi)) { <div class="o-loi" role="alert">@Loi</div> }
             <fieldset class="qt-popup-truong" disabled="@DangLuu">@NoiDung</fieldset>
         </div>
         @if (Chan != null) { <footer class="qt-popup-chan">@Chan</footer> }
     }
 </dialog>
+<ThongBaoLoi NoiDung="@(Mo && !DangLuu ? Loi : null)" NoiDungChanged="LoiChanged" />
 
 @code {
     [Parameter] public bool Mo { get; set; }
     [Parameter] public string TieuDe { get; set; } = "";
     [Parameter] public string MoTa { get; set; }
     [Parameter] public string Loi { get; set; }
+    [Parameter] public EventCallback<string> LoiChanged { get; set; }
     [Parameter] public bool DangLuu { get; set; }
     [Parameter] public bool Rong { get; set; }
     [Parameter] public bool ToanMan { get; set; }

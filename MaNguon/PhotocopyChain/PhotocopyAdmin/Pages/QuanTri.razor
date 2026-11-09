@@ -10,12 +10,9 @@
 <TieuDeTrang TieuDe="Chi nhánh & máy in" MoTa="Quản lý mạng lưới chi nhánh, thiết bị in ấn và vùng phục vụ toàn hệ thống" />
 
 <div class="than-trang khoi-doc">
-    @if (_loi != null && _suaChiNhanh == null && _themMay == null && _suaChiSo == null)
+    @if (_suaChiNhanh == null && _themMay == null && _suaChiSo == null)
     {
-        <div class="o-loi">
-            @((MarkupString)Svg.ChamThan())
-            <span>@_loi</span>
-        </div>
+        <ThongBaoLoi @bind-NoiDung="_loi" />
     }
     @if (_thongBao != null)
     {
@@ -33,7 +30,7 @@
         </div>
     }
     <button class="nut-phu" @onclick="TaiAsync" disabled="@_dangLuu">Làm mới danh sách</button>
-    <HopThoaiQuanTri Mo="@(_suaChiNhanh != null)" TieuDe="@(_suaChiNhanh?.MaChiNhanh == 0 ? "Thêm chi nhánh mới" : "Sửa chi nhánh")" Loi="@_loi" DangLuu="@_dangLuu" Dong="DongChiNhanh" Rong="true">
+    <HopThoaiQuanTri Mo="@(_suaChiNhanh != null)" TieuDe="@(_suaChiNhanh?.MaChiNhanh == 0 ? "Thêm chi nhánh mới" : "Sửa chi nhánh")" @bind-Loi="_loi" DangLuu="@_dangLuu" Dong="DongChiNhanh" Rong="true">
         <NoiDung>
         <form id="qt-form-chi-nhanh" @onsubmit="LuuChiNhanhAsync" @onsubmit:preventDefault>
             <div class="ca-loc-luoi">
@@ -76,7 +73,7 @@
         <Chan><button type="button" class="nut-phu" disabled="@_dangLuu" @onclick="DongChiNhanh">Hủy</button><button type="submit" form="qt-form-chi-nhanh" class="nut-chinh" disabled="@_dangLuu">@(_dangLuu ? "Đang lưu…" : "Lưu chi nhánh")</button></Chan>
     </HopThoaiQuanTri>
 
-    <HopThoaiQuanTri Mo="@(_themMay != null)" TieuDe="Thêm máy in mới" Loi="@_loi" DangLuu="@_dangLuu" Dong="DongMayMoi" Rong="true">
+    <HopThoaiQuanTri Mo="@(_themMay != null)" TieuDe="Thêm máy in mới" @bind-Loi="_loi" DangLuu="@_dangLuu" Dong="DongMayMoi" Rong="true">
         <NoiDung>
         <form id="qt-form-may" @onsubmit="LuuMayMoiAsync" @onsubmit:preventDefault>
             <div class="ca-loc-luoi">
@@ -94,7 +91,7 @@
         </NoiDung>
         <Chan><button type="button" class="nut-phu" disabled="@_dangLuu" @onclick="DongMayMoi">Hủy</button><button type="submit" form="qt-form-may" class="nut-chinh" disabled="@_dangLuu">@(_dangLuu ? "Đang lưu…" : "Lưu máy in")</button></Chan>
     </HopThoaiQuanTri>
-    <HopThoaiQuanTri Mo="@(_suaChiSo != null)" TieuDe="Sửa chỉ số trang in" MoTa="Nhập số counter trên thiết bị. Không thay đổi thông số in của các đơn cũ." Loi="@_loi" DangLuu="@_dangLuu" Dong="DongChiSo">
+    <HopThoaiQuanTri Mo="@(_suaChiSo != null)" TieuDe="Sửa chỉ số trang in" MoTa="Nhập số counter trên thiết bị. Không thay đổi thông số in của các đơn cũ." @bind-Loi="_loi" DangLuu="@_dangLuu" Dong="DongChiSo">
         <NoiDung><form id="qt-form-counter" @onsubmit="LuuChiSoAsync" @onsubmit:preventDefault><p><b>@_suaChiSo?.TenMay</b></p><label class="nhan" for="qt-counter">Chỉ số trang in</label><input id="qt-counter" required class="ca-o-loc mono" type="number" min="0" max="2147483647" step="1" @bind="_chiSoMoi" /></form></NoiDung>
         <Chan><button type="button" class="nut-phu" disabled="@_dangLuu" @onclick="DongChiSo">Hủy</button><button type="submit" form="qt-form-counter" class="nut-chinh" disabled="@_dangLuu">Lưu chỉ số</button></Chan>
     </HopThoaiQuanTri>

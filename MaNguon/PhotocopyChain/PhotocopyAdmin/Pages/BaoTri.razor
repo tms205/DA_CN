@@ -46,7 +46,7 @@
                 <textarea id="loi-nhan-bao-tri" rows="5" maxlength="500" @bind="_message" @bind:event="oninput" disabled="@_busy" placeholder="Ví dụ: Hệ thống đang nâng cấp. Vui lòng quay lại sau."></textarea>
                 <div class="bt-count">@(_message?.Length ?? 0) / 500 ký tự</div>
                 <div class="bt-preview"><span class="bt-preview-label">XEM TRƯỚC THÔNG BÁO</span><strong>@(_khoaWeb||_khoaApp?"Hệ thống đang bảo trì":"Chức năng đang bảo trì")</strong><p>@(string.IsNullOrWhiteSpace(_message) ? "Lời nhắn của bạn sẽ xuất hiện tại đây." : _message)</p><p>Dự kiến mở lại: @Gio(_gioHeThong.AddHours(double.IsFinite(_soGio)&&_soGio is >=0.25 and <=168?_soGio:2))</p></div>
-                @if (_error != null) { <div class="bt-error" role="alert">@_error</div> }
+                @if (_error != null) { <ThongBaoLoi @bind-NoiDung="_error" /> }
                 @if (_notice != null) { <div class="bt-success" role="status">@_notice</div> }
                 <div class="bt-actions">
                     @if (_state.DangBaoTri)

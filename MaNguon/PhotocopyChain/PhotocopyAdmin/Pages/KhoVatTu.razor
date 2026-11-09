@@ -9,12 +9,9 @@
 <TieuDeTrang TieuDe="Kho vật tư" MoTa="Theo dõi tồn kho thực tế, cảnh báo định mức tối thiểu và quản lý phiếu nhập hàng" />
 
 <div class="than-trang khoi-doc">
-    @if (_loi != null && !_moForm && !_moVatTu && !_moCanhBao)
+    @if (!_moForm && !_moVatTu && !_moCanhBao)
     {
-        <div class="o-loi">
-            @((MarkupString)Svg.ChamThan())
-            <span>@_loi</span>
-        </div>
+        <ThongBaoLoi @bind-NoiDung="_loi" />
     }
     @if (_thongBao != null)
     {
@@ -37,7 +34,7 @@
     </div>
     @if (LaCEO())
     {
-        <HopThoaiQuanTri Mo="@_moVatTu" TieuDe="@(_vatTuDangSua == null ? "Thêm vật tư mới" : "Sửa thông tin vật tư")" MoTa="Danh mục dùng chung toàn chuỗi; không thay đổi số lượng tồn hay giá bán dịch vụ." Loi="@_loi" DangLuu="@_dangLuu" Dong="DongVatTu">
+        <HopThoaiQuanTri Mo="@_moVatTu" TieuDe="@(_vatTuDangSua == null ? "Thêm vật tư mới" : "Sửa thông tin vật tư")" MoTa="Danh mục dùng chung toàn chuỗi; không thay đổi số lượng tồn hay giá bán dịch vụ." @bind-Loi="_loi" DangLuu="@_dangLuu" Dong="DongVatTu">
             <NoiDung>
                 <form id="kho-form-vat-tu" @onsubmit="LuuVatTuAsync" @onsubmit:preventDefault>
                     <div class="khoi-doc">
@@ -80,7 +77,7 @@
             </Chan>
         </HopThoaiQuanTri>
     }
-    <HopThoaiQuanTri Mo="@_moCanhBao" TieuDe="Sửa mức cảnh báo tồn kho" MoTa="Chỉ áp dụng cho vật tư tại chi nhánh đang sửa, không điều chỉnh số lượng tồn." Loi="@_loi" DangLuu="@_dangLuu" Dong="DongCanhBao">
+    <HopThoaiQuanTri Mo="@_moCanhBao" TieuDe="Sửa mức cảnh báo tồn kho" MoTa="Chỉ áp dụng cho vật tư tại chi nhánh đang sửa, không điều chỉnh số lượng tồn." @bind-Loi="_loi" DangLuu="@_dangLuu" Dong="DongCanhBao">
         <NoiDung>
             <form id="kho-form-canh-bao" @onsubmit="LuuCanhBaoAsync" @onsubmit:preventDefault>
                 <div class="khoi-doc">
@@ -103,7 +100,7 @@
     {
         <div class="o-canh-bao">Tồn giấy chưa phân loại đang được giữ riêng, chưa tính vào giấy 70gsm/80gsm. Cần kiểm kê trước khi phân bổ; không nhập bù lần nữa cùng lượng giấy đang có.</div>
     }
-    <HopThoaiQuanTri Mo="@_moForm" TieuDe="@(LaCEO() ? "Lập và duyệt phiếu nhập vật tư" : "Đề xuất nhập vật tư")" MoTa="Tồn kho chỉ tăng sau khi xác nhận nhận hàng thực tế." Loi="@_loi" DangLuu="@_dangLuu" Dong="DongForm">
+    <HopThoaiQuanTri Mo="@_moForm" TieuDe="@(LaCEO() ? "Lập và duyệt phiếu nhập vật tư" : "Đề xuất nhập vật tư")" MoTa="Tồn kho chỉ tăng sau khi xác nhận nhận hàng thực tế." @bind-Loi="_loi" DangLuu="@_dangLuu" Dong="DongForm">
         <NoiDung>
         <form id="kho-form-phieu" @onsubmit="TaoPhieuAsync" @onsubmit:preventDefault>
             <div class="ca-loc-luoi" style="align-items: start;">

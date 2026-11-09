@@ -14,9 +14,9 @@
 <TieuDeTrang TieuDe="Bàn giao tại quầy" MoTa="@MoTa()" />
 
 <div class="than-trang khoi-doc">
-    @if (_loi != null && _donPhatSinh == null && _donBanGiao == null)
+    @if (_donPhatSinh == null && _donBanGiao == null)
     {
-        <div class="o-loi">@((MarkupString)Svg.ChamThan())<span>@_loi</span></div>
+        <ThongBaoLoi @bind-NoiDung="_loi" />
     }
     @if (_thongBao != null)
     {
@@ -116,11 +116,11 @@
         }
     </div>
 
-    <HopThoaiQuanTri Mo="@(_donBanGiao != null)" TieuDe="Bàn giao tại quầy" Loi="@_loi" DangLuu="@_dangGui" Dong="DongBanGiao">
+    <HopThoaiQuanTri Mo="@(_donBanGiao != null)" TieuDe="Bàn giao tại quầy" @bind-Loi="_loi" DangLuu="@_dangGui" Dong="DongBanGiao">
         <NoiDung><p><b>@_donBanGiao?.MaDonHangHienThi · @_donBanGiao?.TenKhachHang</b></p><p>@(_donBanGiao?.PhuongThucThanhToan is "COD" or "TIEN_MAT" ? "Chỉ xác nhận khi đã thu đủ tiền COD và giao đúng tài liệu cho khách. Tiền sẽ được ghi nhận vào ca." : "Xác nhận đã giao đúng tài liệu cho khách.")</p></NoiDung>
         <Chan><button type="button" class="nut-phu" disabled="@_dangGui" @onclick="DongBanGiao">Hủy</button><button type="button" class="nut-chinh" disabled="@_dangGui" @onclick="() => BanGiaoAsync(_donBanGiao)">Xác nhận bàn giao</button></Chan>
     </HopThoaiQuanTri>
-    <HopThoaiQuanTri Mo="@(_donPhatSinh != null)" TieuDe="@(_cheDoPhatSinh == "IN_LAI_LOI_QUAY" ? "In lại do lỗi quầy" : "Khách mua thêm")" Loi="@_loi" DangLuu="@_dangGui" Dong="YeuCauDongPhatSinh" Rong="true">
+    <HopThoaiQuanTri Mo="@(_donPhatSinh != null)" TieuDe="@(_cheDoPhatSinh == "IN_LAI_LOI_QUAY" ? "In lại do lỗi quầy" : "Khách mua thêm")" @bind-Loi="_loi" DangLuu="@_dangGui" Dong="YeuCauDongPhatSinh" Rong="true">
     <NoiDung>
         <form id="bg-form-phat-sinh" @onsubmit="TaoPhatSinhAsync" @onsubmit:preventDefault class="bg-phat-sinh">
             <div class="ca-dau">
@@ -526,7 +526,10 @@
             return $"{dong.SoLuongAnh} ảnh · {QuyCachAnhThe.Lay(dong.KichThuocAnh)?.Ten}";
         int tu = dong.TuTrang ?? 1;
         int den = dong.DenTrang ?? (tu + dong.SoTrang - 1);
-        return $"trang {tu}-{den} · {dong.TenDichVu} · " + (dong.HuongGiay == "NGANG" ? "Giấy ngang" : "Giấy đứng");
+        string quyCach = dong.KichThuocAnh != null
+            ? dong.TenDichVu
+            : $"Khổ {dong.KhoGiay} · giấy {dong.LoaiGiay} · {(dong.MatIn == "2_MAT" ? "2 mặt" : "1 mặt")} · {(dong.MauSac == "MAU" ? "In màu" : "Đen trắng")}";
+        return $"trang {tu}-{den} · {quyCach} · " + (dong.HuongGiay == "NGANG" ? "Giấy ngang" : "Giấy đứng");
     }
 
     private bool KimGocBoSungHopLe => SoTrangPhatSinh > 0 && QuyTacIn.SoToMoiBan(SoTrangPhatSinh,

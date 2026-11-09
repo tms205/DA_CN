@@ -70,7 +70,13 @@ void main() {
       await tester.tap(find.text('Đã hiểu · Tiếp tục'));
       await tester.pumpAndSettle();
       expect(datDon, 1);
-      expect(find.textContaining('đã hết hạn'), findsOneWidget);
+      final popup = find.byType(AlertDialog);
+      expect(
+        find.descendant(of: popup, matching: find.textContaining('đã hết hạn')),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Đã hiểu'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Tính lại phí'));
       await tester.pumpAndSettle();
       expect(baoGia, 3);
@@ -83,4 +89,80 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     },
   );
+
+  for (final tongTien in [999, 1000]) {
+    testWidgets('Tổng đơn ${tongTien}đ kiểm tra trước khi gửi', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      var soLanDatDon = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ChonChiNhanhScreen(
+            file: FileIn.fromJson({
+              'maFileIn': 1,
+              'tenFileGoc': 'Bài thử.pdf',
+              'soTrang': 1,
+              'trangThaiFile': 'SAN_SANG',
+            }),
+            maDichVu: 1,
+            tenCauHinh: 'A4 · Đen trắng',
+            soBan: 1,
+            dsGiaCong: const [],
+            hoaToc: false,
+            guiYeuCau: (path, _) async {
+              if (path.endsWith('/chi-nhanh-phu-hop')) {
+                return KetQuaApi()
+                  ..thanhCong = true
+                  ..duLieu = [
+                    {
+                      'maChiNhanh': 1,
+                      'tenChiNhanh': 'Chi nhánh thử',
+                      'diaChi': '140 Lê Trọng Tấn',
+                    },
+                  ];
+              }
+              if (path == '/api/bao-gia') {
+                return KetQuaApi()
+                  ..thanhCong = true
+                  ..duLieu = {'tienIn': tongTien, 'tongTien': tongTien};
+              }
+              soLanDatDon++;
+              return KetQuaApi()
+                ..loi = 'Báo giá đã thay đổi. Vui lòng thử lại.';
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Đặt đơn và chuyển khoản'));
+      await tester.pumpAndSettle();
+      expect(soLanDatDon, 0);
+      if (tongTien < 1000) {
+        expect(find.text('Chính sách hủy và hoàn tiền'), findsNothing);
+        expect(
+          find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.textContaining('phải từ 1.000đ'),
+          ),
+          findsOneWidget,
+        );
+        await tester.tap(find.text('Đã hiểu'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Đặt đơn và chuyển khoản'));
+        await tester.pumpAndSettle();
+        expect(find.byType(AlertDialog), findsOneWidget);
+        expect(soLanDatDon, 0);
+      } else {
+        await tester.tap(find.text('Đã hiểu · Tiếp tục'));
+        await tester.pumpAndSettle();
+        expect(soLanDatDon, 1);
+        expect(
+          find.text('Báo giá đã thay đổi. Vui lòng thử lại.'),
+          findsOneWidget,
+        );
+      }
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
 }

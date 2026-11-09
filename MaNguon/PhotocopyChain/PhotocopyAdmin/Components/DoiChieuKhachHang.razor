@@ -33,7 +33,7 @@ else
         <label for="dc-ket-luan">Nội dung trả lời khách <span aria-hidden="true">*</span></label>
         <textarea id="dc-ket-luan" rows="4" maxlength="1000" disabled="@_dangLuu" @bind="_ketLuan" @bind:event="oninput" placeholder="Ghi kết quả đã kiểm tra và hướng xử lý đã thống nhất với khách…"></textarea>
         <p class="dc-phu">Từ 10–1.000 ký tự · @_ketLuan.Trim().Length/1.000. Kết luận không tự thay đổi đơn, thanh toán hoặc tạo lượt giao mới.</p>
-        @if(_loi!=null) { <div class="o-loi" role="alert">@_loi</div> }
+        @if (_loi != null) { <ThongBaoLoi @bind-NoiDung="_loi" /> }
         <button type="button" class="nut-chinh" disabled="@(_dangLuu || _ketLuan.Trim().Length<10)" @onclick="Luu">@(_dangLuu?"Đang lưu…":"Lưu kết luận và thông báo khách")</button>
     }
 }

@@ -1,9 +1,11 @@
+using System.ComponentModel.DataAnnotations;
 using System.Data;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Dapper;
 using Microsoft.Data.SqlClient;
 using PhotocopyShared.Dtos.DonHang;
+using PhotocopyShared.QuyCachIn;
 
 namespace PhotocopyApi.DichVu;
 
@@ -13,6 +15,12 @@ public sealed record KetQuaTaoDon(DatDonHangResponse Don, bool TaoMoi);
 // Một transaction cho đơn, ghi chú và metadata chống gửi lặp. Không gửi sự kiện hoặc gọi cổng thanh toán trong transaction.
 public sealed class TaoDonHangService
 {
+    public static void KiemTraTongTienToiThieu(decimal tongTien)
+    {
+        if (tongTien < QuyTacIn.TongTienDonToiThieu)
+            throw new ValidationException(QuyTacIn.LoiTongTienDonToiThieu);
+    }
+
     public const string SqlTim = @"SELECT dh.MaDonHang,dh.TongTien,dh.DauYeuCauTao,tt.PhuongThuc AS PhuongThucThanhToan
         FROM dbo.DonHang dh JOIN dbo.ThanhToan tt ON tt.MaDonHang=dh.MaDonHang WHERE dh.MaYeuCauTao=@Key";
     public const string SqlLuu = @"UPDATE dbo.DonHang SET GhiChu=@Note,MaYeuCauTao=@Key,DauYeuCauTao=@Hash WHERE MaDonHang=@Id";
@@ -70,10 +78,12 @@ public sealed class TaoDonHangService
         }
         await db.ExecuteAsync(new CommandDefinition("sp_TaoDonHang", args, tx, commandType: CommandType.StoredProcedure, cancellationToken: ct));
         int order = args.Get<int>("@MaDonHang");
-        if (key.HasValue) await db.ExecuteAsync(SqlLuu, new { Id = order, Note = note, Key = key, Hash = hash }, tx);
-        else if (note != null) await db.ExecuteAsync("UPDATE dbo.DonHang SET GhiChu=@Note WHERE MaDonHang=@Id", new { Id = order, Note = note }, tx);
         var response = await db.QuerySingleAsync<DatDonHangResponse>(@"SELECT dh.MaDonHang,'DH'+RIGHT('00000'+CAST(dh.MaDonHang AS VARCHAR(10)),5) AS MaDonHangHienThi,
             dh.TongTien,tt.PhuongThuc AS PhuongThucThanhToan FROM dbo.DonHang dh JOIN dbo.ThanhToan tt ON tt.MaDonHang=dh.MaDonHang WHERE dh.MaDonHang=@Id", new { Id = order }, tx);
+        // sp_TaoDonHang đã tính lại tổng phải trả. Từ chối trước khi commit cả đơn và thanh toán.
+        KiemTraTongTienToiThieu(response.TongTien);
+        if (key.HasValue) await db.ExecuteAsync(SqlLuu, new { Id = order, Note = note, Key = key, Hash = hash }, tx);
+        else if (note != null) await db.ExecuteAsync("UPDATE dbo.DonHang SET GhiChu=@Note WHERE MaDonHang=@Id", new { Id = order, Note = note }, tx);
         await tx.CommitAsync(ct);
         return new(response, true);
     }

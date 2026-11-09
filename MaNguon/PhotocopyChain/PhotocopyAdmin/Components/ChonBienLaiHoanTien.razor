@@ -6,7 +6,7 @@
         <label for="@_id"><span class="bien-lai-bieu-tuong">@((MarkupString)Svg.TaiLieu(24))</span><span><b>@(_bytes==null?"Chọn ảnh biên lai":"Đổi ảnh biên lai")</b><small>@(_ten??"Ảnh chụp giao dịch chuyển khoản thành công")</small></span></label>
     </div>
     <p class="chu-mo">Chọn 1 ảnh JPG/PNG, tối đa 5 MB. Kiểm tra người nhận và số tiền trên biên lai.</p>
-    @if (_loi != null) { <p class="o-loi" role="alert">@_loi</p> }
+    <ThongBaoLoi @bind-NoiDung="_loi" />
     @if (_bytes != null) { <img src="@($"data:{_mime};base64,{Convert.ToBase64String(_bytes)}")" alt="Biên lai chuyển khoản đang chọn" style="display:block;max-width:100%;max-height:240px;object-fit:contain;margin:12px auto" /> }
 </div>
 @code {

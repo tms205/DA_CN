@@ -14,7 +14,7 @@ else {
     <section style="margin-top:20px;padding:16px;border:1px solid #d8e2ee;border-radius:9px;background:#f8fbff">
         <h3>Bổ sung biên lai cho khoản đã hoàn</h3>
         <p>Đơn đã ghi nhận hoàn tiền nhưng chưa có biên lai. Gửi ảnh giao dịch và lời nhắn để khách đối chiếu.</p>
-        @if(_loiBoSung!=null){<p class="o-loi" role="alert">@_loiBoSung</p>}
+        <ThongBaoLoi @bind-NoiDung="_loiBoSung" />
         @if(_thanhCong!=null){<p class="o-thanh-cong">@_thanhCong</p>}
         <label class="nhan" for="bill-cu-code">Mã chuyển khoản *</label><input id="bill-cu-code" class="ca-o-loc" maxlength="100" @bind="_maChuyen" />
         <label class="nhan" for="bill-cu-note">Lời nhắn cho khách (trên 10 ký tự) *</label><textarea id="bill-cu-note" class="ca-o-loc" maxlength="500" rows="3" @bind="_loiNhan"></textarea>

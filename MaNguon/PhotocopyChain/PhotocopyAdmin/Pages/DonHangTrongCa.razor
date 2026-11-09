@@ -16,10 +16,7 @@
 </TieuDeTrang>
 
 <div class="than-trang khoi-doc">
-    @if (_loi != null)
-    {
-        <div class="o-loi">@((MarkupString)Svg.ChamThan())<span>@_loi</span></div>
-    }
+    <ThongBaoLoi @bind-NoiDung="_loi" />
 
     <div class="the ca-bo-loc">
         <div class="ca-loc-luoi @(LaStaff ? "ca-loc-staff" : "")">

@@ -23,9 +23,9 @@
             </div>
 
             <h2 class="the-tieu-de nho">Hồ sơ</h2>
-            @if (_loiHoSo != null && !_moHoSo)
+            @if (!_moHoSo)
             {
-                <div class="o-loi">@((MarkupString)Svg.ChamThan())<span>@_loiHoSo</span></div>
+                <ThongBaoLoi @bind-NoiDung="_loiHoSo" />
             }
             @if (_tbHoSo != null)
             {
@@ -34,7 +34,7 @@
 
             <dl class="bang-thong-tin gon"><dt>Email</dt><dd>@_nd?.Email</dd><dt>Số điện thoại</dt><dd>@(_nd?.SoDienThoai ?? "Chưa cập nhật")</dd><dt>Chi nhánh</dt><dd>@(_nd?.TenChiNhanh ?? "Toàn chuỗi")</dd></dl>
             <button type="button" class="nut-chinh" @onclick="MoHoSo">Sửa hồ sơ</button>
-            <HopThoaiQuanTri Mo="@_moHoSo" TieuDe="Sửa hồ sơ cá nhân" Loi="@_loiHoSo" DangLuu="@_dangLuuHoSo" Dong="DongHoSo">
+            <HopThoaiQuanTri Mo="@_moHoSo" TieuDe="Sửa hồ sơ cá nhân" @bind-Loi="_loiHoSo" DangLuu="@_dangLuuHoSo" Dong="DongHoSo">
             <NoiDung>
             <EditForm id="hs-form" Model="_hoSo" OnValidSubmit="LuuHoSoAsync" class="dn-form">
                 <DataAnnotationsValidator />
@@ -84,9 +84,9 @@
             <h2 class="the-tieu-de nho">Đổi mật khẩu</h2>
             <p class="the-mo-ta nho">Nếu vừa được cấp mật khẩu tạm, hãy đổi ngay sang mật khẩu của riêng bạn.</p>
 
-            @if (_loiMk != null && !_moMatKhau)
+            @if (!_moMatKhau)
             {
-                <div class="o-loi">@((MarkupString)Svg.ChamThan())<span>@_loiMk</span></div>
+                <ThongBaoLoi @bind-NoiDung="_loiMk" />
             }
             @if (_tbMk != null)
             {
@@ -94,7 +94,7 @@
             }
 
             <button type="button" class="nut-chinh" @onclick="MoMatKhau">Đổi mật khẩu</button>
-            <HopThoaiQuanTri Mo="@_moMatKhau" TieuDe="Đổi mật khẩu" MoTa="Nhập mật khẩu hiện tại và xác nhận mật khẩu mới hai lần." Loi="@_loiMk" DangLuu="@_dangDoiMk" Dong="DongMatKhau">
+            <HopThoaiQuanTri Mo="@_moMatKhau" TieuDe="Đổi mật khẩu" MoTa="Nhập mật khẩu hiện tại và xác nhận mật khẩu mới hai lần." @bind-Loi="_loiMk" DangLuu="@_dangDoiMk" Dong="DongMatKhau">
             <NoiDung>
             <EditForm id="mk-form" Model="_mk" OnValidSubmit="DoiMatKhauAsync" class="dn-form">
                 <DataAnnotationsValidator />

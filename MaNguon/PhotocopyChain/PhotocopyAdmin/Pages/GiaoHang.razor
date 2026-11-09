@@ -76,7 +76,7 @@
     </div>
 </div>
 
-<HopThoaiQuanTri Mo="@(_donGiao != null)" TieuDe="Phân công & bàn giao shipper" Loi="@(_baoTri ? null : _loi)" DangLuu="@_dangGui" Dong="DongPhanCong">
+<HopThoaiQuanTri Mo="@(_donGiao != null)" TieuDe="Phân công & bàn giao shipper" Loi="@(_baoTri ? null : _loi)" LoiChanged="@(s => _loi = s)" DangLuu="@_dangGui" Dong="DongPhanCong">
     <NoiDung>
         @if (_baoTri) { <TrangThaiTaiDuLieu DangBaoTri="true" NoiDung="@_loi" /> }
         <p><b>@_donGiao?.MaDonHangHienThi · @_donGiao?.TenKhachHang</b></p><p>@_donGiao?.DiaChiGiao</p>
@@ -86,7 +86,7 @@
     </NoiDung>
     <Chan><button type="button" class="nut-phu" disabled="@_dangGui" @onclick="DongPhanCong">Hủy</button><button type="button" class="nut-chinh" disabled="@(_dangGui || ShipperChon(_donGiao?.MaDonHang ?? 0) == 0)" @onclick="() => PhanCong(_donGiao)">Xác nhận bàn giao</button></Chan>
 </HopThoaiQuanTri>
-<HopThoaiQuanTri Mo="@(_donThatBai != null)" TieuDe="Xác nhận báo giao thất bại" Rong="true" Loi="@(_baoTri ? null : _loiThatBai)" DangLuu="@_dangGui" Dong="DongXacNhanThatBai">
+<HopThoaiQuanTri Mo="@(_donThatBai != null)" TieuDe="Xác nhận báo giao thất bại" Rong="true" Loi="@(_baoTri ? null : _loiThatBai)" LoiChanged="@(s => _loiThatBai = s)" DangLuu="@_dangGui" Dong="DongXacNhanThatBai">
     <NoiDung>
         @if (_donThatBai != null)
         {

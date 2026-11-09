@@ -1,7 +1,7 @@
 @using PhotocopyShared.Dtos.GiaoHang
 @inject HttpClient Http
 
-<HopThoaiQuanTri Mo="Mo" TieuDe="Phân công giao hàng" Loi="@_loi" DangLuu="@_busy" Dong="Dong">
+<HopThoaiQuanTri Mo="Mo" TieuDe="Phân công giao hàng" @bind-Loi="_loi" DangLuu="@_busy" Dong="Dong">
     <NoiDung>
         <p>Bàn giao đơn <b>@($"DH{MaDonHang:D5}")</b> cho shipper thuộc chi nhánh của đơn.</p>
         @if (_ds == null) { <p role="status">Đang tải shipper…</p> }

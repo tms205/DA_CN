@@ -3,6 +3,8 @@ namespace PhotocopyShared.QuyCachIn;
 public static class QuyTacIn
 {
     public const int SoToKimGocToiDa = 50;
+    public const int TongTienDonToiThieu = 1000;
+    public const string LoiTongTienDonToiThieu = "Tổng tiền đơn hàng phải từ 1.000đ. Vui lòng điều chỉnh đơn trước khi lập.";
 
     public static int SoToMoiBan(int soTrang, string matIn)
         => matIn == "2_MAT" ? soTrang / 2 + soTrang % 2 : soTrang;

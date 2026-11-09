@@ -1,4 +1,4 @@
-﻿@page "/phe-duyet"
+@page "/phe-duyet"
 @attribute [Authorize(Roles = "SUPER_ADMIN")]
 @inject HttpClient Http
 @inject ThongBaoPheDuyet ThongBao
@@ -13,13 +13,7 @@
 
 <div class="than-trang khoi-doc">
     @if (_dangGui) { <p role="status">Đang xử lý xác nhận, vui lòng chờ…</p> }
-    @if (_loi != null)
-    {
-        <div class="o-loi">
-            @((MarkupString)Svg.ChamThan())
-            <span>@_loi</span>
-        </div>
-    }
+    <ThongBaoLoi NoiDung="@_loi" />
     @if (_thongBao != null)
     {
         <div class="o-thanh-cong the-rong">
@@ -136,7 +130,7 @@
     </section>
 </div>
 
-<HopThoaiQuanTri Mo="@(_donHoan != null)" TieuDe="Hoàn tiền đơn đã hủy" MoTa="Kiểm tra hồ sơ và lưu biên lai chuyển khoản cho khách" Loi="@_loiHoan" DangLuu="_dangGui" Dong="DongHoanTien" Rong="true">
+<HopThoaiQuanTri Mo="@(_donHoan != null)" TieuDe="Hoàn tiền đơn đã hủy" MoTa="Kiểm tra hồ sơ và lưu biên lai chuyển khoản cho khách" @bind-Loi="_loiHoan" DangLuu="_dangGui" Dong="DongHoanTien" Rong="true">
     <NoiDung>@if (_donHoan is {} d) {
         <div class="phe-tom-tat"><div><span class="phe-trang-thai @(d.ThongTinHoanTien==null?"thieu":"cho-chuyen")">@(d.ThongTinHoanTien==null?"Chờ bổ sung tài khoản":"Chờ chuyển hoàn")</span><h3>@d.MaDonHangHienThi · @d.TenKhachHang</h3><p>@d.TenChiNhanh · @NgayGuiHoan(d)</p></div><div><span>Số tiền hoàn toàn bộ</span><strong class="mono">@Tien(d.SoTien)</strong></div></div>
         <div class="phe-luoi-ho-so">

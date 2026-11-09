@@ -7,13 +7,7 @@
 
 <div class="than-trang khoi-doc">
     @if (_dangGui) { <p role="status">Đang cập nhật đánh giá…</p> }
-    @if (_loi != null)
-    {
-        <div class="o-loi">
-            @((MarkupString)Svg.ChamThan())
-            <span>@_loi</span>
-        </div>
-    }
+    <ThongBaoLoi @bind-NoiDung="_loi" />
 
     <div class="the the-bang">
         <div class="bang-tieu-de">

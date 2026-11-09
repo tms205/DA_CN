@@ -12,7 +12,7 @@
         <span>@(_daLuu ? "Đã đưa PDF vào đơn. Xóa file bên dưới nếu cần quét lại." : "Hai mặt thẻ → cùng một mặt giấy A4 · không tự tạo đơn hoặc in")</span>
     </div>
     <p class="sq-huong-dan">Chọn ảnh thay cho đặt thẻ lên kính, rồi bấm quét từng mặt. Có thể dùng ảnh minh họa để thử mà không cần giấy tờ thật.</p>
-    @if (_loi != null) { <div class="o-loi" role="alert">@_loi</div> }
+    <ThongBaoLoi @bind-NoiDung="_loi" />
     <div class="sq-hai-mat">
         @foreach (var mat in _haiMat)
         {

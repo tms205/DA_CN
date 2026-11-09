@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 using Dapper;
 using Microsoft.AspNetCore.Http;
@@ -13,6 +14,23 @@ using Xunit;
 namespace PhotocopyApi.Tests;
 public class AnToanGiaoDichTests
 {
+    [Theory]
+    [InlineData(0)]
+    [InlineData(999)]
+    public void TongTienDuoiMotNghin_BiTuChoi(int tongTien)
+    {
+        var loi = Assert.Throws<ValidationException>(() => TaoDonHangService.KiemTraTongTienToiThieu(tongTien));
+        Assert.Contains("1.000đ", loi.Message);
+    }
+
+    [Theory]
+    [InlineData(1000)]
+    [InlineData(1001)]
+    public void TongTienTuMotNghin_DatNguong(int tongTien)
+    {
+        TaoDonHangService.KiemTraTongTienToiThieu(tongTien);
+    }
+
     [Fact]
     public void FingerprintBindsActorChannelScopeAndContent()
     {

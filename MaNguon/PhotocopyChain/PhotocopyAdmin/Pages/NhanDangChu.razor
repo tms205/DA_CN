@@ -33,7 +33,7 @@
             }
             <button class="ocr-primary" disabled="@(_dangXuLy || _dangXuat || !_ds.Any(CanNhanDang))" @onclick="NhanDang">Nhận dạng ảnh chưa xong / bị lỗi</button>
             @if (_dangXuLy) { <p class="ocr-wait" role="status" aria-live="polite">@_tienDo</p><button type="button" class="ocr-secondary" @onclick="DungAsync">Dừng nhận dạng</button> }
-            @if (_loi != null) { <div class="o-loi" role="alert">@_loi</div> }
+            <ThongBaoLoi @bind-NoiDung="_loi" />
         </section>
         <section class="ocr-panel" aria-labelledby="ocr-output-title">
             <div class="ocr-heading"><span class="ocr-step">02</span><div><h2 id="ocr-output-title">Văn bản @(_ds.Count > 0 ? $"ảnh {_chon + 1}/{_ds.Count}" : "")</h2><p>Đối chiếu từng ảnh, chỉnh sửa rồi xuất chung theo thứ tự bên trái</p></div></div>
@@ -51,7 +51,7 @@
         </section>
     </div>
 </div>
-<HopThoaiQuanTri Mo="@_moCat" Rong="true" TieuDe="Cắt vùng văn bản" MoTa="Kéo khoanh phần chữ của ảnh đang chọn." Loi="@_loiCat" Dong="DongCatAsync">
+<HopThoaiQuanTri Mo="@_moCat" Rong="true" TieuDe="Cắt vùng văn bản" MoTa="Kéo khoanh phần chữ của ảnh đang chọn." @bind-Loi="_loiCat" Dong="DongCatAsync">
     <NoiDung><div class="ocr-crop-stage"><canvas @ref="_canvas" class="ocr-crop-canvas" aria-label="Chọn vùng chữ"></canvas></div></NoiDung>
     <Chan><button type="button" class="nut-phu" @onclick="DungToanAnhAsync">Dùng toàn bộ ảnh</button><button type="button" class="nut-chinh" @onclick="ApDungCatAsync">Dùng vùng đã chọn</button></Chan>
 </HopThoaiQuanTri>

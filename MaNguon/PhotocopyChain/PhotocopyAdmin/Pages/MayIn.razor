@@ -12,7 +12,7 @@
         <span>@_danhMuc.Count máy · cập nhật @(_capNhat?.ToString("HH:mm:ss") ?? "—")</span>
         <button type="button" class="nut-phu" disabled="@_dangTai" @onclick="TaiAsync">Làm mới trạng thái</button>
     </div>
-    @if (_loi != null) { <div class="o-loi" role="alert">@_loi</div> }
+    <ThongBaoLoi NoiDung="@_loi" />
     @if (_thongBao != null) { <div class="o-thanh-cong" role="status">@_thongBao</div> }
     @if (_dangTai && _danhMuc.Count == 0) { <div class="the">Đang tải danh sách máy…</div> }
     else if (_danhMuc.Count == 0 && _loi == null) { <div class="the">Chi nhánh chưa đăng ký máy in. CEO có thể thêm máy trong Chi nhánh &amp; máy in.</div> }

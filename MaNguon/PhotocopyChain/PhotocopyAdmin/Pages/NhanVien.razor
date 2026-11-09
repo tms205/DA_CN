@@ -1,4 +1,4 @@
-﻿@page "/nhan-vien"
+@page "/nhan-vien"
 @attribute [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN")]
 @inject HttpClient Http
 @inject PhienDangNhap Phien
@@ -10,12 +10,12 @@
 <TieuDeTrang TieuDe="Nhân viên" MoTa="@MoTa()" />
 
 <div class="than-trang khoi-doc">
-    @if (_loi != null && !_moTao)
+    @if (!_moTao)
     {
-        <div class="o-loi">@((MarkupString)Svg.ChamThan())<span>@_loi</span></div>
+        <ThongBaoLoi @bind-NoiDung="_loi" />
     }
 
-    <HopThoaiQuanTri Mo="@_moTao" TieuDe="Tạo tài khoản nhân viên mới" Loi="@_loi" DangLuu="@_dangCap" Dong="DongTao" Rong="true">
+    <HopThoaiQuanTri Mo="@_moTao" TieuDe="Tạo tài khoản nhân viên mới" @bind-Loi="_loi" DangLuu="@_dangCap" Dong="DongTao" Rong="true">
     <NoiDung>
     <form id="nv-form-tao" @onsubmit="TaoNhanVienAsync" @onsubmit:preventDefault>
         <div class="ca-loc-luoi">

@@ -1,0 +1,138 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="8c5ed915-b2c4-478d-ac84-4ecf8368cdb7" name="USER@TMS 2026-11-09 09:43:19" runUser="TMS\USER" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-11-09T09:43:19.5553387+07:00" queuing="2026-11-09T09:43:19.5553391+07:00" start="2026-11-09T09:43:15.9465893+07:00" finish="2026-11-09T09:43:24.4262124+07:00" />
+  <TestSettings name="default" id="72e0b36c-7e71-4a6f-964d-12f79fdb9ca3">
+    <Deployment runDeploymentRoot="USER_TMS_2026-11-09_09_43_19" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="040c1475-c638-4135-a210-267f34f9df94" testId="2bb5bb8f-d700-ba46-ea2e-ba754a41352c" testName="PhotocopyApi.Tests.E2EBaoCaoTests.TC07_TienDenSauHuy" computerName="TMS" duration="00:00:00.2400765" startTime="2026-11-09T09:43:22.7652326+07:00" endTime="2026-11-09T09:43:22.7652327+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="040c1475-c638-4135-a210-267f34f9df94">
+      <Output>
+        <StdOut>Hủy HTTP 200. Webhook đủ tiền ghi nhận 20.000đ, đơn vẫn đã hủy và không có lệnh in.</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="159acaaf-6001-4dce-ab90-175c0c0a4d9c" testId="b48b73ea-57ea-d278-8ed7-c5261283f357" testName="PhotocopyApi.Tests.E2EBaoCaoTests.TC17_BaoGiaoThatBaiThieuGpsHoacAnh" computerName="TMS" duration="00:00:00.3555726" startTime="2026-11-09T09:43:20.8990536+07:00" endTime="2026-11-09T09:43:20.8990539+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="159acaaf-6001-4dce-ab90-175c0c0a4d9c">
+      <Output>
+        <StdOut>Thiếu GPS hoặc thiếu ảnh đều HTTP 400. Đơn, lượt giao và bằng chứng giữ nguyên. Multipart mô phỏng, không đo GPS thiết bị.</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="9c7b8ec1-350f-4774-862f-ad34203a1fd6" testId="2b47d490-b015-b2b6-fdf5-655330a0b47a" testName="PhotocopyApi.Tests.E2EBaoCaoTests.TC09_HuySau120Giay" computerName="TMS" duration="00:00:00.1813973" startTime="2026-11-09T09:43:23.5997276+07:00" endTime="2026-11-09T09:43:23.5997278+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9c7b8ec1-350f-4774-862f-ad34203a1fd6">
+      <Output>
+        <StdOut>Đơn APP đã thanh toán quá 120 giây. API từ chối hủy HTTP 400, giữ nguyên đơn và thanh toán.</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="7f9f9a18-103f-45e6-9fc1-4cd5b2847bd4" testId="f0619b17-9fd7-20c6-df59-5ee31c2b06e4" testName="PhotocopyApi.Tests.E2EBaoCaoTests.TC01_DangNhapSaiKenh" computerName="TMS" duration="00:00:00.7992511" startTime="2026-11-09T09:43:22.3885003+07:00" endTime="2026-11-09T09:43:22.3885006+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="7f9f9a18-103f-45e6-9fc1-4cd5b2847bd4">
+      <Output>
+        <StdOut>Hai trường hợp sai kênh đều HTTP 403, không cấp token. Đúng kênh HTTP 200.</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="9d09acf7-4a52-46f2-bd46-96543def3cdf" testId="d337593a-630e-1f39-36f4-da9fbfd8e4c5" testName="PhotocopyApi.Tests.E2EBaoCaoTests.TC11_KhongCoConnectorPhuHop" computerName="TMS" duration="00:00:00.3829253" startTime="2026-11-09T09:43:21.4324643+07:00" endTime="2026-11-09T09:43:21.4324645+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9d09acf7-4a52-46f2-bd46-96543def3cdf">
+      <Output>
+        <StdOut>API nhận tiền, đưa đơn vào chờ in, không gán máy hoặc sinh lệnh. Connector chủ động không chạy.</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="59b9c88f-892f-42c8-8da6-ab7e74ba6274" testId="7039edbf-c469-6f28-4855-d6825c364b99" testName="PhotocopyApi.Tests.E2EBaoCaoTests.TC02_FileSaiChu" computerName="TMS" duration="00:00:00.3779250" startTime="2026-11-09T09:43:23.2824803+07:00" endTime="2026-11-09T09:43:23.2824805+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="59b9c88f-892f-42c8-8da6-ab7e74ba6274">
+      <Output>
+        <StdOut>Chủ file GET 200. Khách khác GET 404, POST đặt in 404. Số đơn mới bằng 0.</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="d4a7075b-de0e-47fb-a3e2-f84e3300a7ea" testId="5a98dcec-d5d7-ecdd-6289-6e07ce0ecb73" testName="PhotocopyApi.Tests.E2EBaoCaoTests.TC15_NhanDonChuaThanhToan" computerName="TMS" duration="00:00:00.1842610" startTime="2026-11-09T09:43:24.3441430+07:00" endTime="2026-11-09T09:43:24.3441432+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d4a7075b-de0e-47fb-a3e2-f84e3300a7ea">
+      <Output>
+        <StdOut>Shipper nhận đơn chưa trả tiền bị HTTP 409. Không sinh lượt giao.</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="8f5c2aac-1582-4c7e-9d52-49b22bb632b7" testId="70a3622f-341b-53a5-2548-2729b23c1de3" testName="PhotocopyApi.Tests.E2EBaoCaoTests.TC19_NhanKhoHaiLan" computerName="TMS" duration="00:00:00.2734075" startTime="2026-11-09T09:43:24.0187955+07:00" endTime="2026-11-09T09:43:24.0187957+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="8f5c2aac-1582-4c7e-9d52-49b22bb632b7">
+      <Output>
+        <StdOut>Nhận lần đầu HTTP 200, lặp lại HTTP 400. Tồn kho chỉ tăng 7 đơn vị.</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="f3d70935-5b36-44ae-aa67-b9ef3bb77a2c" testId="bb3191bf-aad1-f0d7-56cf-dc6f19033df8" testName="PhotocopyApi.Tests.E2EBaoCaoTests.TC08_HuySauBatDauIn" computerName="TMS" duration="00:00:00.6585254" startTime="2026-11-09T09:43:19.1437781+07:00" endTime="2026-11-09T09:43:19.1437996+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f3d70935-5b36-44ae-aa67-b9ef3bb77a2c">
+      <Output>
+        <StdOut>CEO hủy đơn đang in nhận HTTP 400; trạng thái in và thanh toán giữ nguyên.</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="736e3612-05f0-467b-9784-8817f207bf31" testId="f7b44076-176f-00ea-fe37-38fb333a5087" testName="PhotocopyApi.Tests.E2EBaoCaoTests.TC05_WebhookSaiTien" computerName="TMS" duration="00:00:00.4302794" startTime="2026-11-09T09:43:19.7955072+07:00" endTime="2026-11-09T09:43:19.7955075+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="736e3612-05f0-467b-9784-8817f207bf31">
+      <Output>
+        <StdOut>Webhook ký hợp lệ 19.000đ cho đơn 20.000đ bị bỏ qua. Chưa thanh toán, chưa gán máy, không có lệnh in.</StdOut>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="31070bfc-7eaa-4e0c-bea4-befcc77bd735" testId="77288205-1700-efc4-931d-779865f4dd1b" testName="PhotocopyApi.Tests.E2EBaoCaoTests.TC13_BanGiaoCodDongThoi" computerName="TMS" duration="00:00:00.4593440" startTime="2026-11-09T09:43:20.4024545+07:00" endTime="2026-11-09T09:43:20.4024549+07:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="31070bfc-7eaa-4e0c-bea4-befcc77bd735">
+      <Output>
+        <StdOut>Hai request đồng thời: một HTTP 200, một HTTP 400, tiền ca tăng đúng 20.000đ.</StdOut>
+      </Output>
+    </UnitTestResult>
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="PhotocopyApi.Tests.E2EBaoCaoTests.TC08_HuySauBatDauIn" storage="c:\users\user\appdata\local\temp\photocopye2ecompile_eee5aef1c3484af4938ad760d34b5ee9\debug\net8.0\photocopyapi.tests.dll" id="bb3191bf-aad1-f0d7-56cf-dc6f19033df8">
+      <Execution id="f3d70935-5b36-44ae-aa67-b9ef3bb77a2c" />
+      <TestMethod codeBase="C:\Users\USER\AppData\Local\Temp\PhotocopyE2ECompile_eee5aef1c3484af4938ad760d34b5ee9\Debug\net8.0\PhotocopyApi.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="PhotocopyApi.Tests.E2EBaoCaoTests" name="TC08_HuySauBatDauIn" />
+    </UnitTest>
+    <UnitTest name="PhotocopyApi.Tests.E2EBaoCaoTests.TC05_WebhookSaiTien" storage="c:\users\user\appdata\local\temp\photocopye2ecompile_eee5aef1c3484af4938ad760d34b5ee9\debug\net8.0\photocopyapi.tests.dll" id="f7b44076-176f-00ea-fe37-38fb333a5087">
+      <Execution id="736e3612-05f0-467b-9784-8817f207bf31" />
+      <TestMethod codeBase="C:\Users\USER\AppData\Local\Temp\PhotocopyE2ECompile_eee5aef1c3484af4938ad760d34b5ee9\Debug\net8.0\PhotocopyApi.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="PhotocopyApi.Tests.E2EBaoCaoTests" name="TC05_WebhookSaiTien" />
+    </UnitTest>
+    <UnitTest name="PhotocopyApi.Tests.E2EBaoCaoTests.TC19_NhanKhoHaiLan" storage="c:\users\user\appdata\local\temp\photocopye2ecompile_eee5aef1c3484af4938ad760d34b5ee9\debug\net8.0\photocopyapi.tests.dll" id="70a3622f-341b-53a5-2548-2729b23c1de3">
+      <Execution id="8f5c2aac-1582-4c7e-9d52-49b22bb632b7" />
+      <TestMethod codeBase="C:\Users\USER\AppData\Local\Temp\PhotocopyE2ECompile_eee5aef1c3484af4938ad760d34b5ee9\Debug\net8.0\PhotocopyApi.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="PhotocopyApi.Tests.E2EBaoCaoTests" name="TC19_NhanKhoHaiLan" />
+    </UnitTest>
+    <UnitTest name="PhotocopyApi.Tests.E2EBaoCaoTests.TC07_TienDenSauHuy" storage="c:\users\user\appdata\local\temp\photocopye2ecompile_eee5aef1c3484af4938ad760d34b5ee9\debug\net8.0\photocopyapi.tests.dll" id="2bb5bb8f-d700-ba46-ea2e-ba754a41352c">
+      <Execution id="040c1475-c638-4135-a210-267f34f9df94" />
+      <TestMethod codeBase="C:\Users\USER\AppData\Local\Temp\PhotocopyE2ECompile_eee5aef1c3484af4938ad760d34b5ee9\Debug\net8.0\PhotocopyApi.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="PhotocopyApi.Tests.E2EBaoCaoTests" name="TC07_TienDenSauHuy" />
+    </UnitTest>
+    <UnitTest name="PhotocopyApi.Tests.E2EBaoCaoTests.TC17_BaoGiaoThatBaiThieuGpsHoacAnh" storage="c:\users\user\appdata\local\temp\photocopye2ecompile_eee5aef1c3484af4938ad760d34b5ee9\debug\net8.0\photocopyapi.tests.dll" id="b48b73ea-57ea-d278-8ed7-c5261283f357">
+      <Execution id="159acaaf-6001-4dce-ab90-175c0c0a4d9c" />
+      <TestMethod codeBase="C:\Users\USER\AppData\Local\Temp\PhotocopyE2ECompile_eee5aef1c3484af4938ad760d34b5ee9\Debug\net8.0\PhotocopyApi.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="PhotocopyApi.Tests.E2EBaoCaoTests" name="TC17_BaoGiaoThatBaiThieuGpsHoacAnh" />
+    </UnitTest>
+    <UnitTest name="PhotocopyApi.Tests.E2EBaoCaoTests.TC09_HuySau120Giay" storage="c:\users\user\appdata\local\temp\photocopye2ecompile_eee5aef1c3484af4938ad760d34b5ee9\debug\net8.0\photocopyapi.tests.dll" id="2b47d490-b015-b2b6-fdf5-655330a0b47a">
+      <Execution id="9c7b8ec1-350f-4774-862f-ad34203a1fd6" />
+      <TestMethod codeBase="C:\Users\USER\AppData\Local\Temp\PhotocopyE2ECompile_eee5aef1c3484af4938ad760d34b5ee9\Debug\net8.0\PhotocopyApi.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="PhotocopyApi.Tests.E2EBaoCaoTests" name="TC09_HuySau120Giay" />
+    </UnitTest>
+    <UnitTest name="PhotocopyApi.Tests.E2EBaoCaoTests.TC02_FileSaiChu" storage="c:\users\user\appdata\local\temp\photocopye2ecompile_eee5aef1c3484af4938ad760d34b5ee9\debug\net8.0\photocopyapi.tests.dll" id="7039edbf-c469-6f28-4855-d6825c364b99">
+      <Execution id="59b9c88f-892f-42c8-8da6-ab7e74ba6274" />
+      <TestMethod codeBase="C:\Users\USER\AppData\Local\Temp\PhotocopyE2ECompile_eee5aef1c3484af4938ad760d34b5ee9\Debug\net8.0\PhotocopyApi.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="PhotocopyApi.Tests.E2EBaoCaoTests" name="TC02_FileSaiChu" />
+    </UnitTest>
+    <UnitTest name="PhotocopyApi.Tests.E2EBaoCaoTests.TC15_NhanDonChuaThanhToan" storage="c:\users\user\appdata\local\temp\photocopye2ecompile_eee5aef1c3484af4938ad760d34b5ee9\debug\net8.0\photocopyapi.tests.dll" id="5a98dcec-d5d7-ecdd-6289-6e07ce0ecb73">
+      <Execution id="d4a7075b-de0e-47fb-a3e2-f84e3300a7ea" />
+      <TestMethod codeBase="C:\Users\USER\AppData\Local\Temp\PhotocopyE2ECompile_eee5aef1c3484af4938ad760d34b5ee9\Debug\net8.0\PhotocopyApi.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="PhotocopyApi.Tests.E2EBaoCaoTests" name="TC15_NhanDonChuaThanhToan" />
+    </UnitTest>
+    <UnitTest name="PhotocopyApi.Tests.E2EBaoCaoTests.TC11_KhongCoConnectorPhuHop" storage="c:\users\user\appdata\local\temp\photocopye2ecompile_eee5aef1c3484af4938ad760d34b5ee9\debug\net8.0\photocopyapi.tests.dll" id="d337593a-630e-1f39-36f4-da9fbfd8e4c5">
+      <Execution id="9d09acf7-4a52-46f2-bd46-96543def3cdf" />
+      <TestMethod codeBase="C:\Users\USER\AppData\Local\Temp\PhotocopyE2ECompile_eee5aef1c3484af4938ad760d34b5ee9\Debug\net8.0\PhotocopyApi.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="PhotocopyApi.Tests.E2EBaoCaoTests" name="TC11_KhongCoConnectorPhuHop" />
+    </UnitTest>
+    <UnitTest name="PhotocopyApi.Tests.E2EBaoCaoTests.TC01_DangNhapSaiKenh" storage="c:\users\user\appdata\local\temp\photocopye2ecompile_eee5aef1c3484af4938ad760d34b5ee9\debug\net8.0\photocopyapi.tests.dll" id="f0619b17-9fd7-20c6-df59-5ee31c2b06e4">
+      <Execution id="7f9f9a18-103f-45e6-9fc1-4cd5b2847bd4" />
+      <TestMethod codeBase="C:\Users\USER\AppData\Local\Temp\PhotocopyE2ECompile_eee5aef1c3484af4938ad760d34b5ee9\Debug\net8.0\PhotocopyApi.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="PhotocopyApi.Tests.E2EBaoCaoTests" name="TC01_DangNhapSaiKenh" />
+    </UnitTest>
+    <UnitTest name="PhotocopyApi.Tests.E2EBaoCaoTests.TC13_BanGiaoCodDongThoi" storage="c:\users\user\appdata\local\temp\photocopye2ecompile_eee5aef1c3484af4938ad760d34b5ee9\debug\net8.0\photocopyapi.tests.dll" id="77288205-1700-efc4-931d-779865f4dd1b">
+      <Execution id="31070bfc-7eaa-4e0c-bea4-befcc77bd735" />
+      <TestMethod codeBase="C:\Users\USER\AppData\Local\Temp\PhotocopyE2ECompile_eee5aef1c3484af4938ad760d34b5ee9\Debug\net8.0\PhotocopyApi.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="PhotocopyApi.Tests.E2EBaoCaoTests" name="TC13_BanGiaoCodDongThoi" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="2bb5bb8f-d700-ba46-ea2e-ba754a41352c" executionId="040c1475-c638-4135-a210-267f34f9df94" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="b48b73ea-57ea-d278-8ed7-c5261283f357" executionId="159acaaf-6001-4dce-ab90-175c0c0a4d9c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="2b47d490-b015-b2b6-fdf5-655330a0b47a" executionId="9c7b8ec1-350f-4774-862f-ad34203a1fd6" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="f0619b17-9fd7-20c6-df59-5ee31c2b06e4" executionId="7f9f9a18-103f-45e6-9fc1-4cd5b2847bd4" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="d337593a-630e-1f39-36f4-da9fbfd8e4c5" executionId="9d09acf7-4a52-46f2-bd46-96543def3cdf" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="7039edbf-c469-6f28-4855-d6825c364b99" executionId="59b9c88f-892f-42c8-8da6-ab7e74ba6274" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="5a98dcec-d5d7-ecdd-6289-6e07ce0ecb73" executionId="d4a7075b-de0e-47fb-a3e2-f84e3300a7ea" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="70a3622f-341b-53a5-2548-2729b23c1de3" executionId="8f5c2aac-1582-4c7e-9d52-49b22bb632b7" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="bb3191bf-aad1-f0d7-56cf-dc6f19033df8" executionId="f3d70935-5b36-44ae-aa67-b9ef3bb77a2c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="f7b44076-176f-00ea-fe37-38fb333a5087" executionId="736e3612-05f0-467b-9784-8817f207bf31" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="77288205-1700-efc4-931d-779865f4dd1b" executionId="31070bfc-7eaa-4e0c-bea4-befcc77bd735" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="11" executed="11" passed="11" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.8.2+699d445a1a (64-bit .NET 8.0.21)&#xD;
+[xUnit.net 00:00:01.05]   Discovering: PhotocopyApi.Tests&#xD;
+[xUnit.net 00:00:01.23]   Discovered:  PhotocopyApi.Tests&#xD;
+[xUnit.net 00:00:01.24]   Starting:    PhotocopyApi.Tests&#xD;
+[xUnit.net 00:00:07.73]   Finished:    PhotocopyApi.Tests&#xD;
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>

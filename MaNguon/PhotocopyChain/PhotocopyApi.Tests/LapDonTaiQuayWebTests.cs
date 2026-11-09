@@ -196,6 +196,34 @@ public class LapDonTaiQuayWebTests
     }
 
     [Theory]
+    [InlineData("COD", 999, 0)]
+    [InlineData("VIETQR", 999, 0)]
+    [InlineData("COD", 1000, 1)]
+    [InlineData("VIETQR", 1000, 1)]
+    public async Task LapDonTaiQuay_KiemTraTongToiThieuVaGiuBanNhap(string phuongThuc, int tongTien, int soLanMongDoi)
+    {
+        int soLan = 0;
+        const string loi = "Tổng tiền đơn hàng phải từ 1.000đ. Vui lòng điều chỉnh đơn trước khi lập.";
+        using var http = new HttpClient(new ApiGia(req =>
+        {
+            Assert.Equal("/api/don-hang/tai-quay", req.RequestUri.AbsolutePath);
+            soLan++;
+            // Báo giá cũ hợp lệ, giá chốt ở API vẫn có thể thấp hơn mức tối thiểu.
+            return Task.FromResult(Tra(new { message = loi }, HttpStatusCode.BadRequest));
+        })) { BaseAddress = new Uri("http://test.local/") };
+        var trang = TaoTrang(http);
+        Gan(trang, "_phuongThucThanhToan", phuongThuc);
+        Gan(trang, "_baoGia", new BaoGiaResponse { TongTien = tongTien });
+
+        await Goi(trang, "LapDonAsync");
+
+        Assert.Equal(soLanMongDoi, soLan);
+        Assert.Equal(loi, Doc<string>(trang, "_loi"));
+        Assert.Single(Doc<List<FileInDto>>(trang, "_dsFile"));
+        Assert.NotNull(Doc<KhachTaiQuayDto>(trang, "_khach"));
+    }
+
+    [Theory]
     [InlineData(false, true, false)]
     [InlineData(true, true, false)]
     [InlineData(false, false, false)]

@@ -115,6 +115,23 @@ public partial class QuanTriController
     public async Task<IActionResult> CapNhatDanhMucDichVu([Range(1, int.MaxValue)] int maDichVu, LuuDichVuRequest req)
         => await LuuDichVuAsync(maDichVu, req, true);
 
+    [HttpPut("danh-muc-dich-vu/{maDichVu}/giay")]
+    [Authorize(Roles = "SUPER_ADMIN")]
+    public async Task<IActionResult> CapNhatNhomGiay([Range(1, int.MaxValue)] int maDichVu, CapNhatNhomGiayRequest req)
+    {
+        using var conn = new SqlConnection(_chuoiKetNoi);
+        int soDong = await conn.ExecuteAsync(
+            @"UPDATE dv SET TenDichVu=@TenDichVu, TrangThai=@TrangThai
+              FROM DichVu dv
+              JOIN DichVu goc ON goc.MaDichVu=@MaDichVu AND goc.LoaiDichVu='IN_AN' AND goc.KichThuocAnh IS NULL
+              WHERE dv.LoaiDichVu='IN_AN' AND dv.KichThuocAnh IS NULL
+                AND dv.KhoGiay=goc.KhoGiay AND dv.LoaiGiay=goc.LoaiGiay
+                AND ISNULL(dv.MaVatTu,0)=ISNULL(goc.MaVatTu,0)",
+            new { MaDichVu = maDichVu, TenDichVu = req.TenDichVu.Trim(), req.TrangThai });
+        if (soDong == 0) return NotFound(new { message = "Không tìm thấy dịch vụ in tài liệu." });
+        return Ok(new KetQuaDto { Message = "Đã cập nhật thông tin chung; giá từng quy cách giữ nguyên." });
+    }
+
     // Sửa giá không được tác động định nghĩa dùng chung hay giá của chi nhánh khác.
     [HttpPut("bang-gia/{maDichVu}")]
     [Authorize(Roles = "SUPER_ADMIN")]

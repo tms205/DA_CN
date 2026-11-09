@@ -65,6 +65,38 @@ public partial class QuanTriController : ControllerBase
         await using var giaoDich = await conn.BeginTransactionAsync();
         string loiVatTu = await KiemTraVatTuDichVuAsync(conn, giaoDich, req);
         if (loiVatTu != null) return BadRequest(new { message = loiVatTu });
+        if (req.GiaInTaiLieu is { } gia)
+        {
+            if (req.LoaiDichVu != "IN_AN" || req.KichThuocAnh != null)
+                return BadRequest(new { message = "Bốn mức giá chỉ áp dụng cho in tài liệu." });
+
+            req.LoaiGiay = req.LoaiGiay.Trim();
+            int? maCu = await conn.QueryFirstOrDefaultAsync<int?>(
+                @"SELECT MaDichVu FROM DichVu WITH (UPDLOCK, HOLDLOCK)
+                  WHERE LoaiDichVu='IN_AN' AND KichThuocAnh IS NULL
+                    AND KhoGiay=@KhoGiay AND LoaiGiay=@LoaiGiay AND MaVatTu=@MaVatTu",
+                new { req.KhoGiay, req.LoaiGiay, req.MaVatTu }, giaoDich);
+            if (maCu != null)
+                return Conflict(new { message = "Loại giấy này đã có dịch vụ. Hãy chỉnh giá tại Bảng giá in ấn." });
+
+            int maDichVu = await conn.ExecuteScalarAsync<int>(
+                @"DECLARE @Moi TABLE (MaDichVu INT, DonGia DECIMAL(12,0));
+                  INSERT INTO DichVu (TenDichVu, LoaiDichVu, KhoGiay, LoaiGiay, MatIn, MauSac, DonGia, MaVatTu, TrangThai)
+                  OUTPUT inserted.MaDichVu, inserted.DonGia INTO @Moi
+                  SELECT @TenDichVu, 'IN_AN', @KhoGiay, @LoaiGiay, q.MatIn, q.MauSac, q.DonGia, @MaVatTu, @TrangThai
+                  FROM (VALUES ('1_MAT','DEN_TRANG',@DonGia), ('2_MAT','DEN_TRANG',@DenTrangHaiMat),
+                               ('1_MAT','MAU',@MauMotMat), ('2_MAT','MAU',@MauHaiMat)) q(MatIn, MauSac, DonGia);
+                  INSERT INTO BangGiaChiNhanh (MaChiNhanh, MaDichVu, DonGia, TrangThai)
+                  SELECT cn.MaChiNhanh, m.MaDichVu, m.DonGia, @TrangThai FROM ChiNhanh cn CROSS JOIN @Moi m;
+                  SELECT MIN(MaDichVu) FROM @Moi;",
+                new
+                {
+                    req.TenDichVu, req.KhoGiay, req.LoaiGiay, req.MaVatTu, req.TrangThai, req.DonGia,
+                    gia.DenTrangHaiMat, gia.MauMotMat, gia.MauHaiMat
+                }, giaoDich);
+            await giaoDich.CommitAsync();
+            return Ok(new { maDichVu, message = "Đã thêm dịch vụ in tài liệu với bốn mức giá." });
+        }
         int ma = await conn.ExecuteScalarAsync<int>(
             @"INSERT INTO DichVu (TenDichVu, LoaiDichVu, KhoGiay, LoaiGiay, MatIn, MauSac,
                                   NhomGiaCong, DonGia, MaVatTu, TrangThai, KichThuocAnh)

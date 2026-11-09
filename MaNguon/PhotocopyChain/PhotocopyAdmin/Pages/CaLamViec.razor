@@ -17,9 +17,9 @@
 
 <div class="than-trang khoi-doc">
     <div class="the"><a class="nut-phu" href="may-in">Xem máy in đang hoạt động tại chi nhánh</a><p class="nv-phu">Trạng thái thiết bị trực tiếp và đơn đang in trong phiên làm việc; không phải thống kê máy của các ca đã kết thúc.</p></div>
-    @if (_loi != null && !_moCa && _caXacNhan == null)
+    @if (!_moCa && _caXacNhan == null)
     {
-        <div class="o-loi">@((MarkupString)Svg.ChamThan())<span>@_loi</span></div>
+        <ThongBaoLoi @bind-NoiDung="_loi" />
     }
     @if (_thongBao != null)
     {
@@ -53,7 +53,7 @@
             <button type="button" class="nut-chinh" @onclick="MoHopCa">Đóng ca &amp; kiểm đếm</button>
         </section>
     }
-    <HopThoaiQuanTri Mo="@_moCa" TieuDe="@(_ca == null ? "Mở ca làm việc" : "Đóng ca — kiểm đếm tiền")" Loi="@_loi" DangLuu="@_dangGui" Dong="DongHopCa" Rong="true">
+    <HopThoaiQuanTri Mo="@_moCa" TieuDe="@(_ca == null ? "Mở ca làm việc" : "Đóng ca — kiểm đếm tiền")" @bind-Loi="_loi" DangLuu="@_dangGui" Dong="DongHopCa" Rong="true">
     <NoiDung>
     @if (_ca == null)
     {
@@ -251,7 +251,7 @@
             }
         </div>
 
-        <HopThoaiQuanTri Mo="@(_caXacNhan != null)" TieuDe="Kiểm đếm & xác nhận ca" Loi="@_loi" DangLuu="@_dangGui" Dong="BoChonXacNhan" Rong="true">
+        <HopThoaiQuanTri Mo="@(_caXacNhan != null)" TieuDe="Kiểm đếm & xác nhận ca" @bind-Loi="_loi" DangLuu="@_dangGui" Dong="BoChonXacNhan" Rong="true">
         <NoiDung>
             <form id="ca-form-doi-soat" @onsubmit="XacNhanLechAsync" @onsubmit:preventDefault class="the ca-the">
                 <div class="ca-dau">

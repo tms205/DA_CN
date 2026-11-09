@@ -443,7 +443,7 @@ public class FileInController : ControllerBase
                     theoDoi.TatNeuSoHuu();
                     // Nếu COM chưa thoát, worker vẫn giữ semaphore để không chạy chồng.
                     luong.Join(TimeSpan.FromSeconds(3));
-                    throw new Exception($"Đổi file {loai} sang PDF quá lâu (file quá lớn hoặc đang đặt mật khẩu). Vui lòng xuất file sang PDF rồi tải lên.");
+                    throw new Exception($"Đổi file {loai} sang PDF quá thời gian cho phép. Vui lòng thử lại hoặc tải bản PDF.");
                 }
                 if (loi == null)
                     return;   // đổi xong
@@ -451,7 +451,7 @@ public class FileInController : ControllerBase
                 _logger.LogWarning(loi, "Lần {LanThu}: {Loai} không đổi được {File} sang PDF", lanThu, loai, duongDanGoc);
                 theoDoi.TatNeuSoHuu();
             }
-            throw new Exception($"Không đổi được file {loai} sang PDF (file hỏng hoặc đang đặt mật khẩu). Vui lòng kiểm tra lại file.");
+            throw new Exception($"Máy chủ không chuyển được file {loai} sang PDF. Vui lòng thử lại hoặc xuất file sang PDF rồi tải lên.");
         }
     }
 
@@ -475,8 +475,15 @@ public class FileInController : ControllerBase
                 finally { blank.Close(0); Marshal.FinalReleaseComObject(blank); }
                 if (!theoDoi.SoHuu) throw new InvalidOperationException("Không xác định được tiến trình Word riêng để chuyển đổi an toàn. Vui lòng tải PDF.");
                 dynamic doc = app.Documents.Open(duongDanGoc, false, true, false, matKhauGia);   // mở chỉ đọc
-                doc.ExportAsFixedFormat(duongDanPdf, 17);                               // 17 = PDF
-                doc.Close(0);                                                           // 0 = không lưu thay đổi
+                try
+                {
+                    doc.ExportAsFixedFormat(duongDanPdf, 17);                            // 17 = PDF
+                }
+                finally
+                {
+                    // Quit(0) ở dưới đóng tài liệu cùng phiên Word. Gọi Close riêng có thể lỗi COM sau khi đã xuất PDF.
+                    Marshal.FinalReleaseComObject(doc);
+                }
             }
             else if (loai == "Excel")
             {

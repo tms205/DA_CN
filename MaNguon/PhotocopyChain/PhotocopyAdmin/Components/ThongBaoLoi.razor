@@ -1,0 +1,45 @@
+@inject IJSRuntime Js
+
+<dialog @ref="_hop" class="loi-popup" role="alertdialog" aria-labelledby="@_tieuDe" aria-describedby="@_moTa">
+    @if (DangHien)
+    {
+        <h2 id="@_tieuDe"><span aria-hidden="true">@((MarkupString)Svg.ChamThan())</span> @TieuDe</h2>
+        <p id="@_moTa">@NoiDung</p>
+        <div class="loi-popup-chan">
+            <button type="button" class="nut-chinh" data-dong-popup autofocus @onclick="DongAsync">Đã hiểu</button>
+        </div>
+    }
+</dialog>
+
+@code {
+    [Parameter] public string NoiDung { get; set; }
+    [Parameter] public EventCallback<string> NoiDungChanged { get; set; }
+    [Parameter] public string TieuDe { get; set; } = "Không thực hiện được";
+
+    private readonly string _tieuDe = "loi-" + Guid.NewGuid().ToString("N");
+    private string _moTa => _tieuDe + "-noidung";
+    private ElementReference _hop;
+    private string _loiDaDoc;
+    private bool _daMo;
+    private bool DangHien => !string.IsNullOrWhiteSpace(NoiDung) && NoiDung != _loiDaDoc;
+
+    protected override void OnParametersSet()
+    {
+        if (NoiDung != _loiDaDoc) _loiDaDoc = null;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_daMo == DangHien) return;
+        _daMo = DangHien;
+        await Js.InvokeVoidAsync(_daMo ? "moHopThoaiQuanTri" : "dongMauDon", _hop);
+    }
+
+    private async Task DongAsync()
+    {
+        _loiDaDoc = NoiDung;
+        _daMo = false;
+        await Js.InvokeVoidAsync("dongMauDon", _hop);
+        await NoiDungChanged.InvokeAsync(null);
+    }
+}

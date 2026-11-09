@@ -183,6 +183,7 @@ public sealed class DichVuQuanTriDto
 
 public sealed partial class LuuDichVuRequest
 {
+    public GiaInTaiLieuRequest? GiaInTaiLieu { get; set; }
     [RegularExpression(@"^(2X3|3X4|4X6|35X45|5X5)$", ErrorMessage = "Kích thước ảnh thẻ không hợp lệ.")]
     public string? KichThuocAnh { get; set; }
     [Required(ErrorMessage = "Vui lòng nhập tên dịch vụ.")]
@@ -207,6 +208,27 @@ public sealed partial class LuuDichVuRequest
     [Range(1, int.MaxValue, ErrorMessage = "Mã vật tư phải là số nguyên dương.")]
     public int? MaVatTu { get; set; }
     [Required(ErrorMessage = "Vui lòng nhập giá trị.")]
+    [RegularExpression(@"^(HIEN|AN)$", ErrorMessage = "Lựa chọn không hợp lệ.")]
+    public string TrangThai { get; set; } = "HIEN";
+}
+
+public sealed class GiaInTaiLieuRequest
+{
+    [Required, SoTien]
+    public decimal? DenTrangHaiMat { get; set; }
+    [Required, SoTien]
+    public decimal? MauMotMat { get; set; }
+    [Required, SoTien]
+    public decimal? MauHaiMat { get; set; }
+}
+
+public sealed class CapNhatNhomGiayRequest
+{
+    [Required(ErrorMessage = "Vui lòng nhập tên dịch vụ.")]
+    [MaxLength(100, ErrorMessage = "Tên dịch vụ tối đa 100 ký tự.")]
+    public string TenDichVu { get; set; } = "";
+
+    [Required]
     [RegularExpression(@"^(HIEN|AN)$", ErrorMessage = "Lựa chọn không hợp lệ.")]
     public string TrangThai { get; set; } = "HIEN";
 }

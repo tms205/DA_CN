@@ -67,7 +67,7 @@ builder.Services.AddSingleton<PhotocopyApi.Ocr.IOcrProcessor, PhotocopyApi.Ocr.O
 builder.Services.AddSingleton<PhotocopyApi.Ocr.OcrQueue>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<PhotocopyApi.Ocr.OcrQueue>());
 builder.Services.AddSingleton<KetNoiBaoTri>();
-builder.Services.AddSingleton(new BaoTriStore(Path.Combine(
+builder.Services.AddSingleton(new BaoTriStore(builder.Configuration["BaoTri:DuongDanTrangThai"] ?? Path.Combine(
     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PhotocopyChain", "maintenance.json")));
 builder.Services.AddSingleton<PhotocopyApi.DichVu.ThuVienMauDon>();
 // Chỉ nguồn ảo đã có; adapter máy thật phải chạy qua connector/driver được kiểm chứng tại tiệm.
@@ -77,7 +77,7 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<LichCaService>();
 builder.Services.AddHostedService<ChotCaHetGioJob>();
 builder.Services.AddSingleton<OtpDatLaiStore>();
-builder.Services.AddSingleton(sp => new PhienDangNhapStore(Path.Combine(
+builder.Services.AddSingleton(sp => new PhienDangNhapStore(builder.Configuration["PhienDangNhap:DuongDanLuu"] ?? Path.Combine(
     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PhotocopyChain", "account-sessions.json"),
     sp.GetRequiredService<IConfiguration>()["Jwt:Key"]));
 builder.Services.AddSingleton<KiemTraPhienDangNhap>();

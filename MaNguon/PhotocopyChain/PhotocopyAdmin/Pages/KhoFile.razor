@@ -5,13 +5,7 @@
 <TieuDeTrang TieuDe="Kho file in" MoTa="Theo dõi file PDF đang lưu trữ và file đã xóa sau khi hoàn tất đơn hàng" />
 
 <div class="than-trang khoi-doc">
-    @if (_loi != null)
-    {
-        <div class="o-loi">
-            @((MarkupString)Svg.ChamThan())
-            <span>@_loi</span>
-        </div>
-    }
+    <ThongBaoLoi @bind-NoiDung="_loi" />
 
     <div class="the the-bang">
         <div class="bang-tieu-de">

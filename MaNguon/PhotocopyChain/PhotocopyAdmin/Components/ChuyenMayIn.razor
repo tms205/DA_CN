@@ -5,7 +5,7 @@
 @inject HttpClient Http
 @implements IAsyncDisposable
 
-<HopThoaiQuanTri Mo="@Mo" TieuDe="Chuyển máy khi gặp sự cố" MoTa="Giữ nguyên đơn và thanh toán. Chỉ gửi phần cần in sau khi lệnh cũ đã dừng." Rong="true" Loi="@_loi" DangLuu="@_dangGui" Dong="Dong">
+<HopThoaiQuanTri Mo="@Mo" TieuDe="Chuyển máy khi gặp sự cố" MoTa="Giữ nguyên đơn và thanh toán. Chỉ gửi phần cần in sau khi lệnh cũ đã dừng." Rong="true" @bind-Loi="_loi" DangLuu="@_dangGui" Dong="Dong">
     <NoiDung>
         @if (_duLieu == null)
         {

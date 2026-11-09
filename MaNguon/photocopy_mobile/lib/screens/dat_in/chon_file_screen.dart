@@ -87,7 +87,7 @@ class _ChonFileScreenState extends State<ChonFileScreen> {
     if (!mounted) return;
     setState(() => _dangTai = false);
     if (!kq.thanhCong) {
-      setState(() => _loi = kq.loi);
+      await hienThongBaoLoi(context, kq.loi);
       return;
     }
     final file = FileIn.fromJson(kq.duLieu);
@@ -103,7 +103,7 @@ class _ChonFileScreenState extends State<ChonFileScreen> {
     if (_dangTai) return;
     int? soAnh = int.tryParse(_soAnh.text);
     if (_loai == 'ANH_THE' && (soAnh == null || soAnh < 1 || soAnh > 100)) {
-      setState(() => _loi = 'Số lượng phải từ 1 đến 100 ảnh mỗi file.');
+      await hienThongBaoLoi(context, 'Số lượng phải từ 1 đến 100 ảnh mỗi file.');
       return;
     }
     // Mở trình chọn file của điện thoại, chỉ cho chọn các đuôi máy chủ nhận
@@ -132,7 +132,7 @@ class _ChonFileScreenState extends State<ChonFileScreen> {
     setState(() => _dangTai = false);
 
     if (!kq.thanhCong) {
-      setState(() => _loi = kq.loi);
+      await hienThongBaoLoi(context, kq.loi);
       return;
     }
 

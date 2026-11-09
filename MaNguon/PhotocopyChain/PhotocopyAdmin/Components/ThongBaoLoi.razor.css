@@ -1,0 +1,19 @@
+.loi-popup {
+    width: min(460px, calc(100vw - 32px));
+    max-height: calc(100dvh - 32px);
+    padding: 24px;
+    margin: auto;
+    border: 1px solid var(--vien);
+    border-radius: 14px;
+    background: var(--trang, white);
+    color: var(--chu);
+    box-shadow: 0 24px 80px #0b243c40;
+    overflow-wrap: anywhere;
+}
+
+.loi-popup::backdrop { background: #10263e70; }
+.loi-popup h2 { display: flex; align-items: center; gap: 9px; margin: 0; font-size: 20px; }
+.loi-popup h2 span { color: var(--do, #b91c1c); display: inline-flex; }
+.loi-popup p { margin: 12px 0 20px; white-space: pre-line; line-height: 1.6; }
+.loi-popup-chan { display: flex; justify-content: flex-end; }
+.loi-popup-chan button:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }

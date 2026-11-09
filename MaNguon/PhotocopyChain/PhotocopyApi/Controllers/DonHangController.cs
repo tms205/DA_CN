@@ -268,6 +268,7 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
         KetQuaTaoDon tao;
         try {tao=await _taoDon.Tao(conn,thamSo,req.MaYeuCauTao,dauYeuCau,maKhachHang,
             req.FileIn.Select(x=>x.MaFileIn),req.GhiChu?.Trim(),HttpContext.RequestAborted);}
+        catch(ValidationException ex){return BadRequest(new {message=ex.Message});}
         catch(YeuCauTaoDonTrungException ex){return Conflict(new {message=ex.Message});}
         catch(InvalidOperationException ex){return Conflict(new {message=ex.Message});}
         catch(SqlException ex){return BadRequest(new {message=ex.Message});}
@@ -436,6 +437,7 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
         KetQuaTaoDon tao;
         try {tao=await _taoDon.Tao(conn,thamSo,req.MaYeuCauTao,dauYeuCau,req.MaKhachHang,
             req.FileIn.Select(x=>x.MaFileIn),ghiChu,HttpContext.RequestAborted);}
+        catch(ValidationException ex){return BadRequest(new {message=ex.Message});}
         catch(YeuCauTaoDonTrungException ex){return Conflict(new {message=ex.Message});}
         catch(InvalidOperationException ex){return Conflict(new {message=ex.Message});}
         catch(SqlException ex){return BadRequest(new {message=ex.Message});}
@@ -948,7 +950,7 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
                 req.DsGiaCong?.Distinct().ToList() ?? new List<int>(), false);
             return Ok(ketQua);
         }
-        catch (Exception ex) when (ex is SqlException || ex is InvalidOperationException)
+        catch (Exception ex) when (ex is SqlException or InvalidOperationException or ValidationException)
         {
             return BadRequest(new { message = ex.Message });
         }
@@ -1239,17 +1241,24 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
             throw new InvalidOperationException("Ảnh thẻ phải giữ toàn bộ số ảnh đã chốt, in một bản PDF và không kèm gia công. Đổi số lượng cần lập đơn mới.");
 
         DichVuDto dichVuIn = await conn.QueryFirstOrDefaultAsync<DichVuDto>(
-            @"SELECT dv.MaDichVu, dv.TenDichVu, dv.LoaiDichVu, dv.KhoGiay, dv.LoaiGiay,
+            @"SELECT TOP (1) dv.MaDichVu, dv.TenDichVu, dv.LoaiDichVu, dv.KhoGiay, dv.LoaiGiay,
                      dv.MatIn, dv.MauSac, dv.NhomGiaCong, dv.KichThuocAnh, bg.DonGia
               FROM DichVu dv
               JOIN BangGiaChiNhanh bg ON bg.MaDichVu = dv.MaDichVu
-              WHERE dv.MaDichVu = @MaDichVu AND bg.MaChiNhanh = @MaChiNhanh
-                AND dv.LoaiDichVu = 'IN_AN' AND bg.TrangThai = N'HIEN'",
-            new { MaDichVu = maDichVu, nguon.MaChiNhanh });
+              JOIN DichVu goc ON goc.MaDichVu = @MaDichVu
+              WHERE bg.MaChiNhanh = @MaChiNhanh AND dv.LoaiDichVu = 'IN_AN' AND bg.TrangThai = N'HIEN'
+                AND (dv.MaDichVu = goc.MaDichVu OR
+                    (@MienPhi = 1 AND goc.TrangThai = N'AN' AND dv.TrangThai = N'HIEN'
+                     AND goc.KichThuocAnh IS NULL AND dv.KichThuocAnh IS NULL
+                     AND dv.KhoGiay = goc.KhoGiay AND dv.LoaiGiay = goc.LoaiGiay
+                     AND dv.MatIn = goc.MatIn AND dv.MauSac = goc.MauSac))
+              ORDER BY CASE WHEN dv.MaDichVu = goc.MaDichVu THEN 0 ELSE 1 END, dv.MaDichVu",
+            new { MaDichVu = maDichVu, nguon.MaChiNhanh, MienPhi = mienPhi });
         if (dichVuIn == null)
             throw new InvalidOperationException("Quy cách in đã chọn không còn được bán.");
         if (dichVuIn.KichThuocAnh != nguon.KichThuocAnh)
             throw new InvalidOperationException("Quy cách in phải đúng loại tài liệu và kích thước ảnh của file gốc.");
+        maDichVu = dichVuIn.MaDichVu;
 
         dsGiaCong = dsGiaCong.Distinct().ToList();
         List<DichVuDto> giaCong = dsGiaCong.Count == 0
@@ -1383,6 +1392,8 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
                          LoaiPhatSinh, TongTien
                   FROM DonHang WHERE MaDonHang = @MaDonMoi",
                 new { MaDonMoi = maDonMoi }, giaoDich);
+            if (!mienPhi)
+                TaoDonHangService.KiemTraTongTienToiThieu(ketQua.TongTien);
             ketQua.Message = mienPhi
                 ? $"Đã tạo việc in lại {ketQua.MaDonHangHienThi}; cửa hàng chịu toàn bộ chi phí."
                 : $"Đã tạo đơn bổ sung {ketQua.MaDonHangHienThi}; khách thanh toán {ketQua.TongTien.ToString("#,##0", new System.Globalization.NumberFormatInfo { NumberGroupSeparator = "." })}₫ khi nhận.";

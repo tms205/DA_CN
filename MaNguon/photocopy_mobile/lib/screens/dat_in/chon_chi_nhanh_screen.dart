@@ -72,7 +72,7 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
   final _yeuCauTao = YeuCauTaoDon();
   bool _dangDatDon = false;
   bool _dangXemChinhSach = false;
-  String? _loiDatDon;
+  static const _tongTienToiThieu = 1000;
 
   @override
   void initState() {
@@ -152,12 +152,13 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
   }
 
   // POST /api/bao-gia — tính lại tiền theo chi nhánh + hình thức nhận + mã giảm giá
-  Future<void> _goiBaoGia() async {
+  Future<void> _goiBaoGia({bool hienLoi = false}) async {
     if (_maChiNhanh == null) {
       setState(() {
         _baoGia = null;
         _loiBaoGia = 'Chưa chọn được chi nhánh in.';
       });
+      if (hienLoi) await hienThongBaoLoi(context, _loiBaoGia!);
       return;
     }
     // Chưa chọn được điểm nhận có tọa độ từ máy chủ thì không tính phí theo địa chỉ cũ.
@@ -167,6 +168,7 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
         _loiBaoGia =
             'Chọn điểm nhận hàng (địa chỉ đã lưu, địa chỉ khác hoặc vị trí hiện tại) để tính phí giao hàng.';
       });
+      if (hienLoi) await hienThongBaoLoi(context, _loiBaoGia!);
       return;
     }
 
@@ -175,7 +177,6 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
     setState(() {
       _dangTinh = true;
       _loiBaoGia = null;
-      _loiDatDon = null;
     });
 
     KetQuaApi kq = await _post('/api/bao-gia', {
@@ -208,11 +209,19 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
         _loiBaoGia = kq.loi;
       }
     });
+    if (!kq.thanhCong && hienLoi) await hienThongBaoLoi(context, kq.loi);
   }
 
   // POST /api/don-hang — F-09: tạo đơn thật
   Future<void> _datDon() async {
     if (_baoGia == null || _dangTinh || _dangDatDon || _dangXemChinhSach) {
+      return;
+    }
+    if (_baoGia!.tongTien < _tongTienToiThieu) {
+      await hienThongBaoLoi(
+        context,
+        'Tổng tiền đơn hàng phải từ 1.000đ. Vui lòng điều chỉnh đơn trước khi lập.',
+      );
       return;
     }
     _dangXemChinhSach = true;
@@ -245,7 +254,6 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
     if (dongY != true || !mounted || _dangDatDon) return;
     setState(() {
       _dangDatDon = true;
-      _loiDatDon = null;
     });
 
     KetQuaApi kq = await _post(
@@ -277,10 +285,8 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
     if (!mounted) return;
 
     if (!kq.thanhCong) {
-      setState(() {
-        _dangDatDon = false;
-        _loiDatDon = kq.loi;
-      });
+      setState(() => _dangDatDon = false);
+      await hienThongBaoLoi(context, kq.loi);
       return;
     }
 
@@ -856,14 +862,12 @@ class _ChonChiNhanhScreenState extends State<ChonChiNhanhScreen> {
                 ),
               ],
             ),
-            if (_loiDatDon != null) ...[
-              const SizedBox(height: 8),
-              HopThongBao(_loiDatDon!),
-            ],
             Align(
               alignment: Alignment.centerRight,
               child: TextButton.icon(
-                onPressed: _dangTinh || _dangDatDon ? null : _goiBaoGia,
+                onPressed: _dangTinh || _dangDatDon
+                    ? null
+                    : () => _goiBaoGia(hienLoi: true),
                 icon: const Icon(Icons.refresh, size: 18),
                 label: const Text('Tính lại phí'),
               ),

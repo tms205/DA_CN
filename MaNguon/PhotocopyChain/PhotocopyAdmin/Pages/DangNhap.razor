@@ -19,10 +19,7 @@
             <p>Đăng nhập bằng tài khoản nhân sự được cấp.</p>
         </div>
 
-        @if (_loi != null)
-        {
-            <div class="o-loi">@((MarkupString)Svg.ChamThan())<span>@_loi</span></div>
-        }
+        <ThongBaoLoi @bind-NoiDung="_loi" />
 
         @if (MatKhauDaDoi == 1) { <div class="o-thanh-cong" role="status">Đã đổi mật khẩu. Vui lòng đăng nhập bằng mật khẩu mới.</div> }
 
