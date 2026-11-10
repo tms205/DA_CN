@@ -266,18 +266,6 @@ internal static class TruyVanSql
         public const string ChoXacNhan = ThongTin + @"
             WHERE ca.TrangThai = 'CHO_XAC_NHAN' ";
 
-        public const string TongHopTienMatChiNhanh = @"
-            SELECT ca.MaNhanVien, nv.HoTen AS TenNhanVien,
-                   COUNT(tt.MaThanhToan) AS SoDon, COALESCE(SUM(tt.SoTien), 0) AS TienMat
-            FROM CaLamViec ca
-            JOIN NguoiDung nv ON nv.MaNguoiDung = ca.MaNhanVien
-            LEFT JOIN ThanhToan tt ON tt.MaCa = ca.MaCa
-                AND tt.PhuongThuc IN ('COD','TIEN_MAT') AND tt.TrangThai = 'DA_THANH_TOAN'
-                AND tt.NgayThanhToan >= @BatDau AND tt.NgayThanhToan < @KetThuc
-            WHERE ca.MaChiNhanh = @MaChiNhanh AND ca.GioMoCa >= @BatDau AND ca.GioMoCa < @KetThuc
-            GROUP BY ca.MaNhanVien, nv.HoTen
-            ORDER BY nv.HoTen, ca.MaNhanVien";
-
         public const string DonHangTrongCa = @"
             SELECT ca.MaCa, ca.MaChiNhanh, cn.TenChiNhanh,
                    ca.MaNhanVien, nv.HoTen AS TenNhanVien,

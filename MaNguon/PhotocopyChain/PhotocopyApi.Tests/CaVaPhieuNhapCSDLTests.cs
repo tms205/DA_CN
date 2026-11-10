@@ -4,7 +4,6 @@ using System.Text.RegularExpressions;
 using Dapper;
 using Microsoft.Data.SqlClient;
 using PhotocopyShared.Dtos.DonHang;
-using PhotocopyApi.CaLamViec;
 using Xunit;
 
 namespace PhotocopyApi.Tests;
@@ -138,7 +137,7 @@ public class CaVaPhieuNhapCSDLTests
     }
 
     [KiemThuCSDL]
-    public async Task TongHopKet_HaiNguoiChungCa_TienMatTheoNguoiThu()
+    public async Task HaiNhanVienCungKhungGio_CodThuocCaNguoiThu()
     {
         using var conn = KetNoi();
         await conn.OpenAsync();
@@ -148,55 +147,32 @@ public class CaVaPhieuNhapCSDLTests
             CREATE TABLE #ChiNhanh (MaChiNhanh INT, TenChiNhanh NVARCHAR(100));
             CREATE TABLE #NguoiDung (MaNguoiDung INT, HoTen NVARCHAR(100));
             CREATE TABLE #DonHang (MaDonHang INT, MaChiNhanh INT, MaNhanVien INT, MaKhachHang INT, TrangThai VARCHAR(30));
-            CREATE TABLE #ThanhToan (MaThanhToan INT, MaDonHang INT, MaCa INT NULL,
+            CREATE TABLE #ThanhToan (MaThanhToan INT, MaDonHang INT, MaCa INT,
                 PhuongThuc VARCHAR(30), TrangThai VARCHAR(30), NgayThanhToan DATETIME, SoTien MONEY);
-            INSERT #ChiNhanh VALUES (1,N'Chi nhánh thử'),(2,N'Chi nhánh khác');
-            INSERT #NguoiDung VALUES (11,N'Nhân viên A'),(12,N'Nhân viên B'),(13,N'Khách'),(14,N'Nhân viên C');
+            INSERT #ChiNhanh VALUES (1,N'Chi nhánh thử');
+            INSERT #NguoiDung VALUES (11,N'Nhân viên A'),(12,N'Nhân viên B'),(13,N'Khách');
             INSERT #CaLamViec VALUES
                 (1,1,11,'2026-11-09T22:00:00','2026-11-10T10:00:00'),
-                (2,1,12,'2026-11-10T08:00:00',NULL),
-                (3,2,14,'2026-11-10T08:00:00',NULL),
-                (4,1,11,'2026-11-10T12:30:00',NULL);
+                (2,1,12,'2026-11-10T08:00:00',NULL);
             INSERT #DonHang VALUES (1,1,11,13,'HOAN_THANH'),(2,1,11,13,'HOAN_THANH');
             INSERT #ThanhToan VALUES
                 (1,1,1,'COD','DA_THANH_TOAN','2026-11-09T22:30:00',50000),
-                (3,3,2,'VIETQR','DA_THANH_TOAN','2026-11-10T08:10:00',100000),
-                (4,4,3,'COD','DA_THANH_TOAN','2026-11-10T08:10:00',99000),
-                (5,5,2,'COD','CHUA_THANH_TOAN','2026-11-10T08:10:00',99000),
-                (6,6,4,'COD','DA_THANH_TOAN','2026-11-10T12:30:00',99000);");
+                (2,2,2,'COD','DA_THANH_TOAN','2026-11-10T09:00:00',30000);");
 
-        var batDau = new DateTime(2026, 11, 9, 21, 30, 0);
-        var ketThuc = new DateTime(2026, 11, 10, 12, 30, 0);
-        var args = new { MaChiNhanh = 1, BatDau = batDau, KetThuc = ketThuc };
-        var truocKhiBThu = (await conn.QueryAsync<TienMatNhanVienDto>(
-            SqlBangCaTam("TongHopTienMatChiNhanh"), args)).AsList();
-        Assert.Equal(2, truocKhiBThu.Count);
-        Assert.Equal(0m, truocKhiBThu.Single(x => x.MaNhanVien == 12).TienMat);
-        Assert.Equal(50000m, truocKhiBThu.Sum(x => x.TienMat));
-
-        await conn.ExecuteAsync(@"INSERT #ThanhToan VALUES
-            (2,2,2,'COD','DA_THANH_TOAN','2026-11-10T09:00:00',30000);");
-        var sauKhiBThu = (await conn.QueryAsync<TienMatNhanVienDto>(
-            SqlBangCaTam("TongHopTienMatChiNhanh"), args)).AsList();
-        Assert.Equal(50000m, sauKhiBThu.Single(x => x.MaNhanVien == 11).TienMat);
-        Assert.Equal(30000m, sauKhiBThu.Single(x => x.MaNhanVien == 12).TienMat);
-        var tongHop = new TongHopKetChiNhanhDto(1, batDau, ketThuc, true,
-            QuyTacCaDangNhap.TienDauCaMacDinh,
-            sauKhiBThu.Sum(x => x.TienMat), sauKhiBThu.Sum(x => x.SoDon), sauKhiBThu);
-        Assert.Equal(280000m, tongHop.KetDuKien);
-        Assert.Equal(2, tongHop.SoDon);
-
-        var chiTietB = await conn.QuerySingleAsync(SqlBangCaTam("DonHangTrongCa"),
-            new { MaCa = 2, args.MaChiNhanh, MaNhanVien = 12 });
-        Assert.Equal(2, (int)chiTietB.MaDonHang);
-        var lichSuB = await conn.QuerySingleAsync(SqlBangCaTam("LichSuDonHangTrongCa"),
-            new { args.MaChiNhanh, MaNhanVien = 12, TuNgay = ketThuc.Date, DenNgay = ketThuc.Date });
-        Assert.Equal(2, (int)lichSuB.MaDonHang);
-        var lichSuA = await conn.QuerySingleAsync(SqlBangCaTam("LichSuDonHangTrongCa"),
-            new { args.MaChiNhanh, MaNhanVien = 11, TuNgay = ketThuc.Date, DenNgay = ketThuc.Date });
-        Assert.Equal(1, (int)lichSuA.MaDonHang);
+        var ngayLamViec = new DateTime(2026, 11, 10);
+        var chiTietB = await conn.QuerySingleAsync<DonHangTrongCaDto>(SqlBangCaTam("DonHangTrongCa"),
+            new { MaCa = 2, MaChiNhanh = 1, MaNhanVien = 12 });
+        Assert.Equal(2, chiTietB.MaDonHang);
+        Assert.Equal(30000m, chiTietB.SoTien);
+        var lichSuB = await conn.QuerySingleAsync<DonHangTrongCaDto>(SqlBangCaTam("LichSuDonHangTrongCa"),
+            new { MaChiNhanh = 1, MaNhanVien = 12, TuNgay = ngayLamViec, DenNgay = ngayLamViec });
+        Assert.Equal(2, lichSuB.MaDonHang);
+        var lichSuA = await conn.QuerySingleAsync<DonHangTrongCaDto>(SqlBangCaTam("LichSuDonHangTrongCa"),
+            new { MaChiNhanh = 1, MaNhanVien = 11, TuNgay = ngayLamViec, DenNgay = ngayLamViec });
+        Assert.Equal(1, lichSuA.MaDonHang);
+        Assert.Equal(50000m, lichSuA.SoTien);
         Assert.Empty(await conn.QueryAsync(SqlBangCaTam("DonHangTrongCa"),
-            new { MaCa = 2, args.MaChiNhanh, MaNhanVien = 11 }));
+            new { MaCa = 2, MaChiNhanh = 1, MaNhanVien = 11 }));
     }
 
     private static string SqlBangCaTam(string ten)

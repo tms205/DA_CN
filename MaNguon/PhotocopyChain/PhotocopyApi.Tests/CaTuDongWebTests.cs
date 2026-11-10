@@ -151,20 +151,19 @@ public class CaTuDongWebTests
     }
 
     [Fact]
-    public async Task TongHopKet_HienDuKienRiengVoiKetCaCaNhan()
+    public async Task CaCaNhan_ChiCongTienMatVaoKet()
     {
         await using var thu = await PhienThu.Tao("BRANCH_ADMIN", 1);
         thu.CaDangMo = new() { MaCa = 2, MaChiNhanh = 1, MaNhanVien = 10,
             GioMoCa = new DateTime(2026, 11, 10, 8, 0, 0), TienDauCa = 200000,
-            DoanhThuTrongCa = 30000, TrangThai = "DANG_MO" };
+            DoanhThuTrongCa = 30000, DoanhThuVietQr = 120000, TrangThai = "DANG_MO" };
 
         string html = await thu.RenderCa(false);
-        Assert.Contains("Tổng hợp két theo ca chi nhánh", html);
-        Assert.Contains("Két chung dự kiến", html);
-        Assert.Contains("280.000₫", html);
+        Assert.Contains("Két phải có", html);
         Assert.Contains("230.000₫", html);
-        Assert.Contains("Nhân viên A", html);
-        Assert.Contains("Nhân viên B", html);
+        Assert.Contains("VietQR · không vào két", html);
+        Assert.Contains("120.000₫", html);
+        Assert.DoesNotContain("Két chung dự kiến", html);
     }
 
     private sealed class PhienThu : IAsyncDisposable
@@ -253,13 +252,6 @@ public class CaTuDongWebTests
                     "/api/quan-tri/bao-cao/hien-tai" => new TongQuanHienTaiDto(),
                     "/api/ca" => thu.CaDaDong==null ? Array.Empty<CaLamViecDto>() : new[]{thu.CaDaDong},
                     "/api/ca/cho-xac-nhan" => Array.Empty<CaLamViecDto>(),
-                    "/api/ca/tong-hop-ket" => new TongHopKetChiNhanhDto(1,
-                        new DateTime(2026, 11, 9, 21, 30, 0), new DateTime(2026, 11, 10, 12, 30, 0),
-                        true, 200000, 80000, 2,
-                        new[] {
-                            new TienMatNhanVienDto { TenNhanVien = "Nhân viên A", SoDon = 1, TienMat = 50000 },
-                            new TienMatNhanVienDto { TenNhanVien = "Nhân viên B", SoDon = 1, TienMat = 30000 }
-                        }),
                     _ => throw new InvalidOperationException("GET ngoài dự kiến: " + request.RequestUri.AbsolutePath)
                 };
                 return new(HttpStatusCode.OK) { Content = JsonContent.Create(ds) };

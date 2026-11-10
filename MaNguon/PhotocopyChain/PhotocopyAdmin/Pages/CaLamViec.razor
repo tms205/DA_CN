@@ -53,10 +53,6 @@
             <button type="button" class="nut-chinh" @onclick="MoHopCa">Đóng ca &amp; kiểm đếm</button>
         </section>
     }
-    @if (!CeoDangXemToanChuoi())
-    {
-        <TongHopKetChiNhanh @key="(PhamVi.MaChiNhanh, _lanMoCa)" />
-    }
     <HopThoaiQuanTri Mo="@_moCa" TieuDe="@(_ca == null ? "Mở ca làm việc" : "Đóng ca — kiểm đếm tiền")" @bind-Loi="_loi" DangLuu="@_dangGui" Dong="DongHopCa" Rong="true">
     <NoiDung>
     @if (_ca == null)
@@ -327,7 +323,6 @@
     private string _ghiChuTongKet;
     private int? _maCaDaNhacTongKet;
     private int _luotTaiCa;
-    private int _lanMoCa;
     private readonly CancellationTokenSource _theoDoiDung = new();
     private bool _daHuy;
 
@@ -562,7 +557,6 @@
             _thongBao = "Đã mở ca, giờ có thể tiếp nhận đơn và thu COD khi bàn giao.";
             _tienDemDuoc = null;
             _moCa = false;
-            ++_lanMoCa;
             StateHasChanged();
             await TaiDanhSachVaChoXacNhan();
         }
