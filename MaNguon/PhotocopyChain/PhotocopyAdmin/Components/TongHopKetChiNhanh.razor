@@ -1,0 +1,104 @@
+@inject HttpClient Http
+
+<section class="the ca-the">
+    <div class="ca-dau">
+        <div>
+            <h2 class="the-tieu-de nho">Tổng hợp két theo ca chi nhánh</h2>
+            <p class="the-mo-ta nho">Số tiền dự kiến khi dùng chung một két và cấp quỹ đầu ca một lần. VietQR hiển thị ở phần đối soát riêng.</p>
+        </div>
+        <button type="button" class="nut-phu" disabled="@_dangTai" @onclick="TaiCaHienTai">Ca hiện tại</button>
+    </div>
+    <form class="ca-loc-hanh-dong" @onsubmit="XemCaDaChon" @onsubmit:preventDefault>
+        <label class="truong">
+            <span class="nhan">Ngày nghiệp vụ</span>
+            <input type="date" class="ca-o-loc" required min="1753-01-02" @bind="_ngay" />
+        </label>
+        <label class="truong">
+            <span class="nhan">Ca làm việc</span>
+            <select class="ca-o-loc" @bind="_soCa">
+                <option value="1">Ca sáng</option>
+                <option value="2">Ca chiều</option>
+                <option value="3">Ca tối</option>
+            </select>
+        </label>
+        <button type="submit" class="nut-chinh" disabled="@(_dangTai || !_ngay.HasValue)">Xem tổng hợp</button>
+    </form>
+    @if (_dangTai)
+    {
+        <p class="nv-phu" role="status">Đang tải số liệu két…</p>
+    }
+    else if (_loi)
+    {
+        <p class="o-canh-bao" role="alert">Không tải được tổng hợp két. Vui lòng thử lại.</p>
+    }
+    else if (_ket != null)
+    {
+        <p class="goi-y">Khung tổng hợp từ @_ket.BatDau.ToString("HH:mm dd/MM/yyyy") đến @_ket.KetThuc.ToString("HH:mm dd/MM/yyyy").</p>
+        @if (!_ket.CoCaLamViec)
+        {
+            <p class="nv-phu">Chưa có ca làm việc tại chi nhánh trong khung giờ này.</p>
+        }
+        else
+        {
+            <div class="ca-so-lieu">
+                <div class="ca-o"><div class="ca-o-nhan">Quỹ chuẩn đầu ca</div><b class="mono">@Tien(_ket.QuyDauCa)</b></div>
+                <div class="ca-o"><div class="ca-o-nhan">Tiền mặt đã thu</div><b class="mono">@Tien(_ket.TongTienMat)</b></div>
+                <div class="ca-o"><div class="ca-o-nhan">Số đơn đã thu</div><b class="mono">@_ket.SoDon</b></div>
+                <div class="ca-o ca-o-chinh"><div class="ca-o-nhan">Két chung dự kiến</div><b class="mono">@Tien(_ket.KetDuKien)</b></div>
+            </div>
+            @if (_ket.NhanVien.Count > 0)
+            {
+                <table class="bang" aria-label="Tiền mặt đã thu theo nhân viên">
+                    <thead><tr><th scope="col">Người thu tiền</th><th scope="col">Số đơn</th><th scope="col">Tiền đã thu</th></tr></thead>
+                    <tbody>
+                        @foreach (var nv in _ket.NhanVien)
+                        {
+                            <tr><td data-nhan="Người thu tiền">@nv.TenNhanVien</td><td data-nhan="Số đơn">@nv.SoDon</td><td data-nhan="Tiền đã thu" class="mono">@Tien(nv.TienMat)</td></tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            <p class="nv-phu">Dùng để đối chiếu trước kiểm đếm. Tổng này chưa tính khoản chi hoặc tiền chuyển ra khỏi két.</p>
+        }
+    }
+</section>
+
+@code {
+    private TongHopKetChiNhanhDto _ket;
+    private DateTime? _ngay;
+    private int _soCa = 1;
+    private bool _dangTai;
+    private bool _loi;
+    private static readonly System.Globalization.NumberFormatInfo KieuSo =
+        new() { NumberGroupSeparator = ".", NumberDecimalSeparator = "," };
+
+    protected override Task OnInitializedAsync() => TaiCaHienTai();
+    private Task TaiCaHienTai() => Tai("api/ca/tong-hop-ket");
+    private Task XemCaDaChon() => _ngay is DateTime ngay
+        ? Tai(FormattableString.Invariant($"api/ca/tong-hop-ket?ngay={ngay:yyyy-MM-dd}&ca={_soCa}"))
+        : Task.CompletedTask;
+
+    private async Task Tai(string url)
+    {
+        if (_dangTai) return;
+        _dangTai = true;
+        _loi = false;
+        _ket = null;
+        try
+        {
+            _ket = await Http.GetFromJsonAsync<TongHopKetChiNhanhDto>(url);
+            if (_ket == null)
+            {
+                _loi = true;
+                return;
+            }
+            _ngay = _ket.KetThuc.Date;
+            _soCa = _ket.SoCa;
+        }
+        catch (HttpRequestException) { _loi = true; }
+        catch (TaskCanceledException) { _loi = true; }
+        finally { _dangTai = false; }
+    }
+
+    private static string Tien(decimal tien) => tien.ToString("#,##0", KieuSo) + "₫";
+}

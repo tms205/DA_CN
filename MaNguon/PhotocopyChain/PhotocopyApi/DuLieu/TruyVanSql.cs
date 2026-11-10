@@ -211,29 +211,24 @@ internal static class TruyVanSql
                    ca.TienChi, ca.TienBu, ca.GhiChu, ca.TrangThai,
                    xn.HoTen AS TenNguoiXacNhan,
                    (SELECT COUNT(*) FROM ThanhToan tt
-                    WHERE tt.MaCa = ca.MaCa) AS SoDonDaThu,
-                   (SELECT COUNT(*)
-                    FROM ThanhToan tt
-                    JOIN DonHang dh ON dh.MaDonHang = tt.MaDonHang
-                    WHERE dh.MaChiNhanh = ca.MaChiNhanh
-                      AND tt.PhuongThuc = 'VIETQR'
-                      AND tt.TrangThai = 'DA_THANH_TOAN'
-                      AND tt.NgayThanhToan >= ca.GioMoCa
-                      AND tt.NgayThanhToan <= ISNULL(ca.GioDongCa, GETDATE())
-                      AND ca.MaCa = " + CaCuaThanhToanVietQr + @") AS SoDonVietQr,
-                   (SELECT ISNULL(SUM(tt.SoTien), 0)
-                    FROM ThanhToan tt
-                    JOIN DonHang dh ON dh.MaDonHang = tt.MaDonHang
-                    WHERE dh.MaChiNhanh = ca.MaChiNhanh
-                      AND tt.PhuongThuc = 'VIETQR'
-                      AND tt.TrangThai = 'DA_THANH_TOAN'
-                      AND tt.NgayThanhToan >= ca.GioMoCa
-                      AND tt.NgayThanhToan <= ISNULL(ca.GioDongCa, GETDATE())
-                      AND ca.MaCa = " + CaCuaThanhToanVietQr + @") AS DoanhThuVietQr
+                    WHERE tt.MaCa = ca.MaCa AND tt.PhuongThuc IN ('COD','TIEN_MAT')
+                      AND tt.TrangThai = 'DA_THANH_TOAN') AS SoDonDaThu,
+                   qr.SoDonVietQr, qr.DoanhThuVietQr
             FROM CaLamViec ca
             JOIN ChiNhanh cn ON cn.MaChiNhanh = ca.MaChiNhanh
             JOIN NguoiDung nv ON nv.MaNguoiDung = ca.MaNhanVien
-            LEFT JOIN NguoiDung xn ON xn.MaNguoiDung = ca.MaNguoiXacNhan ";
+            LEFT JOIN NguoiDung xn ON xn.MaNguoiDung = ca.MaNguoiXacNhan
+            CROSS APPLY (
+                SELECT COUNT(*) AS SoDonVietQr, ISNULL(SUM(tt.SoTien), 0) AS DoanhThuVietQr
+                FROM ThanhToan tt
+                JOIN DonHang dh ON dh.MaDonHang = tt.MaDonHang
+                WHERE dh.MaChiNhanh = ca.MaChiNhanh
+                  AND tt.PhuongThuc = 'VIETQR'
+                  AND tt.TrangThai = 'DA_THANH_TOAN'
+                  AND tt.NgayThanhToan >= ca.GioMoCa
+                  AND tt.NgayThanhToan <= ISNULL(ca.GioDongCa, GETDATE())
+                  AND ca.MaCa = " + CaCuaThanhToanVietQr + @"
+            ) qr ";
 
         public const string DangMoCuaNhanVien = ThongTin + @"
             WHERE ca.MaNhanVien = @MaNhanVien AND ca.TrangThai = 'DANG_MO'
@@ -260,8 +255,28 @@ internal static class TruyVanSql
         public const string TheoMa = ThongTin + @"
             WHERE ca.MaCa = @MaCa";
 
+        public const string MoVaDocCa = @"
+            DECLARE @MaCa INT;
+            SELECT @MaCa = MaCa FROM CaLamViec
+            WHERE MaNhanVien = @MaNhanVien AND MaChiNhanh = @MaChiNhanh AND TrangThai = 'DANG_MO';
+            IF @MaCa IS NULL
+                EXEC dbo.sp_MoCa @MaNhanVien=@MaNhanVien, @TienDauCa=@TienDauCa,
+                    @MaChiNhanhThayThe=@MaChiNhanhThayThe, @MaCa=@MaCa OUTPUT;" + TheoMa;
+
         public const string ChoXacNhan = ThongTin + @"
             WHERE ca.TrangThai = 'CHO_XAC_NHAN' ";
+
+        public const string TongHopTienMatChiNhanh = @"
+            SELECT ca.MaNhanVien, nv.HoTen AS TenNhanVien,
+                   COUNT(tt.MaThanhToan) AS SoDon, COALESCE(SUM(tt.SoTien), 0) AS TienMat
+            FROM CaLamViec ca
+            JOIN NguoiDung nv ON nv.MaNguoiDung = ca.MaNhanVien
+            LEFT JOIN ThanhToan tt ON tt.MaCa = ca.MaCa
+                AND tt.PhuongThuc IN ('COD','TIEN_MAT') AND tt.TrangThai = 'DA_THANH_TOAN'
+                AND tt.NgayThanhToan >= @BatDau AND tt.NgayThanhToan < @KetThuc
+            WHERE ca.MaChiNhanh = @MaChiNhanh AND ca.GioMoCa >= @BatDau AND ca.GioMoCa < @KetThuc
+            GROUP BY ca.MaNhanVien, nv.HoTen
+            ORDER BY nv.HoTen, ca.MaNhanVien";
 
         public const string DonHangTrongCa = @"
             SELECT ca.MaCa, ca.MaChiNhanh, cn.TenChiNhanh,
@@ -277,12 +292,13 @@ internal static class TruyVanSql
             JOIN ThanhToan tt ON tt.MaDonHang = dh.MaDonHang
             JOIN NguoiDung kh ON kh.MaNguoiDung = dh.MaKhachHang
             WHERE ca.MaCa = @MaCa AND (@MaChiNhanh IS NULL OR ca.MaChiNhanh = @MaChiNhanh)
-              AND (@MaNhanVien IS NULL OR dh.MaNhanVien = @MaNhanVien)
+              AND (@MaNhanVien IS NULL OR ca.MaNhanVien = @MaNhanVien)
               AND tt.TrangThai = 'DA_THANH_TOAN'
               AND (
                     (tt.PhuongThuc IN ('COD','TIEN_MAT') AND tt.MaCa = ca.MaCa)
                     OR
                     (tt.PhuongThuc = 'VIETQR'
+                     AND (@MaNhanVien IS NULL OR dh.MaNhanVien = @MaNhanVien)
                      AND tt.NgayThanhToan >= ca.GioMoCa
                      AND tt.NgayThanhToan <= ISNULL(ca.GioDongCa, GETDATE())
                      AND ca.MaCa = " + CaCuaThanhToanVietQr + @")
@@ -322,8 +338,9 @@ internal static class TruyVanSql
             ) ca
             JOIN NguoiDung nv ON nv.MaNguoiDung = ca.MaNhanVien
             WHERE (@MaChiNhanh IS NULL OR dh.MaChiNhanh = @MaChiNhanh)
-              -- STAFF bị khóa ở tầng dữ liệu: chỉ đọc đơn do chính mình tiếp nhận.
-              AND (@MaNhanVien IS NULL OR dh.MaNhanVien = @MaNhanVien)
+              -- Tiền mặt theo người thu; VietQR giữ phạm vi đơn do người đó tiếp nhận.
+              AND (@MaNhanVien IS NULL OR
+                   CASE WHEN tt.PhuongThuc = 'VIETQR' THEN dh.MaNhanVien ELSE ca.MaNhanVien END = @MaNhanVien)
               AND tt.TrangThai = 'DA_THANH_TOAN'
               AND (CASE WHEN CAST(COALESCE(ca.GioMoCa,tt.NgayThanhToan) AS TIME)>='21:30'
                    THEN DATEADD(DAY,1,CAST(COALESCE(ca.GioMoCa,tt.NgayThanhToan) AS DATE))

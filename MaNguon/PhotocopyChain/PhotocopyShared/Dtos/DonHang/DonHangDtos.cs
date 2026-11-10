@@ -386,6 +386,21 @@ public sealed class DonHangTrongCaDto
     public string TrangThaiDonHang { get; set; } = "";
 }
 
+public sealed record TongHopKetChiNhanhDto(
+    int SoCa, DateTime BatDau, DateTime KetThuc, bool CoCaLamViec,
+    decimal QuyDauCa, decimal TongTienMat, int SoDon, IReadOnlyList<TienMatNhanVienDto> NhanVien)
+{
+    public decimal KetDuKien => QuyDauCa + TongTienMat;
+}
+
+public sealed class TienMatNhanVienDto
+{
+    public int MaNhanVien { get; set; }
+    public string TenNhanVien { get; set; } = "";
+    public int SoDon { get; set; }
+    public decimal TienMat { get; set; }
+}
+
 public sealed class MoCaRequest
 {
     /// <summary>Tiền lẻ có sẵn trong két lúc mở ca.</summary>

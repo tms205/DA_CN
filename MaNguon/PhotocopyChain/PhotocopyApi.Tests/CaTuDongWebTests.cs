@@ -91,8 +91,11 @@ public class CaTuDongWebTests
     public async Task CeoBamMoCa_ThiGui200000TheoChiNhanhDangChon()
     {
         await using var thu = await PhienThu.Tao("SUPER_ADMIN", 2);
-        await thu.RenderCa(true);
+        string html = await thu.RenderCa(true);
         Assert.Equal((2, 200000m), Assert.Single(thu.DaMo));
+        Assert.Equal(1, thu.SoLanDocCaDangMo);
+        Assert.Contains("Đã mở ca, giờ có thể tiếp nhận đơn", html);
+        Assert.Contains("Ca đang mở", html);
     }
 
     [Fact]
@@ -147,6 +150,23 @@ public class CaTuDongWebTests
         }
     }
 
+    [Fact]
+    public async Task TongHopKet_HienDuKienRiengVoiKetCaCaNhan()
+    {
+        await using var thu = await PhienThu.Tao("BRANCH_ADMIN", 1);
+        thu.CaDangMo = new() { MaCa = 2, MaChiNhanh = 1, MaNhanVien = 10,
+            GioMoCa = new DateTime(2026, 11, 10, 8, 0, 0), TienDauCa = 200000,
+            DoanhThuTrongCa = 30000, TrangThai = "DANG_MO" };
+
+        string html = await thu.RenderCa(false);
+        Assert.Contains("Tổng hợp két theo ca chi nhánh", html);
+        Assert.Contains("Két chung dự kiến", html);
+        Assert.Contains("280.000₫", html);
+        Assert.Contains("230.000₫", html);
+        Assert.Contains("Nhân viên A", html);
+        Assert.Contains("Nhân viên B", html);
+    }
+
     private sealed class PhienThu : IAsyncDisposable
     {
         private readonly ServiceProvider _services;
@@ -157,6 +177,7 @@ public class CaTuDongWebTests
         public List<(int ChiNhanh, decimal Tien)> DaMo { get; } = new();
         public CaLamViecDto CaDangMo { get; set; }
         public CaLamViecDto CaDaDong { get; set; }
+        public int SoLanDocCaDangMo { get; set; }
         public List<string> DaThaoTac { get; } = new();
 
         private PhienThu(string vaiTro, int? chiNhanh)
@@ -222,13 +243,23 @@ public class CaTuDongWebTests
             if (request.Method == HttpMethod.Get)
             {
                 if (request.RequestUri.AbsolutePath == "/api/ca/dang-mo")
+                {
+                    thu.SoLanDocCaDangMo++;
                     return thu.CaDangMo == null ? new(HttpStatusCode.NoContent) : new(HttpStatusCode.OK) { Content = JsonContent.Create(thu.CaDangMo) };
+                }
                 if(request.RequestUri.AbsolutePath=="/api/ca/cho-tong-ket")return new(HttpStatusCode.NoContent);
                 object ds = request.RequestUri.AbsolutePath switch {
                     "/api/danh-muc/chi-nhanh" => new[] { new ChiNhanhDto { MaChiNhanh = 1 }, new ChiNhanhDto { MaChiNhanh = 2 } },
                     "/api/quan-tri/bao-cao/hien-tai" => new TongQuanHienTaiDto(),
                     "/api/ca" => thu.CaDaDong==null ? Array.Empty<CaLamViecDto>() : new[]{thu.CaDaDong},
                     "/api/ca/cho-xac-nhan" => Array.Empty<CaLamViecDto>(),
+                    "/api/ca/tong-hop-ket" => new TongHopKetChiNhanhDto(1,
+                        new DateTime(2026, 11, 9, 21, 30, 0), new DateTime(2026, 11, 10, 12, 30, 0),
+                        true, 200000, 80000, 2,
+                        new[] {
+                            new TienMatNhanVienDto { TenNhanVien = "Nhân viên A", SoDon = 1, TienMat = 50000 },
+                            new TienMatNhanVienDto { TenNhanVien = "Nhân viên B", SoDon = 1, TienMat = 30000 }
+                        }),
                     _ => throw new InvalidOperationException("GET ngoài dự kiến: " + request.RequestUri.AbsolutePath)
                 };
                 return new(HttpStatusCode.OK) { Content = JsonContent.Create(ds) };

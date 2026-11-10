@@ -107,6 +107,36 @@ public class CaController : ControllerBase
         return Ok(danhSach);
     }
 
+    [HttpGet("tong-hop-ket")]
+    public async Task<IActionResult> TongHopKet(
+        [FromServices] TimeProvider dongHo, [FromQuery] DateOnly? ngay, [FromQuery] int? ca,
+        CancellationToken dung)
+    {
+        if (!int.TryParse(User.FindFirst(TenClaim.MaChiNhanh)?.Value, out int maChiNhanh))
+            return BadRequest(new { message = "Vui lòng chọn một chi nhánh để xem tổng hợp két." });
+        if (ngay.HasValue != ca.HasValue || ngay < new DateOnly(1753, 1, 2) || ca is < 1 or > 3)
+            return BadRequest(new { message = "Chọn ngày hợp lệ và ca sáng, chiều hoặc tối." });
+
+        DateTime ketThucHienTai = LichCa.GioKetThuc(LichCa.BayGio(dongHo));
+        DateTime ngayLamViec = ngay?.ToDateTime(TimeOnly.MinValue) ?? ketThucHienTai.Date;
+        int soCa = ca ?? (ketThucHienTai.Hour == 12 ? 1 : ketThucHienTai.Hour == 17 ? 2 : 3);
+        // Ca sáng nghiệp vụ nhận cả các ca mở từ 21:30 tối hôm trước.
+        DateTime batDau = ngayLamViec.AddMinutes(soCa switch { 1 => -150, 2 => 750, _ => 1050 });
+        DateTime ketThuc = LichCa.GioKetThuc(batDau);
+
+        await using var conn = new SqlConnection(_chuoiKetNoi);
+        var nhanVien = (await conn.QueryAsync<TienMatNhanVienDto>(new CommandDefinition(
+            TruyVanSql.CaLamViec.TongHopTienMatChiNhanh,
+            new { MaChiNhanh = maChiNhanh, BatDau = batDau, KetThuc = ketThuc },
+            cancellationToken: dung))).AsList();
+
+        var chiTiet = User.IsInRole(VaiTro.Staff)
+            ? nhanVien.Where(x => x.MaNhanVien == int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value)).ToList()
+            : nhanVien;
+        return Ok(new TongHopKetChiNhanhDto(soCa, batDau, ketThuc, nhanVien.Count > 0,
+            QuyTacCaDangNhap.TienDauCaMacDinh, nhanVien.Sum(x => x.TienMat), nhanVien.Sum(x => x.SoDon), chiTiet));
+    }
+
     // GET api/ca/5/don-hang — tách từng đơn đã thanh toán trong ca, không gộp thành một cục.
     // Web tự chia 5 dòng mỗi trang để code dễ đọc và dữ liệu của một ca cũng không quá lớn.
     [HttpGet("{maCa}/don-hang")]
@@ -147,8 +177,8 @@ public class CaController : ControllerBase
         int maNguoiDung = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
 
         // Super Admin không có MaChiNhanh trong JWT nên xem được toàn chuỗi.
-        // Quản lý bị giới hạn trong chi nhánh. STAFF còn bị giới hạn theo MaNhanVien
-        // ở chính câu SQL để không thể sửa request rồi xem đơn của người khác.
+        // Quản lý bị giới hạn trong chi nhánh. SQL giới hạn nhân viên theo người thu COD
+        // hoặc người tiếp nhận đơn VietQR.
         int? maChiNhanh = vaiTro == "SUPER_ADMIN"
             ? null
             : int.Parse(User.FindFirst(TenClaim.MaChiNhanh).Value);
@@ -173,48 +203,40 @@ public class CaController : ControllerBase
     [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
     public async Task<IActionResult> MoCa(MoCaRequest req)
     {
-        int maNhanVien = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
-        if (_lich != null)
-        {
-            await _lich.ChotHetGioAsync(maNhanVien, HttpContext.RequestAborted);
-            if (await _lich.ConCaChuaTongKetAsync(maNhanVien, HttpContext.RequestAborted))
-                return Conflict(new { message = "Bạn còn ca hết giờ chưa tổng kết. Hãy nhập tiền thực đếm trước khi mở ca mới." });
-        }
         var claimChiNhanh = User.FindFirst(TenClaim.MaChiNhanh);
         if (claimChiNhanh == null)
             return BadRequest(new { message = "Vui lòng chọn một chi nhánh trước khi mở ca." });
         int maChiNhanh = int.Parse(claimChiNhanh.Value);
+        int maNhanVien = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
+        var dung = HttpContext.RequestAborted;
+        if (_lich != null)
+        {
+            await _lich.ChotHetGioAsync(maNhanVien, dung);
+            if (await _lich.ConCaChuaTongKetAsync(maNhanVien, dung))
+                return Conflict(new { message = "Bạn còn ca hết giờ chưa tổng kết. Hãy nhập tiền thực đếm trước khi mở ca mới." });
+        }
 
         using var conn = new SqlConnection(_chuoiKetNoi);
-
-        // Mỗi người chỉ có một ca đang mở. Mở lại dùng ca cũ, không đổi tiền.
-        CaLamViecDto caDangMo = await conn.QueryFirstOrDefaultAsync<CaLamViecDto>(
-            TruyVanSql.CaLamViec.DangMoCuaNhanVien,
-            new { MaChiNhanh = maChiNhanh, MaNhanVien = maNhanVien });
-        if (caDangMo != null) return Ok(caDangMo);
-
-        // Thủ tục trả mã ca vừa mở qua tham số OUTPUT
-        var thamSo = new DynamicParameters();
-        thamSo.Add("@MaNhanVien", maNhanVien);
-        thamSo.Add("@TienDauCa", req.TienDauCa);
-        thamSo.Add("@MaChiNhanhThayThe", User.IsInRole(VaiTro.SuperAdmin) ? maChiNhanh : null);
-        thamSo.Add("@MaCa", dbType: DbType.Int32, direction: ParameterDirection.Output);
-
         try
         {
-            // Thủ tục khóa theo nhân viên để đăng nhập đồng thời không tạo trùng.
-            await conn.ExecuteAsync("sp_MoCa", thamSo, commandType: CommandType.StoredProcedure);
+            // Tìm mã ca, mở nếu cần và đọc kết quả trong cùng lượt gửi SQL.
+            // sp_MoCa vẫn khóa theo nhân viên nếu hai yêu cầu cùng mở một ca.
+            var ca = await conn.QuerySingleAsync<CaLamViecDto>(new CommandDefinition(
+                TruyVanSql.CaLamViec.MoVaDocCa,
+                new
+                {
+                    MaNhanVien = maNhanVien,
+                    MaChiNhanh = maChiNhanh,
+                    req.TienDauCa,
+                    MaChiNhanhThayThe = User.IsInRole(VaiTro.SuperAdmin) ? (int?)maChiNhanh : null
+                },
+                cancellationToken: dung));
+            return Ok(ca);
         }
         catch (SqlException ex)
         {
             return BadRequest(new { message = ex.Message });
         }
-
-        int maCa = thamSo.Get<int>("@MaCa");
-        CaLamViecDto ca = await conn.QueryFirstAsync<CaLamViecDto>(
-            TruyVanSql.CaLamViec.TheoMa,
-            new { MaCa = maCa });
-        return Ok(ca);
     }
 
     // Gửi tiền thực đếm: thủ tục tự xác định ca CEO để chốt ngay, không cần người khác duyệt.

@@ -53,6 +53,10 @@
             <button type="button" class="nut-chinh" @onclick="MoHopCa">Đóng ca &amp; kiểm đếm</button>
         </section>
     }
+    @if (!CeoDangXemToanChuoi())
+    {
+        <TongHopKetChiNhanh @key="(PhamVi.MaChiNhanh, _lanMoCa)" />
+    }
     <HopThoaiQuanTri Mo="@_moCa" TieuDe="@(_ca == null ? "Mở ca làm việc" : "Đóng ca — kiểm đếm tiền")" @bind-Loi="_loi" DangLuu="@_dangGui" Dong="DongHopCa" Rong="true">
     <NoiDung>
     @if (_ca == null)
@@ -322,6 +326,8 @@
     private decimal? _tienDemDuoc;
     private string _ghiChuTongKet;
     private int? _maCaDaNhacTongKet;
+    private int _luotTaiCa;
+    private int _lanMoCa;
     private readonly CancellationTokenSource _theoDoiDung = new();
     private bool _daHuy;
 
@@ -341,7 +347,7 @@
                 if (_daHuy || _dangGui || CeoDangXemToanChuoi()) continue;
                 await InvokeAsync(async () =>
                 {
-                    if (_daHuy) return;
+                    if (_daHuy || _dangGui) return;
                     await TaiCaDangMo(token);
                     if (!_daHuy) StateHasChanged();
                 });
@@ -387,14 +393,13 @@
     private async Task TaiTatCa()
     {
         _dangTai = true;
-        if (!CeoDangXemToanChuoi())
-        {
-            await TaiCaDangMo();
-        }
-        await TaiDanhSachCa();
-        if (LaQuanLyChiNhanh()) await TaiCaChoXacNhan();
+        var caHienTai = CeoDangXemToanChuoi() ? Task.CompletedTask : TaiCaDangMo();
+        await Task.WhenAll(caHienTai, TaiDanhSachVaChoXacNhan());
         _dangTai = false;
     }
+
+    private Task TaiDanhSachVaChoXacNhan() => Task.WhenAll(
+        TaiDanhSachCa(), LaQuanLyChiNhanh() ? TaiCaChoXacNhan() : Task.CompletedTask);
 
     private async Task TaiCaChoXacNhan()
     {
@@ -482,33 +487,38 @@
     // GET api/ca/dang-mo — trả 204 nếu chưa mở ca nào
     private async Task TaiCaDangMo(CancellationToken token = default)
     {
+        int luot = ++_luotTaiCa;
         try
         {
-            var res = await Http.GetAsync("api/ca/dang-mo", token);
-            if (res.StatusCode == System.Net.HttpStatusCode.OK)
+            using var res = await Http.GetAsync("api/ca/dang-mo", token);
+            if (luot != _luotTaiCa) return;
+            CaLamViecDto ca;
+            if (res.StatusCode == System.Net.HttpStatusCode.NoContent)
             {
-                _ca = await res.Content.ReadFromJsonAsync<CaLamViecDto>();
+                using var cho = await Http.GetAsync("api/ca/cho-tong-ket", token);
+                cho.EnsureSuccessStatusCode();
+                ca = cho.StatusCode == System.Net.HttpStatusCode.NoContent
+                    ? null : await cho.Content.ReadFromJsonAsync<CaLamViecDto>(cancellationToken: token);
             }
             else
             {
-                _ca = null;
-                using var cho = await Http.GetAsync("api/ca/cho-tong-ket", token);
-                if (cho.StatusCode == System.Net.HttpStatusCode.OK)
-                {
-                    _ca = await cho.Content.ReadFromJsonAsync<CaLamViecDto>();
-                    if (_maCaDaNhacTongKet != _ca.MaCa)
-                    {
-                        _maCaDaNhacTongKet = _ca.MaCa;
-                        _moCa = true;
-                    }
-                }
+                res.EnsureSuccessStatusCode();
+                ca = await res.Content.ReadFromJsonAsync<CaLamViecDto>(cancellationToken: token);
+            }
+
+            if (luot != _luotTaiCa) return;
+            _ca = ca;
+            if (ca?.TrangThai == "CHO_TONG_KET" && _maCaDaNhacTongKet != ca.MaCa)
+            {
+                _maCaDaNhacTongKet = ca.MaCa;
+                _moCa = true;
             }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch
         {
-            _loi = "Không kết nối được máy chủ API. Kiểm tra PhotocopyApi đã chạy chưa.";
-            _ca = null;
+            if (luot == _luotTaiCa)
+                _loi = "Không tải được trạng thái ca. Vui lòng thử lại.";
         }
     }
 
@@ -538,27 +548,29 @@
         if (_loi != null) return;
         _thongBao = null;
         _dangGui = true;
+        ++_luotTaiCa; // Bỏ phản hồi thăm dò đã gửi trước lúc mở ca.
         try
         {
-            var res = await Http.PostAsJsonAsync("api/ca/mo", new MoCaRequest { TienDauCa = _tienDauCa });
-            if (res.IsSuccessStatusCode)
-            {
-                _thongBao = "Đã mở ca, giờ có thể tiếp nhận đơn và thu COD khi bàn giao.";
-                _tienDemDuoc = null;
-                _moCa = false;
-            }
-            else
+            using var res = await Http.PostAsJsonAsync("api/ca/mo", new MoCaRequest { TienDauCa = _tienDauCa });
+            if (!res.IsSuccessStatusCode)
             {
                 var loi = await res.Content.ReadFromJsonAsync<ApiError>();
-                _loi = loi.Message;
+                _loi = loi?.Message ?? "Không mở được ca làm việc.";
+                return;
             }
+            _ca = await res.Content.ReadFromJsonAsync<CaLamViecDto>();
+            _thongBao = "Đã mở ca, giờ có thể tiếp nhận đơn và thu COD khi bàn giao.";
+            _tienDemDuoc = null;
+            _moCa = false;
+            ++_lanMoCa;
+            StateHasChanged();
+            await TaiDanhSachVaChoXacNhan();
         }
         catch
         {
-            _loi = "Không kết nối được máy chủ API.";
+            _loi = "Không xác nhận được kết quả mở ca. Hãy tải lại để kiểm tra trạng thái.";
         }
-        _dangGui = false;
-        await TaiTatCa();
+        finally { _dangGui = false; }
     }
 
     // POST api/ca/dong — CEO chốt ngay; STAFF/BRANCH_ADMIN chờ người khác đối soát.
@@ -620,7 +632,7 @@
     private string MoTa()
     {
         string noi = PhamVi.MaChiNhanh != null ? "Chi nhánh đang chọn" : Phien.NguoiDung?.TenChiNhanh ?? "Toàn chuỗi";
-        return noi + " · 3 ca mỗi ngày: 09:00–13:00 · 13:00–17:00 · 17:00–21:00";
+        return noi + " · 3 ca mỗi ngày: 07:30–12:30 · 12:30–17:30 · 17:30–21:30";
     }
 
     private string ChuLech(CaLamViecDto ca)

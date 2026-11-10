@@ -37,7 +37,7 @@
             @if (!LaStaff)
             {
                 <label class="truong">
-                    <span class="nhan">Nhân viên tiếp nhận</span>
+                    <span class="nhan">Nhân viên theo ca</span>
                     <select class="ca-o-loc" @bind="_maNhanVien">
                         <option value="">Tất cả nhân viên</option>
                         @foreach (var nhanVien in DanhSachNhanVien())
@@ -74,7 +74,7 @@
         <div class="ca-loc-hanh-dong">
             <span class="nv-phu">
                 @(LaStaff
-                    ? "Chỉ hiển thị đơn do chính bạn tiếp nhận · mặc định 30 ngày gần nhất."
+                    ? "COD do bạn thu và VietQR theo đơn bạn tiếp nhận · mặc định 30 ngày gần nhất."
                     : "Mặc định hiển thị lịch sử 30 ngày gần nhất.")
             </span>
             <div>
@@ -352,7 +352,7 @@
     private string MoTa()
     {
         if (LaStaff)
-            return (Phien.NguoiDung?.TenChiNhanh ?? "Chi nhánh") + " · các đơn do chính bạn tiếp nhận";
+            return (Phien.NguoiDung?.TenChiNhanh ?? "Chi nhánh") + " · tiền mặt bạn thu và VietQR theo đơn bạn tiếp nhận";
         string noi = PhamVi.MaChiNhanh != null ? "Chi nhánh đang chọn" : Phien.NguoiDung?.TenChiNhanh ?? "Toàn chuỗi";
         return noi + " · tra cứu đơn đã thanh toán theo nhân viên và ca làm việc";
     }
