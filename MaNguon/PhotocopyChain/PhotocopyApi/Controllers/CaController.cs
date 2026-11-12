@@ -264,9 +264,10 @@ public class CaController : ControllerBase
         var danhSach = await conn.QueryAsync<CaLamViecDto>(
             TruyVanSql.CaLamViec.ChoXacNhan + @"
               AND ca.MaNhanVien <> @MaNguoiDung
+              AND (@LaCeo = 1 OR nv.VaiTro = 'STAFF')
               AND (@MaChiNhanh IS NULL OR ca.MaChiNhanh = @MaChiNhanh)
               ORDER BY ca.GioDongCa DESC",
-            new { MaNguoiDung = maNguoiDung, MaChiNhanh = maChiNhanh });
+            new { MaNguoiDung = maNguoiDung, MaChiNhanh = maChiNhanh, LaCeo = User.IsInRole(VaiTro.SuperAdmin) });
         return Ok(danhSach);
     }
 
@@ -283,6 +284,20 @@ public class CaController : ControllerBase
 
         using var conn = new SqlConnection(_chuoiKetNoi);
         var claimChiNhanh = User.FindFirst(TenClaim.MaChiNhanh);
+        var caCanDuyet = await conn.QueryFirstOrDefaultAsync<CaLamViecDto>(
+            TruyVanSql.CaLamViec.TheoMa, new { MaCa = maCa });
+        if (caCanDuyet == null) return NotFound(new { message = "Không tìm thấy ca làm việc." });
+        if (caCanDuyet.TrangThai != "CHO_XAC_NHAN")
+            return Conflict(new { message = "Ca chưa tổng kết hoặc đã được xác nhận." });
+        if (caCanDuyet.MaNhanVien == maQuanLy)
+            return StatusCode(403, new { message = "Không được tự duyệt ca của mình." });
+        if (!User.IsInRole(VaiTro.SuperAdmin))
+        {
+            var vaiTroNguoiDongCa = await conn.ExecuteScalarAsync<string>(
+                "SELECT VaiTro FROM NguoiDung WHERE MaNguoiDung=@MaNhanVien", new { caCanDuyet.MaNhanVien });
+            if (vaiTroNguoiDongCa != VaiTro.Staff)
+                return StatusCode(403, new { message = "Ca của quản lý phải do CEO xác nhận." });
+        }
         if (claimChiNhanh != null)
         {
             int? maChiNhanhCa = await conn.ExecuteScalarAsync<int?>(
@@ -291,6 +306,8 @@ public class CaController : ControllerBase
             if (maChiNhanhCa != int.Parse(claimChiNhanh.Value))
                 return StatusCode(403, new { message = "Ca không thuộc phạm vi chi nhánh đang chọn." });
         }
+        var loiDoiSoat = PhotocopyShared.CaLamViec.QuyTacDoiSoatCa.KiemTra(caCanDuyet, req);
+        if (loiDoiSoat != null) return BadRequest(new { message = loiDoiSoat });
         try
         {
             await conn.ExecuteAsync("sp_XacNhanCa", new

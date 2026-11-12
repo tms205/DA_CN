@@ -1,4 +1,4 @@
-@page "/ca-lam-viec"
+﻿@page "/ca-lam-viec"
 @attribute [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
 @using PhotocopyShared.Dtos.DonHang
 @inject HttpClient Http
@@ -242,10 +242,10 @@
             else if (_dsChoXacNhan.Count == 0) { <div class="bang-trong">Không có ca nào chờ xác nhận.</div> }
             else
             {
-                <div class="bang-cuon"><table role="table" class="bang"><thead><tr><th scope="col">Nhân viên</th><th scope="col">Thời gian</th><th scope="col">Két theo hệ thống</th><th scope="col">Việc cần làm</th><th scope="col"></th></tr></thead><tbody>
+                <div class="bang-cuon"><table role="table" class="bang"><thead><tr><th scope="col">Nhân viên</th><th scope="col">Thời gian</th><th scope="col">Két theo hệ thống</th><th scope="col">Lý do</th><th scope="col"></th></tr></thead><tbody>
                 @foreach (CaLamViecDto ca in _dsChoXacNhan)
                 {
-                    <tr><td data-nhan="Nhân viên"><b>@ca.TenNhanVien</b></td><td data-nhan="Thời gian">@ca.GioMoCa.ToString("HH:mm") – @ca.GioDongCa?.ToString("HH:mm dd/MM")</td><td class="mono" data-nhan="Két theo hệ thống"><b>@Tien(ca.TienDauCa + ca.DoanhThuTrongCa)</b></td><td data-nhan="Việc cần làm">Kiểm đếm tiền thực tế trong két</td><td data-nhan="Thao tác"><button class="nut-nho chinh" @onclick="() => ChonXacNhan(ca)">Kiểm tra &amp; xác nhận</button></td></tr>
+                    <tr><td data-nhan="Nhân viên"><b>@ca.TenNhanVien</b></td><td data-nhan="Thời gian">@ca.GioMoCa.ToString("HH:mm") – @ca.GioDongCa?.ToString("HH:mm dd/MM")</td><td class="mono" data-nhan="Két theo hệ thống"><b>@Tien(ca.TienDauCa + ca.DoanhThuTrongCa)</b><div class="nv-phu">Nhân viên đếm: @(ca.TongDoanhThuCuoiCa.HasValue ? Tien(ca.TongDoanhThuCuoiCa.Value) : "Chưa khai")</div><div class="nhan-mau @(ca.TongDoanhThuCuoiCa == TienPhaiCo(ca) ? "nhan-xanh" : "nhan-cam")">@ChenhLechNhanVien(ca)</div></td><td data-nhan="Lý do" style="max-width:320px;white-space:pre-wrap;overflow-wrap:anywhere">@(string.IsNullOrWhiteSpace(ca.GhiChu) ? "Không có chênh lệch" : ca.GhiChu)</td><td data-nhan="Thao tác"><button class="nut-nho chinh" @onclick="() => ChonXacNhan(ca)">Kiểm tra &amp; xác nhận</button></td></tr>
                 }
                 </tbody></table></div>
             }
@@ -261,37 +261,21 @@
                     </div>
                 </div>
 
-                @if (!_dangXuLyLech)
-                {
-                    <div class="ca-cau-hoi">
-                        <b>Số tiền quản lý trực tiếp kiểm đếm có khớp không?</b>
-                        <span>Hãy đếm tiền thực tế trong két rồi mới chọn. Không dùng số tiền nhân viên đã khai để xác nhận thay.</span>
-                    </div>
-                    <div class="ca-lua-chon">
-                        <button type="button" class="ca-nut-ket-qua khop" disabled="@_dangGui" @onclick="XacNhanKhopAsync">
-                            <b>@((MarkupString)Svg.DauTich(18)) Khớp tiền</b>
-                            <span>Xác nhận và đóng ca ngay</span>
-                        </button>
-                        <button type="button" class="ca-nut-ket-qua lech" disabled="@_dangGui" @onclick="BatDauXuLyLech">
-                            <b>@((MarkupString)Svg.CanhBao()) Có chênh lệch</b>
-                            <span>Nhập số tiền quản lý đếm được</span>
-                        </button>
-                    </div>
-                }
-                else
-                {
-                    <div class="o-canh-bao">
-                        <span class="o-cb-icon">@((MarkupString)Svg.ThongTin())</span>
-                        <div>
-                            <div class="o-cb-tieu-de">Ghi nhận theo số quản lý kiểm đếm</div>
-                            <div class="o-cb-noi-dung">Số nhân viên tự khai vẫn được lưu để đối chiếu; kết quả chốt ca dùng số tiền quản lý trực tiếp đếm.</div>
-                        </div>
-                    </div>
+                <div class="ca-so-lieu">
+                    <div class="ca-o"><div class="ca-o-nhan">Nhân viên đã đếm</div><b class="mono">@(_caXacNhan.TongDoanhThuCuoiCa.HasValue ? Tien(_caXacNhan.TongDoanhThuCuoiCa.Value) : "Chưa khai")</b></div>
+                    <div class="ca-o"><div class="ca-o-nhan">Chênh lệch nhân viên khai</div><b>@ChenhLechNhanVien(_caXacNhan)</b></div>
+                </div>
+                <div class="o-canh-bao"><div><b>Lý do của người đóng ca</b><p style="white-space:pre-wrap;overflow-wrap:anywhere">@(string.IsNullOrWhiteSpace(_caXacNhan.GhiChu) ? "Không ghi lý do" : _caXacNhan.GhiChu)</p></div></div>
+                <p class="goi-y">Nhập tiền thực đếm trước khi nhận tiền bù. Nếu khác số nhân viên khai, kiểm đếm lại và ghi rõ kết quả đối soát. Số nhân viên khai được giữ nguyên.</p>
                     <div class="ca-loc-luoi ca-xu-ly-lech">
                         <div class="truong"><label class="nhan">Quản lý đếm được (₫)</label><input max="999999999999" required class="ca-o-loc mono" type="number" min="0" step="1" @bind="TienQuanLyDemNhap" @bind:event="oninput" /></div>
                         @if (_tienQuanLyDem != null)
                         {
                             decimal lechQuanLy = _tienQuanLyDem.Value - TienPhaiCo(_caXacNhan);
+                            @if (_tienQuanLyDem != _caXacNhan.TongDoanhThuCuoiCa)
+                            {
+                                <div class="o-canh-bao ca-ghi-chu-lech" role="alert">Số kiểm đếm khác số nhân viên khai. Kiểm tra lại và ghi lý do trước khi xác nhận.</div>
+                            }
                             <div class="truong ca-ket-qua-dem">
                                 <label class="nhan">Kết quả kiểm đếm</label>
                                 <span class="nhan-mau @(lechQuanLy < 0 ? "nhan-do" : lechQuanLy > 0 ? "nhan-cam" : "nhan-xanh")">@(lechQuanLy < 0 ? "Thiếu " + Tien(-lechQuanLy) : lechQuanLy > 0 ? "Thừa " + Tien(lechQuanLy) : "Khớp tiền")</span>
@@ -299,16 +283,16 @@
                             @if (lechQuanLy < 0)
                             {
                                 <div class="truong"><label class="nhan">Tiền đã chi cho tiệm</label><input max="999999999999" required step="1" class="ca-o-loc mono" type="number" min="0" @bind="_tienChi" /></div>
-                                <div class="truong"><label class="nhan">Nhân viên bù</label><input max="999999999999" required step="1" class="ca-o-loc mono" type="number" min="0" @bind="_tienBu" /></div>
+                                <div class="truong"><label class="nhan">Nhân viên đã nộp bù (₫)</label><input max="999999999999" required step="1" class="ca-o-loc mono" type="number" min="0" @bind="_tienBu" /><small>Chỉ nhập sau khi đã nhận và kiểm đếm tiền bù.</small></div>
+                                <div class="o-canh-bao ca-ghi-chu-lech">Nhân viên cần bù: <b>@Tien(Math.Max(0, -lechQuanLy - _tienChi))</b> sau khi trừ khoản chi hợp lệ. Chưa bù đủ thì ca tiếp tục chờ xác nhận.</div>
                             }
-                            @if (lechQuanLy != 0) { <div class="truong ca-ghi-chu-lech"><label class="nhan">Lý do chênh lệch / khoản chi</label><input maxlength="255" class="ca-o-loc" placeholder="Ghi rõ nguyên nhân thiếu hoặc thừa tiền" @bind="_ghiChuXacNhan" /></div> }
+                            @if (lechQuanLy != 0 || _tienQuanLyDem != _caXacNhan.TongDoanhThuCuoiCa) { <div class="truong ca-ghi-chu-lech"><label class="nhan">Lý do / kết quả đối soát</label><input required maxlength="255" class="ca-o-loc" placeholder="Ghi rõ nguyên nhân và kết quả kiểm đếm lại" @bind="_ghiChuXacNhan" /></div> }
                         }
                     </div>
-                    <button type="button" class="nut-phu" disabled="@_dangGui" @onclick="QuayLaiChonKetQua">Quay lại</button>
-                }
+
             </form>
         </NoiDung>
-        <Chan><button type="button" class="nut-phu" disabled="@_dangGui" @onclick="BoChonXacNhan">Hủy</button>@if (_dangXuLyLech) { <button type="submit" form="ca-form-doi-soat" class="nut-chinh" disabled="@(_dangGui || _tienQuanLyDem == null)">@(_dangGui ? "Đang xác nhận…" : "Xác nhận đóng ca")</button> }</Chan>
+        <Chan><button type="button" class="nut-phu" disabled="@_dangGui" @onclick="BoChonXacNhan">Hủy</button><button type="submit" form="ca-form-doi-soat" class="nut-chinh" disabled="@(_dangGui || _tienQuanLyDem == null)">@(_dangGui ? "Đang xác nhận…" : "Xác nhận đóng ca")</button></Chan>
         </HopThoaiQuanTri>
     }
 </div>
@@ -357,7 +341,6 @@
     private string _thongBao;
     private List<CaLamViecDto> _dsChoXacNhan;
     private CaLamViecDto _caXacNhan;
-    private bool _dangXuLyLech;
     private decimal? _tienQuanLyDem;
     private decimal _tienChi;
     private decimal _tienBu;
@@ -373,9 +356,8 @@
         {
             _tienQuanLyDem = value;
             if (_caXacNhan == null || value == null) return;
-            decimal thieu = TienPhaiCo(_caXacNhan) - value.Value;
             _tienChi = 0;
-            _tienBu = thieu > 0 ? thieu : 0;
+            _tienBu = 0;
             _ghiChuXacNhan = "";
         }
     }
@@ -412,7 +394,6 @@
         if (_dangGui) return;
         _loi = _thongBao = null;
         _caXacNhan = ca;
-        _dangXuLyLech = false;
         _tienQuanLyDem = null;
         _tienChi = 0;
         _tienBu = 0;
@@ -423,32 +404,14 @@
     {
         if (_dangGui) return;
         _caXacNhan = null;
-        _dangXuLyLech = false;
         _tienQuanLyDem = null;
     }
 
-    private void BatDauXuLyLech()
+    private string ChenhLechNhanVien(CaLamViecDto ca)
     {
-        _dangXuLyLech = true;
-        _tienQuanLyDem = null;
-        _tienChi = 0;
-        _tienBu = 0;
-        _ghiChuXacNhan = "";
-    }
-
-    private void QuayLaiChonKetQua()
-    {
-        _dangXuLyLech = false;
-        _tienQuanLyDem = null;
-        _tienChi = 0;
-        _tienBu = 0;
-        _ghiChuXacNhan = "";
-    }
-
-    private async Task XacNhanKhopAsync()
-    {
-        if (_caXacNhan == null) return;
-        await GuiXacNhanCaAsync(TienPhaiCo(_caXacNhan), 0, 0, null);
+        if (ca.TongDoanhThuCuoiCa == null) return "Chưa có số liệu";
+        decimal lech = ca.TongDoanhThuCuoiCa.Value - TienPhaiCo(ca);
+        return lech < 0 ? "Thiếu " + Tien(-lech) : lech > 0 ? "Thừa " + Tien(lech) : "Khớp tiền";
     }
 
     private async Task XacNhanLechAsync()
@@ -461,6 +424,8 @@
     {
         if (_dangGui || _caXacNhan == null) return;
         var req = new XacNhanCaRequest { TienQuanLyDemCuoiCa = tienQuanLyDem, TienChi = tienChi, TienBu = tienBu, GhiChu = ghiChu };
+        _loi = PhotocopyShared.CaLamViec.QuyTacDoiSoatCa.KiemTra(_caXacNhan, req);
+        if (_loi != null) return;
         _loi = QuyTacNhap.LayLoi(req);
         if (_loi != null) return;
         _loi = null; _thongBao = null;
@@ -471,7 +436,6 @@
             if (!res.IsSuccessStatusCode) { _loi = await DocLoiApi.TuPhanHoiAsync(res, "Không xác nhận được ca."); return; }
             _thongBao = "Đã kiểm đếm và xác nhận ca của " + _caXacNhan.TenNhanVien + ".";
             _caXacNhan = null;
-            _dangXuLyLech = false;
             _tienQuanLyDem = null;
             await TaiTatCa();
         }
