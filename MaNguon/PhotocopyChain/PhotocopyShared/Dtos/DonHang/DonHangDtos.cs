@@ -1,4 +1,4 @@
-using PhotocopyShared.KiemTraDuLieu;
+﻿using PhotocopyShared.KiemTraDuLieu;
 using System.ComponentModel.DataAnnotations;
 using PhotocopyShared.Dtos.DatIn;
 using PhotocopyShared.Dtos.Tuan3;
@@ -169,6 +169,7 @@ public sealed class DonHangChiTietDto
 {
     public string KenhDatDon { get; set; } = "LEGACY";
     public double GiayChoTiepNhan { get; set; }
+    public bool DaXacNhanXuLyNgay { get; set; }
     public bool ChoHuyKhach { get; set; }
 
     public int? MaMayIn { get; set; }
@@ -231,6 +232,7 @@ public sealed class HangDoiDonDto
 {
     public string KenhDatDon { get; set; } = "LEGACY";
     public double GiayChoTiepNhan { get; set; }
+    public bool DaXacNhanXuLyNgay { get; set; }
     public bool ChoHuyKhach { get; set; }
 
     public int? MaMayIn { get; set; }

@@ -1,4 +1,4 @@
-using PhotocopyShared.Dtos.DonHang;
+﻿using PhotocopyShared.Dtos.DonHang;
 namespace PhotocopyApi.DuLieu;
 
 // Chỉ tập trung các câu SELECT dài để Controller dễ đọc:
@@ -51,9 +51,10 @@ internal static class TruyVanSql
         public const string ChiTiet = @"
             SELECT dh.MaDonHang, dh.MaMayIn,
                    dh.KenhDatDon,
-                   CASE WHEN dh.KenhDatDon='APP' AND tt.TrangThai='DA_THANH_TOAN' AND dh.TrangThai='CHO_XAC_NHAN'
+                   CASE WHEN dh.KenhDatDon='APP' AND tt.TrangThai='DA_THANH_TOAN' AND dh.TrangThai='CHO_XAC_NHAN' AND ISNULL(JSON_VALUE(dh.BangChungHuyJson,'$.BoQuaChoHaiPhut'),'false')<>'true'
                      AND tt.NgayThanhToan IS NOT NULL AND GETDATE()<DATEADD(SECOND,120,tt.NgayThanhToan)
                      THEN DATEDIFF_BIG(MILLISECOND,GETDATE(),DATEADD(SECOND,120,tt.NgayThanhToan))/1000.0 ELSE 0 END AS GiayChoTiepNhan,
+                   CAST(CASE WHEN JSON_VALUE(dh.BangChungHuyJson,'$.BoQuaChoHaiPhut')='true' THEN 1 ELSE 0 END AS BIT) AS DaXacNhanXuLyNgay,
                    " + ChinhSachDonApp.SqlChoHuy + @" AS ChoHuyKhach,
                    'DH' + RIGHT('00000' + CAST(dh.MaDonHang AS VARCHAR(10)), 5) AS MaDonHangHienThi,
                    dh.MaDonHangGoc,
@@ -113,9 +114,10 @@ internal static class TruyVanSql
         public const string HangDoi = @"
             SELECT dh.MaDonHang, dh.MaMayIn,
                    dh.KenhDatDon,
-                   CASE WHEN dh.KenhDatDon='APP' AND tt.TrangThai='DA_THANH_TOAN' AND dh.TrangThai='CHO_XAC_NHAN'
+                   CASE WHEN dh.KenhDatDon='APP' AND tt.TrangThai='DA_THANH_TOAN' AND dh.TrangThai='CHO_XAC_NHAN' AND ISNULL(JSON_VALUE(dh.BangChungHuyJson,'$.BoQuaChoHaiPhut'),'false')<>'true'
                      AND tt.NgayThanhToan IS NOT NULL AND GETDATE()<DATEADD(SECOND,120,tt.NgayThanhToan)
                      THEN DATEDIFF_BIG(MILLISECOND,GETDATE(),DATEADD(SECOND,120,tt.NgayThanhToan))/1000.0 ELSE 0 END AS GiayChoTiepNhan,
+                   CAST(CASE WHEN JSON_VALUE(dh.BangChungHuyJson,'$.BoQuaChoHaiPhut')='true' THEN 1 ELSE 0 END AS BIT) AS DaXacNhanXuLyNgay,
                    " + ChinhSachDonApp.SqlChoHuy + @" AS ChoHuyKhach,
                    'DH' + RIGHT('00000' + CAST(dh.MaDonHang AS VARCHAR(10)), 5) AS MaDonHangHienThi,
                    dh.MaDonHangGoc,

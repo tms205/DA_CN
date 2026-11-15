@@ -1,3 +1,4 @@
+import '../../widgets/xu_ly_ngay.dart';
 import '../../widgets/khieu_nai_hoan_tien.dart';
 import '../../widgets/bang_chung_huy_don.dart';
 import 'dart:async';
@@ -164,6 +165,8 @@ class _TienDoScreenState extends State<TienDoScreen> {
                   child: Text(
                     _don!.giayChoTiepNhan > 0
                         ? 'Còn ${_don!.giayChoTiepNhan ~/ 60}:${(_don!.giayChoTiepNhan % 60).toString().padLeft(2, '0')} để hủy và yêu cầu hoàn tiền. Nhân viên chưa tiếp nhận trong thời gian này.'
+                        : _don!.daXacNhanXuLyNgay
+                        ? 'Bạn đã xác nhận xử lý ngay. Đơn chờ nhân viên tiếp nhận; không còn được hủy/hoàn theo thời gian chờ.'
                         : 'Đã hết 2 phút hủy/hoàn thông thường. Đơn đang chờ nhân viên tiếp nhận.',
                     style: TextStyle(
                       color: _don!.giayChoTiepNhan > 0
@@ -173,6 +176,14 @@ class _TienDoScreenState extends State<TienDoScreen> {
                   ),
                 ),
               ),
+            ],
+            if (_don!.kenhDatDon == 'APP' &&
+                _don!.daTra &&
+                _don!.trangThaiDonHang == 'CHO_XAC_NHAN' &&
+                _don!.giayChoTiepNhan > 0 &&
+                !_don!.daXacNhanXuLyNgay) ...[
+              const SizedBox(height: 8),
+              NutXuLyNgay(maDonHang: widget.maDonHang, sauXacNhan: _taiDon),
             ],
             if (_don!.choPhepHuy) ...[
               const SizedBox(height: 12),

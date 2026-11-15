@@ -1,0 +1,66 @@
+﻿@inject HttpClient Http
+
+<section class="the the-bang" aria-label="Lịch sử đơn đã hủy">
+    <div class="bang-tieu-de"><div><h2>Lịch sử đơn đã hủy</h2><p class="bang-mo-ta">Tra cứu đơn đã hủy, lý do và kết quả hoàn tiền.</p></div><span class="bang-dem">@(_data?.Total ?? 0) đơn</span></div>
+    <form class="ls-huy-bo-loc" @onsubmit="TimAsync" @onsubmit:preventDefault>
+        <label><span>Tìm đơn hàng</span><input class="ca-o-loc" type="search" maxlength="100" placeholder="Mã đơn, khách, số điện thoại, chi nhánh…" @bind="_tim" /></label>
+        <label><span>Trạng thái thanh toán</span><select class="ca-o-loc" @bind="_thanhToan"><option value="">Tất cả</option><option value="CHUA_THANH_TOAN">Không cần hoàn</option><option value="DA_THANH_TOAN">Chờ hoàn tiền</option><option value="DA_HOAN_TIEN">Đã hoàn tiền</option></select></label>
+        <button class="nut-phu" type="submit" disabled="@_tai">@(_tai ? "Đang tải…" : "Tra cứu")</button>
+    </form>
+    @if (_loi != null) { <div class="bang-trong" role="alert">@_loi <button class="nut-nho" @onclick="TaiAsync">Thử lại</button></div> }
+    else if (_data == null) { <TrangThaiTaiBang NoiDung="Đang tải lịch sử đơn đã hủy…" /> }
+    else if (_data.Items.Count == 0) { <div class="bang-trong">Không có đơn đã hủy phù hợp với bộ lọc.</div> }
+    else
+    {
+        <div class="bang-cuon"><table class="bang" aria-label="Danh sách đơn đã hủy">
+            <thead><tr><th scope="col">Đơn / khách hàng</th><th scope="col">Chi nhánh</th><th scope="col">Lý do hủy</th><th scope="col">Số tiền đơn</th><th scope="col">Trạng thái hoàn</th><th scope="col">Thao tác</th></tr></thead>
+            <tbody>@foreach (var d in _data.Items) {
+                <tr>
+                    <td data-nhan="Đơn / khách hàng"><b class="mono">@d.MaDonHangHienThi</b><div>@d.TenKhachHang</div><div class="nv-phu">@d.SoDienThoai</div><div class="nv-phu">@(d.GuiLuc.HasValue ? "Hủy: " + d.GuiLuc.Value.ToOffset(TimeSpan.FromHours(7)).ToString("HH:mm dd/MM/yyyy") : "Ngày đặt: " + d.NgayDat.ToString("HH:mm dd/MM/yyyy"))</div></td>
+                    <td data-nhan="Chi nhánh">@d.TenChiNhanh</td>
+                    <td data-nhan="Lý do hủy" class="ls-huy-ly-do">@(d.ThongTinHoanTien?.LyDo ?? d.GhiChu ?? "Hồ sơ cũ chưa ghi lý do")</td>
+                    <td data-nhan="Số tiền đơn" class="mono">@d.SoTien.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("vi-VN"))₫</td>
+                    <td data-nhan="Trạng thái hoàn"><span class="nhan-mau @(d.TrangThaiThanhToan == "DA_HOAN_TIEN" ? "nhan-xanh" : d.TrangThaiThanhToan == "DA_THANH_TOAN" ? "nhan-cam" : "")">@Nhan(d.TrangThaiThanhToan)</span></td>
+                    <td data-nhan="Thao tác"><button type="button" class="nut-nho" @onclick="()=>_chon=d">Xem hồ sơ</button></td>
+                </tr>
+            }</tbody>
+        </table></div>
+    }
+    @if (_data?.Total > 0) {
+        <div class="ls-huy-phan-trang"><span>Trang @_trang / @TongTrang · @_data.Total đơn</span><div><button class="nut-nho" disabled="@(_tai || _trang<=1)" @onclick="()=>DoiTrang(-1)">Trước</button><button class="nut-nho" disabled="@(_tai || _trang>=TongTrang)" @onclick="()=>DoiTrang(1)">Sau</button></div></div>
+    }
+</section>
+<HopThoaiQuanTri Mo="@(_chon != null)" TieuDe="Hồ sơ đơn đã hủy" Dong="()=>_chon=null" Rong="true">
+    <NoiDung>@if (_chon != null) {
+        <p><b>@_chon.MaDonHangHienThi</b> · @_chon.TenKhachHang · @_chon.TenChiNhanh</p>
+        <p><span class="nhan-mau">Đã hủy</span> · @Nhan(_chon.TrangThaiThanhToan)</p>
+        <p class="ls-huy-ly-do"><b>Lý do hủy:</b> @(_chon.ThongTinHoanTien?.LyDo ?? _chon.GhiChu ?? "Chưa có lý do trong hồ sơ cũ")</p>
+        <BangChungHuyDon @key="_chon.MaDonHang" MaDonHang="_chon.MaDonHang" DaHoanTien="@(_chon.TrangThaiThanhToan == "DA_HOAN_TIEN")" />
+    }</NoiDung>
+    <Chan><button class="nut-phu" @onclick="()=>_chon=null">Đóng</button></Chan>
+</HopThoaiQuanTri>
+
+@code {
+    private LichSuDonHuyDto _data;
+    private HoanTienChoDuyetDto _chon;
+    private string _tim = "", _thanhToan = "", _loi;
+    private int _trang = 1;
+    private bool _tai;
+    private int TongTrang => Math.Max(1, ((_data?.Total ?? 0) + 7) / 8);
+    protected override Task OnInitializedAsync() => TaiAsync();
+    private async Task TimAsync() { _trang=1; await TaiAsync(); }
+    private async Task DoiTrang(int buoc) { _trang=Math.Clamp(_trang+buoc,1,TongTrang); await TaiAsync(); }
+    public async Task TaiAsync()
+    {
+        if (_tai) return;
+        _tai=true; _loi=null;
+        try {
+            _data=await Http.GetFromJsonAsync<LichSuDonHuyDto>($"api/quan-tri/lich-su-don-huy?trang={_trang}&tim={Uri.EscapeDataString(_tim.Trim())}&thanhToan={_thanhToan}");
+            if (_trang>TongTrang) { _trang=TongTrang; _tai=false; await TaiAsync(); }
+        }
+        catch (HttpRequestException) { _loi="Chưa tải được lịch sử đơn hủy. Vui lòng thử lại."; }
+        finally { _tai=false; await InvokeAsync(StateHasChanged); }
+    }
+    private static string Nhan(string trangThai) => trangThai switch { "DA_HOAN_TIEN"=>"Đã hoàn tiền", "DA_THANH_TOAN"=>"Chờ hoàn tiền", "CHUA_THANH_TOAN"=>"Không cần hoàn", _=>"Cần kiểm tra thanh toán" };
+}
+

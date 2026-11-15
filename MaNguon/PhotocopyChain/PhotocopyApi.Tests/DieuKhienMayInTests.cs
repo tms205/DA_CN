@@ -8,6 +8,22 @@ namespace PhotocopyApi.Tests;
 
 public class DieuKhienMayInTests
 {
+    [Theory]
+    [InlineData("AO", "DANG_IN", 6, "job-6", true)]
+    [InlineData("THAT", "DANG_IN", 6, "job-6", false)]
+    [InlineData("AO", "SAN_SANG", 6, "job-6", false)]
+    [InlineData("AO", "HET_GIAY", 6, "job-6", false)]
+    [InlineData("AO", "DANG_IN", 7, "job-6", false)]
+    [InlineData("AO", "DANG_IN", 6, null, false)]
+    public void BoQuaThoiGian_ChiDungLenhAoDangIn(string mode, string state, int order, string job, bool ok)
+    {
+        var store = new TrangThaiMayInAoStore();
+        store.CapNhat(1, state, 6, baoCao: new() { CheDo = mode });
+        var error = store.DieuKhien(1, new() { ThaoTac = "HOAN_TAT_MO_PHONG", MaDonHang = order }, job);
+        Assert.Equal(ok, error == null);
+        Assert.Equal(ok ? job : null, store.LayDieuKhien(1).MaLenhHoanTatMoPhong);
+    }
+
     [Fact]
     public void CapNhatTrangThaiTuApi_KhongLamMayThatBienThanhMayAo()
     {

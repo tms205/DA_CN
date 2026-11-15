@@ -1,4 +1,4 @@
-@page "/kho-vat-tu"
+﻿@page "/kho-vat-tu"
 @attribute [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN")]
 @inject HttpClient Http
 @inject PhienDangNhap Phien
@@ -251,15 +251,25 @@
                                     <div class="nv-ten">@p.TenNguoiLap</div>
                                 </td>
                                 <td data-nhan="Trạng thái duyệt">
-                                    <span class="nhan-mau @Mau(p.TrangThai)">@p.TrangThai</span>
+                                    <span class="nhan-mau @Mau(p.TrangThai)">@(p.TrangThai == "DA_HUY" ? "Đã hủy" : p.TrangThai)</span>
+                                    @if (p.TrangThai == "DA_HUY")
+                                    {
+                                        <div class="nv-phu" style="white-space:pre-wrap;overflow-wrap:anywhere;max-width:280px;margin-top:6px"><b>Lý do hủy:</b> @p.LyDoHuy</div>
+                                    }
                                 </td>
                                 <td class="cot-hanh-dong" data-nhan="Thao tác">
-                                    @if (LaQuanLyChiNhanh() && p.TrangThai == "DA_DUYET")
-                                    {
-                                        <button class="nut-nho chinh" disabled="@_dangLuu" title="Xác nhận hàng đã về kho chi nhánh" @onclick="() => NhanHangAsync(p)">
-                                            @((MarkupString)Svg.DauTich(14)) Nhận đủ @p.SoLuong
-                                        </button>
-                                    }
+                                    <div class="phieu-thao-tac">
+                                        @if (LaQuanLyChiNhanh() && p.TrangThai == "DA_DUYET")
+                                        {
+                                            <button type="button" class="nut-nho chinh" disabled="@_dangLuu" title="Xác nhận hàng đã về kho chi nhánh" @onclick="() => NhanHangAsync(p)">
+                                                @((MarkupString)Svg.DauTich(14)) Nhận đủ @p.SoLuong
+                                            </button>
+                                        }
+                                        @if ((LaCEO() || LaQuanLyChiNhanh()) && p.TrangThai is "CHO_DUYET" or "DA_DUYET")
+                                        {
+                                            <button type="button" class="nut-nho phieu-nut-huy" disabled="@_dangLuu" @onclick="() => MoHuyPhieu(p)">Hủy phiếu</button>
+                                        }
+                                    </div>
                                 </td>
                             </tr>
                         }
@@ -270,7 +280,54 @@
     </div>
 </div>
 
+<HopThoaiQuanTri Mo="@(_phieuHuy != null)" TieuDe="Hủy phiếu nhập" MoTa="Kiểm tra thông tin và ghi lý do trước khi xác nhận." @bind-Loi="_loi" DangLuu="@_dangLuu" Dong="DongHuyPhieu">
+    <NoiDung>
+        @if (_phieuHuy != null)
+        {
+            <form id="form-huy-phieu" @onsubmit="HuyPhieuAsync" @onsubmit:preventDefault>
+                <section class="huy-phieu-thong-tin" aria-label="Thông tin phiếu cần hủy">
+                    <div class="huy-phieu-dau"><b class="mono">PN@(_phieuHuy.MaPhieuNhap.ToString("0000"))</b><span class="nhan-mau @Mau(_phieuHuy.TrangThai)">@(_phieuHuy.TrangThai == "DA_DUYET" ? "Đã duyệt · chưa nhận hàng" : "Chờ duyệt")</span></div>
+                    <h3>@_phieuHuy.TenVatTu</h3>
+                    <dl class="huy-phieu-chi-tiet">
+                        <div><dt>Chi nhánh</dt><dd>@_phieuHuy.TenChiNhanh</dd></div>
+                        <div><dt>Nhà cung cấp</dt><dd>@(string.IsNullOrWhiteSpace(_phieuHuy.NhaCungCap) ? "Chưa cung cấp" : _phieuHuy.NhaCungCap)</dd></div>
+                        <div><dt>Số lượng</dt><dd>@_phieuHuy.SoLuong @_phieuHuy.DonViTinh</dd></div>
+                        <div><dt>Đơn giá</dt><dd class="mono">@Tien(_phieuHuy.DonGia)/@_phieuHuy.DonViTinh</dd></div>
+                    </dl>
+                </section>
+                <div class="huy-phieu-luu-y">Phiếu sẽ chuyển sang <b>Đã hủy</b> và không thể tiếp tục nhận hàng. Lịch sử và lý do được giữ lại; tồn kho không thay đổi.</div>
+                <div class="huy-phieu-ly-do"><label class="nhan" for="ly-do-huy-phieu">Lý do hủy <span class="huy-phieu-bat-buoc">(bắt buộc)</span></label>
+                    <textarea id="ly-do-huy-phieu" rows="4" required maxlength="500" aria-describedby="huy-phieu-goi-y" placeholder="Ví dụ: Nhà cung cấp báo hết hàng, cần lập lại phiếu khác…" @bind="_lyDoHuyPhieu" @bind:event="oninput"></textarea>
+                    <div id="huy-phieu-goi-y" class="huy-phieu-goi-y"><span>Lý do sẽ hiển thị trong lịch sử phiếu nhập.</span><span>@_lyDoHuyPhieu.Length/500</span></div>
+                </div>
+            </form>
+        }
+    </NoiDung>
+    <Chan><button type="button" class="nut-phu" disabled="@_dangLuu" @onclick="DongHuyPhieu">Giữ phiếu</button><button class="nut-chinh nguy-hiem" type="submit" form="form-huy-phieu" disabled="@(_dangLuu || string.IsNullOrWhiteSpace(_lyDoHuyPhieu))">@(_dangLuu ? "Đang hủy…" : "Xác nhận hủy phiếu")</button></Chan>
+</HopThoaiQuanTri>
+
 @code {
+    private PhieuNhapDto _phieuHuy;
+    private string _lyDoHuyPhieu = "";
+    private void MoHuyPhieu(PhieuNhapDto p) { if (_dangLuu) return; _phieuHuy = p; _lyDoHuyPhieu = ""; _loi = null; }
+    private void DongHuyPhieu() { if (!_dangLuu) { _phieuHuy = null; _loi = null; } }
+    private async Task HuyPhieuAsync()
+    {
+        if (_dangLuu || _phieuHuy == null) return;
+        if (string.IsNullOrWhiteSpace(_lyDoHuyPhieu)) { _loi = "Vui lòng nhập lý do hủy phiếu nhập."; return; }
+        _dangLuu = true; _loi = null;
+        try
+        {
+            using var r = await Http.PostAsJsonAsync($"api/quan-tri/phieu-nhap/{_phieuHuy.MaPhieuNhap}/huy", new HuyPhieuNhapRequest { LyDoHuy = _lyDoHuyPhieu.Trim() });
+            if (!r.IsSuccessStatusCode) { _loi = await DocLoiApi.TuPhanHoiAsync(r, "Không hủy được phiếu nhập."); return; }
+            _phieuHuy = null;
+            _thongBao = "Đã hủy phiếu nhập. Tồn kho không thay đổi.";
+            await TaiAsync();
+        }
+        catch (HttpRequestException) { _loi = "Mất kết nối API. Hãy tải lại lịch sử để kiểm tra phiếu."; }
+        finally { _dangLuu = false; }
+    }
+
     private List<TonKhoDto> _tonKho;
     private List<PhieuNhapDto> _phieu;
     private string DonViTinhDangChon => _tonKho?.FirstOrDefault(x => x.MaVatTu == _form.MaVatTu)?.DonViTinh ?? "đơn vị";
@@ -429,7 +486,7 @@
 
     private string Mau(string s) => s == "DA_NHAP"
         ? "nhan-xanh"
-        : s == "CHO_DUYET" ? "nhan-cam" : s == "TU_CHOI" ? "nhan-do" : "nhan-accent";
+        : s == "CHO_DUYET" ? "nhan-cam" : s is "TU_CHOI" or "DA_HUY" ? "nhan-do" : "nhan-accent";
 
     private static readonly System.Globalization.NumberFormatInfo KieuSo = new()
     {

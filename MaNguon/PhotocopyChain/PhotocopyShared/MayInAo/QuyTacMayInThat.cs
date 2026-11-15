@@ -1,4 +1,4 @@
-using PhotocopyShared.Dtos.MayInAo;
+﻿using PhotocopyShared.Dtos.MayInAo;
 
 namespace PhotocopyShared.MayInAo;
 
@@ -8,6 +8,8 @@ public static class QuyTacMayInThat
     public static string? KiemTra(HangDoiWindowsDto? queue, IEnumerable<DongLenhInDto> dongIn)
     {
         if (queue == null || queue.LaMayAo) return "Chưa xác minh được queue máy in thật.";
+        if ((queue.TrangThaiDriver & (1 | 2 | 8 | 16 | 128 | 4096)) != 0)
+            return "Máy in thật đang offline, tạm dừng hoặc có lỗi; không được chọn để gửi in.";
         if (queue.KhoGiayHoTro == null) return "Driver chưa cung cấp khổ giấy. Làm mới thiết bị trước khi gửi in thật.";
         foreach (var dong in dongIn)
         {

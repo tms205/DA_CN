@@ -439,7 +439,7 @@ public partial class QuanTriController : ControllerBase
         var ds = await conn.QueryAsync<PhieuNhapDto>(
             @"SELECT pn.MaPhieuNhap, pn.MaChiNhanh, cn.TenChiNhanh, pn.MaVatTu, vt.TenVatTu, vt.DonViTinh,
                      pn.NhaCungCap, pn.SoLuong, pn.DonGia, lap.HoTen AS TenNguoiLap,
-                     duyet.HoTen AS TenNguoiDuyet, pn.TrangThai, pn.NgayLap
+                     duyet.HoTen AS TenNguoiDuyet, pn.TrangThai, pn.NgayLap, pn.LyDoHuy
               FROM PhieuNhap pn JOIN ChiNhanh cn ON cn.MaChiNhanh=pn.MaChiNhanh
               JOIN VatTu vt ON vt.MaVatTu=pn.MaVatTu
               LEFT JOIN NguoiDung lap ON lap.MaNguoiDung=pn.MaNguoiLap
@@ -479,14 +479,22 @@ public partial class QuanTriController : ControllerBase
     {
         int maNguoiDuyet = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
         using var conn = new SqlConnection(_chuoiKetNoi);
+        await conn.OpenAsync();
+        await using var tx = await conn.BeginTransactionAsync();
+        string trangThai = await conn.ExecuteScalarAsync<string>(
+            "SELECT TrangThai FROM PhieuNhap WITH(UPDLOCK,HOLDLOCK) WHERE MaPhieuNhap=@MaPhieuNhap",
+            new { MaPhieuNhap = maPhieuNhap }, tx);
+        if (trangThai != "CHO_DUYET") return Conflict(new { message = "Phiếu không còn chờ duyệt. Hãy tải lại." });
+
         int? maChiNhanhPhieu = await conn.ExecuteScalarAsync<int?>(
-            "SELECT MaChiNhanh FROM PhieuNhap WHERE MaPhieuNhap=@MaPhieuNhap", new { MaPhieuNhap = maPhieuNhap });
+            "SELECT MaChiNhanh FROM PhieuNhap WHERE MaPhieuNhap=@MaPhieuNhap", new { MaPhieuNhap = maPhieuNhap }, tx);
         if (maChiNhanhPhieu == null) return NotFound(new { message = "Không tìm thấy phiếu nhập." });
         if (!DuocLamViecVoiChiNhanh(maChiNhanhPhieu.Value))
             return StatusCode(403, new { message = "Phiếu nhập không thuộc phạm vi chi nhánh đang chọn." });
         try
         {
-            await conn.ExecuteAsync("sp_DuyetPhieuNhap", new { MaPhieuNhap = maPhieuNhap, MaNguoiDuyet = maNguoiDuyet, req.DongY }, commandType: CommandType.StoredProcedure);
+            await conn.ExecuteAsync("sp_DuyetPhieuNhap", new { MaPhieuNhap = maPhieuNhap, MaNguoiDuyet = maNguoiDuyet, req.DongY }, transaction: tx, commandType: CommandType.StoredProcedure);
+            await tx.CommitAsync();
         }
         catch (SqlException ex) { return BadRequest(new { message = ex.Message }); }
         return Ok(new KetQuaDto { Message = req.DongY ? "Đã duyệt phiếu nhập." : "Đã từ chối phiếu nhập." });
@@ -499,13 +507,21 @@ public partial class QuanTriController : ControllerBase
         int maChiNhanh = int.Parse(User.FindFirst(TenClaim.MaChiNhanh).Value);
         if (req.SoLuongThucNhan <= 0) return BadRequest(new { message = "Số lượng thực nhận phải lớn hơn 0." });
         using var conn = new SqlConnection(_chuoiKetNoi);
+        await conn.OpenAsync();
+        await using var tx = await conn.BeginTransactionAsync();
+        string trangThai = await conn.ExecuteScalarAsync<string>(
+            "SELECT TrangThai FROM PhieuNhap WITH(UPDLOCK,HOLDLOCK) WHERE MaPhieuNhap=@MaPhieuNhap",
+            new { MaPhieuNhap = maPhieuNhap }, tx);
+        if (trangThai != "DA_DUYET") return Conflict(new { message = "Phiếu chưa được duyệt, đã hủy hoặc đã nhập kho. Hãy tải lại." });
+
         bool dungChiNhanh = await conn.ExecuteScalarAsync<bool>(
             "SELECT CAST(CASE WHEN EXISTS (SELECT 1 FROM PhieuNhap WHERE MaPhieuNhap=@MaPhieuNhap AND MaChiNhanh=@MaChiNhanh) THEN 1 ELSE 0 END AS BIT)",
-            new { MaPhieuNhap = maPhieuNhap, MaChiNhanh = maChiNhanh });
+            new { MaPhieuNhap = maPhieuNhap, MaChiNhanh = maChiNhanh }, tx);
         if (!dungChiNhanh) return StatusCode(403, new { message = "Phiếu nhập không thuộc chi nhánh của bạn." });
         try
         {
-            await conn.ExecuteAsync("sp_NhapKho", new { MaPhieuNhap = maPhieuNhap, req.SoLuongThucNhan }, commandType: CommandType.StoredProcedure);
+            await conn.ExecuteAsync("sp_NhapKho", new { MaPhieuNhap = maPhieuNhap, req.SoLuongThucNhan }, transaction: tx, commandType: CommandType.StoredProcedure);
+            await tx.CommitAsync();
         }
         catch (SqlException ex) { return BadRequest(new { message = ex.Message }); }
         return Ok(new KetQuaDto { Message = "Đã nhập vật tư vào kho." });

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace PhotocopyApi.DichVu;
 
@@ -36,6 +37,29 @@ public sealed class TienTrinhOffice
         lock (_khoa) { _pid = process.Id; _gioTao = start; }
     }
 
+    // PowerPoint không công bố HWND qua COM trên một số phiên bản.
+    // Tên ngẫu nhiên của tài liệu vừa tạo xác định cửa sổ; NhanCuaSo vẫn kiểm PID/tuổi tiến trình.
+    public bool NhanCuaSoTheoTieuDe(string tenDuyNhat)
+    {
+        if (string.IsNullOrWhiteSpace(tenDuyNhat)) throw new ArgumentException("Thiếu tên cửa sổ riêng.");
+        for (int lan = 0; lan < 20 && !SoHuu; lan++)
+        {
+            bool timThay = false;
+            EnumWindows((hwnd, _) =>
+            {
+                var title = new StringBuilder(1024);
+                GetWindowText(hwnd, title, title.Capacity);
+                if (!title.ToString().Contains(tenDuyNhat, StringComparison.Ordinal)) return true;
+                timThay = true;
+                NhanCuaSo(hwnd.ToInt64());
+                return false;
+            }, IntPtr.Zero);
+            if (timThay) return true;
+            Thread.Sleep(50);
+        }
+        return false;
+    }
+
     public void TatNeuSoHuu()
     {
         lock (_khoa)
@@ -53,4 +77,9 @@ public sealed class TienTrinhOffice
 
     [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
+    private delegate bool EnumWindowProc(IntPtr hwnd, IntPtr parameter);
+    [DllImport("user32.dll")]
+    private static extern bool EnumWindows(EnumWindowProc callback, IntPtr parameter);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetWindowText(IntPtr hwnd, StringBuilder text, int maxCount);
 }

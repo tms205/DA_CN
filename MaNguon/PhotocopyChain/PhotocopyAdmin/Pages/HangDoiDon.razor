@@ -1,4 +1,4 @@
-@page "/"
+﻿@page "/"
 @using Microsoft.AspNetCore.SignalR.Client
 @using PhotocopyShared.Dtos.DonHang
 @using PhotocopyShared.Dtos.DatIn
@@ -355,19 +355,23 @@
         else
         {
             <div class="hd-may-in">
-            @foreach (var may in _dsMayIn)
+            @foreach (bool nhomThat in new[] { false, true })
             {
+                @if (_dsMayIn.Any(x => LaMayThat(x) == nhomThat)) { <h3 class="hd-muc">@(nhomThat ? "Máy in thật" : "Máy in ảo")</h3> }
+                @foreach (var may in _dsMayIn.Where(x => LaMayThat(x) == nhomThat).OrderBy(x => x.MaMayIn))
+                {
                 <label class="hd-may @(ChonDuocMay(may) ? "" : "mo")">
                     <input type="radio" name="mayin" disabled="@(!ChonDuocMay(may))" checked="@(_mayDaChon == may.MaMayIn)" @onchange="() => _mayDaChon = may.MaMayIn" />
                     <div><b>@TenThietBi(may)</b><div class="nv-phu">@(LaMayThat(may) ? "Máy thật · Windows" : "Máy ảo · Mô phỏng") · #@may.MaMayIn</div>
                         @if (LaMayThat(may)) { <div class="nv-phu">Danh mục: @may.TenMay</div> }
-                        <div class="nv-phu">@(may.DapUngDuoc ? MoTaNangLuc(may) : may.LyDoKhongDapUng)</div><div class="nv-phu">@(MayDangKetNoi(may.MaMayIn) ? "Connector đang kết nối" : "Chưa kết nối hoặc máy đang lỗi/tạm dừng")</div></div>
+                        <div class="nv-phu">@(may.DapUngDuoc ? MoTaNangLuc(may) : may.LyDoKhongDapUng)</div><div class="nv-phu">@(ChonDuocMay(may) ? "Đang kết nối · có thể chọn" : "Không thể chọn · kiểm tra kết nối và quy cách")</div></div>
                 </label>
+                }
             }
             </div>
         }
     </NoiDung>
-    <Chan><button type="button" class="nut-phu" disabled="@_dangGui" @onclick="DongChonMay">Hủy</button><button type="button" class="nut-chinh" disabled="@(_dangGui || _mayDaChon == null || !MayDangKetNoi(_mayDaChon.Value))" @onclick="BatDauInAsync">Gửi lệnh tới máy in</button></Chan>
+    <Chan><button type="button" class="nut-phu" disabled="@_dangGui" @onclick="DongChonMay">Hủy</button><button type="button" class="nut-chinh" disabled="@(_dangGui || _mayDaChon == null || !(_dsMayIn?.Any(x => x.MaMayIn == _mayDaChon.Value && ChonDuocMay(x)) == true))" @onclick="BatDauInAsync">Gửi lệnh tới máy in</button></Chan>
 </HopThoaiQuanTri>
 <HopThoaiQuanTri Mo="@_moHuy" TieuDe="Hủy đơn hàng" @bind-Loi="_loiThaoTac" DangLuu="@_dangGui" Dong="DongHuyDon">
     <NoiDung><form id="hd-form-huy" @onsubmit="HuyDonAsync" @onsubmit:preventDefault><p>Hủy đơn <b>@_donDangChon?.MaDonHangHienThi</b>? Chỉ hủy được khi chưa bắt đầu in. Nếu đã nhận tiền, đơn sẽ chờ hoàn tiền; lịch sử vẫn được giữ để đối soát.</p><label class="nhan" for="hd-ly-do-huy">Lý do hủy</label><textarea id="hd-ly-do-huy" class="ca-o-loc" required maxlength="255" @bind="_lyDoHuy" placeholder="Nêu rõ lý do hủy"></textarea>@if (_donDangChon?.TrangThaiDonHang != "CHO_XAC_NHAN") {
@@ -619,7 +623,7 @@
     }
 
     private bool MayDangKetNoi(int ma) => _dsTrangThaiMayIn.Any(x => x.MaMayIn == ma && x.TrangThai is "SAN_SANG" or "DANG_IN");
-    private bool ChonDuocMay(MayInDto may) => may.DapUngDuoc && MayDangKetNoi(may.MaMayIn);
+    private bool ChonDuocMay(MayInDto may) => may.DapUngDuoc && MayDangKetNoi(may.MaMayIn) && (!LaMayThat(may) || (may.KetNoi?.TrucTuyen == true && may.KetNoi.HangDoi != null));
     private bool LaMayThat(MayInDto may) => (may.KetNoi?.CheDo ?? _dsTrangThaiMayIn.FirstOrDefault(x => x.MaMayIn == may.MaMayIn)?.CheDo) == "THAT";
     private string TenThietBi(MayInDto may) => LaMayThat(may)
         ? may.KetNoi?.TenHangDoi ?? _dsTrangThaiMayIn.FirstOrDefault(x => x.MaMayIn == may.MaMayIn)?.TenHangDoi ?? may.TenMay : may.TenMay;

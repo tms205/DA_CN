@@ -1,0 +1,7 @@
+.qt-thanh-thao-tac { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; max-width: 100%; flex: 0 1 auto; }
+.qt-thanh-thao-tac button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: auto; min-height: 38px; padding: 9px 13px; margin: 0; border-radius: 8px; font-size: 13px; font-weight: 600; line-height: 1.4; white-space: nowrap; }
+.qt-thanh-thao-tac button > span { display: inline-flex; }
+.qt-thanh-thao-tac .qt-lam-moi { background: #fff; color: #52667c; border-color: #d4dfeb; box-shadow: none; }
+.qt-thanh-thao-tac .qt-lam-moi:hover:not(:disabled) { background: #f1f6fb; color: #174e7d; }
+.qt-thanh-thao-tac button:focus-visible { outline: 2px solid #175b92; outline-offset: 3px; }
+@media (max-width: 700px) { .qt-thanh-thao-tac { justify-content: flex-start; width: 100%; padding: 8px 0 14px; } .qt-thanh-thao-tac button { flex: 1 1 auto; } }

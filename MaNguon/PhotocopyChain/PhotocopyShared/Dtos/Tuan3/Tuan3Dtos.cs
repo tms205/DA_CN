@@ -351,6 +351,7 @@ public sealed class TonKhoDto
 
 public sealed class PhieuNhapDto
 {
+    public string? LyDoHuy { get; set; }
     public int MaPhieuNhap { get; set; }
     public int MaChiNhanh { get; set; }
     public string TenChiNhanh { get; set; } = "";
@@ -381,6 +382,13 @@ public sealed class TaoPhieuNhapRequest
 public sealed class DuyetPhieuNhapRequest
 {
     public bool DongY { get; set; }
+}
+
+public sealed class HuyPhieuNhapRequest
+{
+    [Required(ErrorMessage = "Vui lòng nhập lý do hủy phiếu nhập.")]
+    [MaxLength(500, ErrorMessage = "Lý do hủy tối đa 500 ký tự.")]
+    public string LyDoHuy { get; set; } = "";
 }
 
 public sealed class NhanHangRequest
@@ -414,6 +422,7 @@ public sealed class DoiSoatMayInDto
 
 public sealed class HoanTienChoDuyetDto
 {
+    public string TrangThaiThanhToan { get; set; } = "";
     public int MaDonHang { get; set; }
     public string MaDonHangHienThi { get; set; } = "";
     public string TenKhachHang { get; set; } = "";

@@ -1,0 +1,19 @@
+.huy-phieu-thong-tin { padding: 18px; background: #f6f8fb; border: 1px solid #dce4ee; border-radius: 10px; }
+.huy-phieu-dau { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.huy-phieu-thong-tin h3 { font-size: 17px; margin: 14px 0; color: #17324d; overflow-wrap: anywhere; }
+.huy-phieu-chi-tiet { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; margin: 0; }
+.huy-phieu-chi-tiet dt { color: #56677d; font-size: 13px; margin-bottom: 4px; }
+.huy-phieu-chi-tiet dd { color: #21354c; margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.huy-phieu-luu-y { margin: 18px 0; padding: 12px 14px; border-left: 3px solid #d49422; border-radius: 4px; background: #fff8e9; color: #76531b; line-height: 1.6; }
+.huy-phieu-ly-do label { display: block; margin-bottom: 8px; }
+.huy-phieu-bat-buoc { color: #a22e35; font-size: 12px; font-weight: 500; text-transform: none; }
+.huy-phieu-ly-do textarea { display: block; width: 100%; box-sizing: border-box; min-height: 120px; padding: 12px 14px; border: 1px solid #c6d2e1; border-radius: 8px; background: #fff; color: #21354c; font: inherit; line-height: 1.6; resize: vertical; }
+.huy-phieu-ly-do textarea:focus-visible { outline: 2px solid #175b92; outline-offset: 2px; border-color: #175b92; }
+.huy-phieu-ly-do textarea::placeholder { color: #718197; }
+.huy-phieu-goi-y { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; color: #56677d; font-size: 12px; line-height: 1.5; }
+@media (max-width: 520px) { .huy-phieu-chi-tiet { grid-template-columns: 1fr; } .huy-phieu-thong-tin { padding: 14px; } }
+.phieu-thao-tac { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: 132px; max-width: 100%; }
+.phieu-thao-tac .nut-nho { display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 34px; box-sizing: border-box; margin: 0; border-radius: 6px; white-space: nowrap; }
+.phieu-thao-tac .phieu-nut-huy { background: #fff; border: 1px solid #e5bcc0; color: #b3323c; box-shadow: none; }
+.phieu-thao-tac .phieu-nut-huy:hover:not(:disabled) { background: #fff1f2; border-color: #c44a54; }
+.phieu-thao-tac button:focus-visible { outline: 2px solid #175b92; outline-offset: 2px; }

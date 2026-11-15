@@ -1,4 +1,4 @@
-@page "/quan-tri"
+﻿@page "/quan-tri"
 @attribute [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN")]
 @inject HttpClient Http
 @inject PhienDangNhap Phien
@@ -7,7 +7,16 @@
 
 <PageTitle>Chi nhánh & máy in · PhotocopyChain</PageTitle>
 
-<TieuDeTrang TieuDe="Chi nhánh & máy in" MoTa="Quản lý mạng lưới chi nhánh, thiết bị in ấn và vùng phục vụ toàn hệ thống" />
+<TieuDeTrang TieuDe="Chi nhánh & máy in" MoTa="Quản lý mạng lưới chi nhánh, thiết bị in ấn và vùng phục vụ toàn hệ thống">
+    <div class="qt-thanh-thao-tac" role="group" aria-label="Thao tác chi nhánh và máy in">
+        @if (LaSuper())
+        {
+            <button type="button" class="nut-chinh" disabled="@_dangLuu" @onclick="ThemChiNhanh"><span aria-hidden="true">@((MarkupString)Svg.ToaNha(16))</span>Thêm chi nhánh</button>
+            <button type="button" class="nut-phu" disabled="@_dangLuu" @onclick="ThemMayIn"><span aria-hidden="true">@((MarkupString)Svg.MayIn(16))</span>Thêm máy in</button>
+        }
+        <button type="button" class="nut-phu qt-lam-moi" @onclick="TaiAsync" disabled="@_dangLuu" title="Tải lại danh sách chi nhánh và máy in"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 7a7 7 0 0 1 11.5-1L20 9M4 15l2.4 3A7 7 0 0 0 18 17"/></svg>Làm mới</button>
+    </div>
+</TieuDeTrang>
 
 <div class="than-trang khoi-doc">
     @if (_suaChiNhanh == null && _themMay == null && _suaChiSo == null)
@@ -22,14 +31,6 @@
         </div>
     }
 
-    @if (LaSuper())
-    {
-        <div class="xac-nhan-o">
-            <button class="nut-chinh" @onclick="ThemChiNhanh">Thêm chi nhánh</button>
-            <button class="nut-phu" @onclick="ThemMayIn">Thêm máy in</button>
-        </div>
-    }
-    <button class="nut-phu" @onclick="TaiAsync" disabled="@_dangLuu">Làm mới danh sách</button>
     <HopThoaiQuanTri Mo="@(_suaChiNhanh != null)" TieuDe="@(_suaChiNhanh?.MaChiNhanh == 0 ? "Thêm chi nhánh mới" : "Sửa chi nhánh")" @bind-Loi="_loi" DangLuu="@_dangLuu" Dong="DongChiNhanh" Rong="true">
         <NoiDung>
         <form id="qt-form-chi-nhanh" @onsubmit="LuuChiNhanhAsync" @onsubmit:preventDefault>

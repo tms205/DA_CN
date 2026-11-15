@@ -1,3 +1,4 @@
+import '../../widgets/xu_ly_ngay.dart';
 import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 
@@ -641,6 +642,10 @@ class _ThanhToanScreenState extends State<ThanhToanScreen>
           const SizedBox(height: 18),
           _theMaDon(),
           const SizedBox(height: 18),
+          if (!laTienMat && tt.daTra) ...[
+            NutXuLyNgay(maDonHang: widget.maDonHang, sauXacNhan: () async { _xemTienDo(); }),
+            const SizedBox(height: 10),
+          ],
           NutChinh(
             nhan: 'Theo dõi tiến độ đơn',
             iconSau: Ico.muiTenPhai,

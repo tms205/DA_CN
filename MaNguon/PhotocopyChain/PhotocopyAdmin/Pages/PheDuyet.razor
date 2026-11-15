@@ -1,4 +1,4 @@
-@page "/phe-duyet"
+﻿@page "/phe-duyet"
 @attribute [Authorize(Roles = "SUPER_ADMIN")]
 @inject HttpClient Http
 @inject ThongBaoPheDuyet ThongBao
@@ -128,6 +128,7 @@
             <KhieuNaiHoanTien MaDonCanMo="@(_tabHoanTien=="SAN_PHAM"?DonCanMo:null)" @ref="_khieuNai" SoChoThayDoi="CapNhatSoKhieuNai" HienTieuDe="false" />
         </div>
     </section>
+    <LichSuDonDaHuy @ref="_lichSuHuy" />
 </div>
 
 <HopThoaiQuanTri Mo="@(_donHoan != null)" TieuDe="Hoàn tiền đơn đã hủy" MoTa="Kiểm tra hồ sơ và lưu biên lai chuyển khoản cho khách" @bind-Loi="_loiHoan" DangLuu="_dangGui" Dong="DongHoanTien" Rong="true">
@@ -176,6 +177,7 @@
     private void DongHoanTien() { if(!_dangGui) _donHoan=null; }
     private void CapNhatSoKhieuNai(int n) { _soKhieuNai=n; ThongBao.CapNhat((_phieu?.Count(x=>x.TrangThai=="CHO_DUYET")??0)+(_hoanTien?.Count??0)+n); }
     private XacNhanThaoTac _xacNhan;
+    private LichSuDonDaHuy _lichSuHuy;
     private bool _dangGui;
     private bool _dangTai;
     private List<PhieuNhapDto> _phieu; private List<HoanTienChoDuyetDto> _hoanTien; private string _loi; private string _thongBao;
@@ -199,6 +201,7 @@
             }
             ThongBao.CapNhat(_phieu.Count(x => x.TrangThai == "CHO_DUYET") + _hoanTien.Count + _soKhieuNai);
             if (_khieuNai != null) await _khieuNai.Tai();
+            if (_lichSuHuy != null) await _lichSuHuy.TaiAsync();
         }
         catch
         {

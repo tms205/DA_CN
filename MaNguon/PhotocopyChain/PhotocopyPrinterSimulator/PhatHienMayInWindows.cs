@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Runtime.InteropServices;
 using PhotocopyShared.Dtos.MayInAo;
 
@@ -23,7 +23,7 @@ public class PhatHienMayInWindows
             {
                 var p = Marshal.PtrToStructure<PrinterInfo2>(IntPtr.Add(buffer, checked(i * Marshal.SizeOf<PrinterInfo2>())));
                 string ten = Chu(p.PrinterName), driver = Chu(p.DriverName), port = Chu(p.PortName);
-                var queue = new HangDoiWindowsDto { Ten = ten, Driver = driver, Cong = port, TrangThaiDriver = p.Status,
+                var queue = new HangDoiWindowsDto { Ten = ten, Driver = driver, Cong = port, TrangThaiDriver = p.Status | ((p.Attributes & 1024) != 0 ? 128u : 0u),
                     SoJob = checked((int)p.Jobs), LaMayAo = LaQueueAo(ten, driver, port),
                     InMau = DocNangLuc(ten, port, 32), InHaiMat = DocNangLuc(ten, port, 7), KhoGiayHoTro = DocKhoGiay(ten, port) };
                 if (!queue.LaMayAo && (queue.KhoGiayHoTro == null || queue.InMau == null || queue.InHaiMat == null))

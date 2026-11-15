@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
@@ -410,6 +410,7 @@ public class FileInController : ControllerBase
     {
         {
             // Office vừa khởi động đôi khi còn bận nên từ chối lệnh → lỗi thì cho thử lại thêm 1 lần
+            Exception loiCuoi = null;
             for (int lanThu = 1; lanThu <= 2; lanThu++)
             {
                 if (!_khoaOffice.Wait(TimeSpan.FromSeconds(5)))
@@ -449,9 +450,10 @@ public class FileInController : ControllerBase
                     return;   // đổi xong
 
                 _logger.LogWarning(loi, "Lần {LanThu}: {Loai} không đổi được {File} sang PDF", lanThu, loai, duongDanGoc);
+                loiCuoi = loi;
                 theoDoi.TatNeuSoHuu();
             }
-            throw new Exception($"Máy chủ không chuyển được file {loai} sang PDF. Vui lòng thử lại hoặc xuất file sang PDF rồi tải lên.");
+            throw new Exception($"Máy chủ không chuyển được file {loai} sang PDF. Vui lòng thử lại hoặc xuất file sang PDF rồi tải lên.", loiCuoi);
         }
     }
 
@@ -462,9 +464,11 @@ public class FileInController : ControllerBase
         string matKhauGia = "khongcomk1";
 
         dynamic app = Activator.CreateInstance(Type.GetTypeFromProgID(loai + ".Application"));
+        int? baoMatPowerPointCu = null, canhBaoPowerPointCu = null;
         try
         {
-            app.AutomationSecurity = 3;   // không cho chạy macro trong file của khách
+            // PowerPoint có thể dùng lại phiên đang mở; chỉ đổi cấu hình sau khi nhận đúng tiến trình.
+            if (loai != "PowerPoint") app.AutomationSecurity = 3;
 
             if (loai == "Word")
             {
@@ -497,16 +501,77 @@ public class FileInController : ControllerBase
             }
             else
             {
-                theoDoi.NhanCuaSo((long)app.HWND);
-                if (!theoDoi.SoHuu) throw new InvalidOperationException("PowerPoint đang dùng chung tiến trình khác. Vui lòng tải PDF.");
+                // Dùng tên tài liệu ngẫu nhiên để tìm HWND qua Windows, không gọi HWND qua COM.
+                string tepNhanDien = Path.Combine(Path.GetTempPath(), "photocopy-owner-" + Guid.NewGuid().ToString("N") + ".pptx");
+                dynamic blank = null;
+                bool daXacMinh = false;
+                try
+                {
+                    blank = app.Presentations.Add(-1);
+                    blank.SaveAs(tepNhanDien, 24);
+                    daXacMinh = theoDoi.NhanCuaSoTheoTieuDe(Path.GetFileNameWithoutExtension(tepNhanDien));
+                }
+                finally
+                {
+                    try
+                    {
+                        if (blank != null)
+                        {
+                            try { blank.Saved = -1; blank.Close(); }
+                            finally { Marshal.FinalReleaseComObject(blank); }
+                        }
+                    }
+                    finally
+                    {
+                        try { System.IO.File.Delete(tepNhanDien); }
+                        catch (IOException) { }
+                        catch (UnauthorizedAccessException) { }
+                    }
+                }
+                if (!daXacMinh) throw new InvalidOperationException("Chưa xác minh được cửa sổ PowerPoint để chuyển đổi an toàn.");
+                // File tải lên có đường dẫn riêng. Không đóng bản đang mở sẵn trong phiên người dùng.
+                dynamic presentations = app.Presentations;
+                try
+                {
+                    for (int i = 1; i <= (int)presentations.Count; i++)
+                    {
+                        dynamic existing = presentations[i];
+                        try
+                        {
+                            if (string.Equals((string)existing.FullName, duongDanGoc, StringComparison.OrdinalIgnoreCase))
+                                throw new InvalidOperationException("Tài liệu này đang mở trong PowerPoint; chưa chuyển để bảo vệ phiên đang dùng.");
+                        }
+                        finally { Marshal.ReleaseComObject(existing); }
+                    }
+                }
+                finally { Marshal.ReleaseComObject(presentations); }
+                if (!theoDoi.SoHuu)
+                {
+                    baoMatPowerPointCu = (int)app.AutomationSecurity;
+                    canhBaoPowerPointCu = (int)app.DisplayAlerts;
+                }
+                app.AutomationSecurity = 3;                                             // tắt macro trước khi mở file khách
                 app.DisplayAlerts = 1;                                                  // PowerPoint: 1 = không hiện hộp thoại
                 dynamic slide = app.Presentations.Open(duongDanGoc, -1, 0, 0);          // chỉ đọc, không mở cửa sổ
-                slide.SaveAs(duongDanPdf, 32);                                          // 32 = PDF
-                slide.Close();
+                try { slide.SaveAs(duongDanPdf, 32); }                                  // 32 = PDF
+                finally
+                {
+                    try { slide.Close(); }
+                    finally { Marshal.FinalReleaseComObject(slide); }
+                }
             }
         }
         finally
         {
+            if (loai == "PowerPoint" && !theoDoi.SoHuu)
+            {
+                try
+                {
+                    if (baoMatPowerPointCu.HasValue) app.AutomationSecurity = baoMatPowerPointCu.Value;
+                    if (canhBaoPowerPointCu.HasValue) app.DisplayAlerts = canhBaoPowerPointCu.Value;
+                }
+                catch { }
+            }
             // Tắt Office. 
             try
             {
@@ -517,7 +582,8 @@ public class FileInController : ControllerBase
                 }
             }
             catch { }
-            Marshal.FinalReleaseComObject(app);
+            if (loai == "PowerPoint" && !theoDoi.SoHuu) Marshal.ReleaseComObject(app);
+            else Marshal.FinalReleaseComObject(app);
         }
     }
 

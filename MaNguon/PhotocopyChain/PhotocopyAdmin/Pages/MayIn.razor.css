@@ -1,4 +1,4 @@
-.mi-trang { display: grid; gap: 16px; }
+﻿.mi-trang { display: grid; gap: 16px; }
 .mi-toolbar, .mi-console-dau, .mi-tien-do { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .mi-toolbar { color: var(--chu-phu); }
 .mi-layout { display: grid; grid-template-columns: minmax(220px, 30%) minmax(0, 1fr); gap: 20px; align-items: start; }
@@ -39,3 +39,5 @@
 .mi-may:focus-visible, .mi-console button:focus-visible, .mi-console a:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 @media (max-width: 1100px) { .mi-layout { grid-template-columns: 1fr; } .mi-danh-sach { grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr)); } }
 @media (max-width: 600px) { .mi-console { padding: 16px; } .mi-lcd { padding: 16px; } .mi-lcd h3 { font-size: 21px; } .mi-thong-so { grid-template-columns: 1fr; } .mi-toolbar button { width: 100%; } .mi-nut-dieu-khien > * { flex: 1 1 100%; text-align: center; } }
+.mi-tieu-de-nhom { display:flex; justify-content:space-between; align-items:center; margin:12px 0 2px; font-size:15px; color:var(--chu); }
+.mi-tieu-de-nhom span { color:var(--chu-phu); font-size:12px; background:var(--trang); border:1px solid var(--vien); padding:3px 8px; border-radius:12px; }

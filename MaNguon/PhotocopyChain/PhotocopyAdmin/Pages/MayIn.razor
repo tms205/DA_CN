@@ -1,15 +1,16 @@
-@page "/may-in"
+﻿@page "/may-in"
 @attribute [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
 @using PhotocopyShared.Dtos.MayInAo
 @inject HttpClient Http
+@inject PhamViChiNhanh PhamVi
 @implements IAsyncDisposable
 
 <PageTitle>Bảng điều khiển máy in · PhotocopyChain</PageTitle>
-<TieuDeTrang TieuDe="Bảng điều khiển máy in" MoTa="Theo dõi thiết bị và xử lý lệnh in trong chi nhánh đang chọn" />
+<TieuDeTrang TieuDe="Bảng điều khiển máy in" MoTa="Danh sách máy đã đăng ký, thiết bị liên kết và trạng thái kết nối" />
 
 <div class="than-trang mi-trang">
     <div class="mi-toolbar">
-        <span>@_danhMuc.Count máy · cập nhật @(_capNhat?.ToString("HH:mm:ss") ?? "—")</span>
+        <div><b>@_danhMuc.Count máy</b> · @_danhMuc.Count(LaMayThat) máy thật · @_danhMuc.Count(x => !LaMayThat(x)) máy mô phỏng · cập nhật @(_capNhat?.ToString("HH:mm:ss") ?? "—")</div>
         <button type="button" class="nut-phu" disabled="@_dangTai" @onclick="TaiAsync">Làm mới trạng thái</button>
     </div>
     <ThongBaoLoi NoiDung="@_loi" />
@@ -20,25 +21,30 @@
     {
         <div class="mi-layout">
             <section class="mi-danh-sach" aria-label="Chọn máy in">
-                @foreach (var m in _danhMuc)
+                @foreach (bool thatNhom in new[] { false, true })
                 {
+                    <h2 class="mi-tieu-de-nhom">@(thatNhom ? "Máy in thật" : "Máy in ảo") <span>@_danhMuc.Count(x => LaMayThat(x) == thatNhom)</span></h2>
+                    @foreach (var m in _danhMuc.Where(x => LaMayThat(x) == thatNhom).OrderBy(x => x.MaMayIn))
+                    {
                     var tt = TrangThai(m.MaMayIn);
                     <button type="button" class="mi-may @(_maMay == m.MaMayIn ? "chon" : "")" aria-pressed="@(_maMay == m.MaMayIn ? "true" : "false")" @onclick="() => ChonMay(m.MaMayIn)">
                         <span class="mi-icon">@((MarkupString)Svg.MayIn(24))</span>
-                        <span class="mi-may-chu"><strong>@TenThietBi(m)</strong><small>@(LaMayThat(m) ? "Máy thật · Windows" : "Máy ảo · Mô phỏng") · @m.TenChiNhanh</small><span>@TenTrangThai(tt.TrangThai)</span></span>
-                        <span class="mi-led @(SanSang(tt) ? "online" : "")" aria-hidden="true"></span>
+                        <span class="mi-may-chu"><strong>@TenThietBi(m)</strong><small>@(LaMayThat(m) ? "Máy thật · Windows" : "Máy ảo · Mô phỏng") · @m.TenChiNhanh</small>
+                        @if (LaMayThat(m) && TenThietBi(m) != m.TenMay) { <small>Danh mục #@m.MaMayIn: @m.TenMay</small> }<span>@(LaMayThat(m) && m.KetNoi?.TrucTuyen != true ? "Mất kết nối máy thật" : TenTrangThai(tt.TrangThai))</span></span>
+                        <span class="mi-led @(SanSang(tt) && (!LaMayThat(m) || m.KetNoi?.TrucTuyen == true) ? "online" : "")" aria-hidden="true"></span>
                     </button>
+                    }
                 }
             </section>
             @if (MayDaChon is { } may)
             {
                 var tt = TrangThai(may.MaMayIn);
-                bool ngoaiTuyen = tt.TrangThai == "MAT_KET_NOI";
+                bool ngoaiTuyen = tt.TrangThai == "MAT_KET_NOI" || (LaMayThat(may) && may.KetNoi?.TrucTuyen != true);
                 bool that = LaMayThat(may);
                 <section class="mi-console the" aria-label="Điều khiển máy đã chọn">
                     <div class="mi-console-dau"><div><span class="mi-nhan">THIẾT BỊ #@may.MaMayIn</span><h2>@TenThietBi(may)</h2><p>@may.TenChiNhanh</p>@if (that) { <small>Danh mục: @may.TenMay · giữ nguyên mã máy và lịch sử đơn</small> }</div><span class="nhan-mau @(that ? "nhan-xanh" : "nhan-xam")">@(that ? "Máy thật · Windows" : "Máy ảo · Mô phỏng")</span></div>
                     <div class="mi-lcd" aria-label="Màn hình trạng thái">
-                        <div class="mi-lcd-dau"><span>TRẠNG THÁI</span><strong>@TenTrangThai(tt.TrangThai)</strong></div>
+                        <div class="mi-lcd-dau"><span>TRẠNG THÁI</span><strong>@(ngoaiTuyen ? "Mất kết nối" : TenTrangThai(tt.TrangThai))</strong></div>
                         @if (tt.MaDonHangDangIn != null)
                         {
                             <h3>Đơn DH@(tt.MaDonHangDangIn.Value.ToString("D5"))</h3>
@@ -59,9 +65,14 @@
                         @if (!string.IsNullOrWhiteSpace(tt.Loi)) { <p class="mi-lcd-loi">@tt.Loi</p> }
                         @if (!string.IsNullOrWhiteSpace(tt.ThongDiep)) { <p>@tt.ThongDiep</p> }
                     </div>
+                    @if (KhacPhamVi) { <p class="o-canh-bao">Chọn chi nhánh @may.TenChiNhanh trên thanh đầu trang để điều khiển máy này.</p> }
                     <div class="mi-nut-dieu-khien">
-                        <button type="button" class="nut-phu" disabled="@(_dangGui || ngoaiTuyen || tt.TamDung)" @onclick='() => GuiAsync("TAM_DUNG")'>Tạm dừng</button>
-                        <button type="button" class="nut-chinh" disabled="@(_dangGui || ngoaiTuyen || !tt.TamDung)" @onclick='() => GuiAsync("TIEP_TUC")'>Tiếp tục</button>
+                        @if (!that && tt.TrangThai == "DANG_IN" && !tt.TamDung)
+                        {
+                            <button type="button" class="nut-chinh" disabled="@(_dangGui || ngoaiTuyen || KhacPhamVi)" @onclick='() => GuiAsync("HOAN_TAT_MO_PHONG")'>Bỏ qua thời gian · hoàn tất mô phỏng</button>
+                        }
+                        <button type="button" class="nut-phu" disabled="@(_dangGui || ngoaiTuyen || KhacPhamVi || tt.TamDung)" @onclick='() => GuiAsync("TAM_DUNG")'>Tạm dừng</button>
+                        <button type="button" class="nut-chinh" disabled="@(_dangGui || ngoaiTuyen || KhacPhamVi || !tt.TamDung)" @onclick='() => GuiAsync("TIEP_TUC")'>Tiếp tục</button>
                         <a class="nut-phu" href="/">Xem hàng đợi đơn</a>
                     </div>
                     <dl class="mi-thong-so"><div><dt>@(that ? "Khổ giấy từ driver" : "Khổ giấy tối đa")</dt><dd>@(that ? (may.KetNoi?.HangDoi?.KhoGiayHoTro is { Count: > 0 } kho ? string.Join(", ", kho) : "Chưa xác nhận từ driver") : may.KhoGiay)</dd></div><div><dt>Tốc độ danh mục</dt><dd>@may.TocDo trang/phút</dd></div><div><dt>Màu / hai mặt</dt><dd>@(that ? $"Màu: {NangLuc(may.KetNoi?.HangDoi?.InMau)} · Hai mặt: {NangLuc(may.KetNoi?.HangDoi?.InHaiMat)}" : $"{(may.InMau ? "Có màu" : "Đen trắng")} · {(may.In2Mat ? "Hai mặt" : "Một mặt")}")</dd></div><div><dt>Counter đã hoàn tất</dt><dd>@may.SoTrangDaIn trang</dd></div></dl>
@@ -72,13 +83,13 @@
                         {
                             <div class="mi-xac-nhan"><strong>Cần kiểm tra bản giấy</strong><p>Đối chiếu đủ tất cả file, trang, số bản và quy cách. Job biến mất khỏi Windows không chứng minh giấy đã in đủ.</p>
                                 <label><input type="checkbox" @bind="_daKiemTra" /> Tôi đã kiểm tra toàn bộ bản giấy của đơn DH@(tt.MaDonHangDangIn?.ToString("D5"))</label>
-                                <button type="button" class="nut-chinh" disabled="@(!_daKiemTra || _dangGui)" @onclick='() => GuiAsync("XAC_NHAN_BAN_GIAY")'>Xác nhận đã kiểm tra bản giấy</button>
+                                <button type="button" class="nut-chinh" disabled="@(!_daKiemTra || _dangGui || KhacPhamVi)" @onclick='() => GuiAsync("XAC_NHAN_BAN_GIAY")'>Xác nhận đã kiểm tra bản giấy</button>
                             </div>
                         }
                     }
                     else
                     {
-                        <fieldset class="mi-mo-phong" disabled="@(_dangGui || ngoaiTuyen)"><legend>Mô phỏng sự cố · không tác động máy thật</legend>
+                        <fieldset class="mi-mo-phong" disabled="@(_dangGui || ngoaiTuyen || KhacPhamVi)"><legend>Mô phỏng sự cố · không tác động máy thật</legend>
                             <button type="button" class="nut-phu" @onclick='() => GuiAsync("HET_GIAY")'>Hết giấy</button>
                             <button type="button" class="nut-phu" @onclick='() => GuiAsync("KET_GIAY")'>Kẹt giấy</button>
                             <button type="button" class="nut-phu" @onclick='() => GuiAsync("OFFLINE")'>Mất kết nối máy</button>
@@ -94,6 +105,7 @@
 </div>
 
 @code {
+    private bool KhacPhamVi => PhamVi.MaChiNhanh.HasValue && MayDaChon != null && MayDaChon.MaChiNhanh != PhamVi.MaChiNhanh.Value;
     private List<MayInQuanTriDto> _danhMuc = new();
     private List<TrangThaiKetNoiMayInDto> _trangThai = new();
     private readonly CancellationTokenSource _dung = new();
@@ -141,12 +153,12 @@
     }
     private async Task GuiAsync(string thaoTac)
     {
-        if (_dangGui || _maMay == 0) return;
+        if (_dangGui || _maMay == 0 || KhacPhamVi) return;
         _dangGui = true; _loi = _thongBao = null;
         try
         {
             using var res = await Http.PostAsJsonAsync($"api/may-in-ao/{_maMay}/dieu-khien", new DieuKhienMayInRequest {
-                ThaoTac = thaoTac, MaDonHang = thaoTac == "XAC_NHAN_BAN_GIAY" ? TrangThai(_maMay).MaDonHangDangIn : null }, _dung.Token);
+                ThaoTac = thaoTac, MaDonHang = thaoTac is "XAC_NHAN_BAN_GIAY" or "HOAN_TAT_MO_PHONG" ? TrangThai(_maMay).MaDonHangDangIn : null }, _dung.Token);
             if (!res.IsSuccessStatusCode) { _loi = await DocLoiApi.TuPhanHoiAsync(res, "Không gửi được thao tác máy in."); return; }
             _thongBao = "Đã gửi thao tác. Trạng thái đổi sau khi connector thực hiện và phản hồi."; _daKiemTra = false;
         }

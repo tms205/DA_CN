@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Diagnostics;
@@ -160,6 +160,11 @@ public sealed class MayInSimulator : BackgroundService
                     // Checkpoint cũ chưa có tổng thời gian: không đoán downtime là thời gian đã in.
                     if (dangIn.TongSoGiay <= 0) dangIn.TongSoGiay = QuyTacMayInAo.TinhSoGiay(may, dangIn.Lenh!.DsDongIn);
                     await GuiHeartbeat(may.MaMayIn, "DANG_IN", dung, dangIn, may, dieuKhien);
+                    if (dieuKhien.MaLenhHoanTatMoPhong == dangIn.MaLenh)
+                    {
+                        dangIn.SoGiayDaIn = dangIn.TongSoGiay;
+                        await LuuTienTrinh(may.MaMayIn, dangIn, dung);
+                    }
                     if (dangIn.SoGiayDaIn >= dangIn.TongSoGiay)
                         await HoanTat(may, dangIn, dung);
                     else

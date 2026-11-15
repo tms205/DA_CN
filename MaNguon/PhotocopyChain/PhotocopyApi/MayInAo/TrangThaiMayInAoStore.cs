@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Text.Json;
 using PhotocopyShared.Dtos.MayInAo;
 
@@ -29,7 +29,7 @@ public sealed class TrangThaiMayInAoStore
         lock (_khoa)
         {
             var x = _dieuKhien.GetValueOrDefault(maMayIn) ?? new();
-            return new() { TamDung = x.TamDung, LoiMoPhong = x.LoiMoPhong, MaLenhXacNhan = x.MaLenhXacNhan };
+            return new() { TamDung = x.TamDung, LoiMoPhong = x.LoiMoPhong, MaLenhXacNhan = x.MaLenhXacNhan, MaLenhHoanTatMoPhong = x.MaLenhHoanTatMoPhong };
         }
     }
 
@@ -46,6 +46,12 @@ public sealed class TrangThaiMayInAoStore
                 case "HET_GIAY": case "KET_GIAY": case "OFFLINE": case "KHOI_PHUC":
                     if (tt?.CheDo == "THAT") return "Máy thật không cho phép mô phỏng lỗi.";
                     x.LoiMoPhong = req.ThaoTac == "KHOI_PHUC" ? null : req.ThaoTac;
+                    break;
+                case "HOAN_TAT_MO_PHONG":
+                    if (tt?.CheDo != "AO" || tt.TrangThai != "DANG_IN" || tt.TamDung
+                        || req.MaDonHang != tt.MaDonHangDangIn || string.IsNullOrWhiteSpace(maLenh))
+                        return "Chỉ bỏ qua thời gian của đúng lệnh đang in mô phỏng, không áp dụng máy thật hoặc máy đang lỗi/tạm dừng.";
+                    x.MaLenhHoanTatMoPhong = maLenh;
                     break;
                 case "XAC_NHAN_BAN_GIAY":
                     if (tt?.CheDo != "THAT" || tt.TrangThai != "CHO_XAC_NHAN"

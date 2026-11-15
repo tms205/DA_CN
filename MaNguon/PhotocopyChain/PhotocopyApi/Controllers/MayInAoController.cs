@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.Data;
 using System.Security.Cryptography;
 using System.Text;
@@ -135,7 +135,7 @@ public sealed partial class MayInAoController : ControllerBase
         var tt = _trangThai.LayTatCa().FirstOrDefault(x => x.MaMayIn == maMayIn);
         if (tt == null || tt.TrangThai == "MAT_KET_NOI") return Conflict(new { message = "Connector chưa kết nối. Không gửi thao tác khi chưa biết trạng thái máy." });
         var lenh = _quyenNhanLenh.LayLenhDangIn(maMayIn);
-        if (req.ThaoTac == "XAC_NHAN_BAN_GIAY" && (lenh == null || lenh.MaDonHang != req.MaDonHang))
+        if ((req.ThaoTac is "XAC_NHAN_BAN_GIAY" or "HOAN_TAT_MO_PHONG") && (lenh == null || lenh.MaDonHang != req.MaDonHang))
             return Conflict(new { message = "Lệnh đang giữ đã thay đổi. Tải lại trạng thái và kiểm tra đúng đơn." });
         string loi = _trangThai.DieuKhien(maMayIn, req, lenh?.MaLenh);
         if (loi != null) return BadRequest(new { message = loi });

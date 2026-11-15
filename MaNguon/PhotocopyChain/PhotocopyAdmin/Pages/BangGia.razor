@@ -1,4 +1,4 @@
-@page "/bang-gia"
+﻿@page "/bang-gia"
 @inject HttpClient Http
 @inject PhienDangNhap Phien
 @inject PhamViChiNhanh PhamVi
@@ -6,7 +6,12 @@
 
 <PageTitle>Bảng giá · PhotocopyChain</PageTitle>
 
-<TieuDeTrang TieuDe="Bảng giá in ấn" MoTa="@MoTaPhamVi()" />
+<TieuDeTrang TieuDe="Bảng giá in ấn" MoTa="@MoTaPhamVi()">
+    @if (LaSuperAdmin() || Phien.NguoiDung?.TenVaiTro == "BRANCH_ADMIN")
+    {
+        <a class="nut-phu bang-gia-danh-muc" href="dich-vu"><span aria-hidden="true">@((MarkupString)Svg.CaiDat(16))</span><span>Quản lý danh mục dịch vụ</span></a>
+    }
+</TieuDeTrang>
 
 <div class="than-trang khoi-doc">
     @if (_dangSua == null)
@@ -32,10 +37,6 @@
         </div>
     }
 
-    @if (LaSuperAdmin() || Phien.NguoiDung?.TenVaiTro == "BRANCH_ADMIN")
-    {
-        <a class="nut-phu" href="dich-vu">Quản lý danh mục dịch vụ</a>
-    }
     <HopThoaiQuanTri Mo="@(CoTheSua() && _dangSua != null)" TieuDe="@("Sửa giá: " + _dangSua?.TenDichVu)"
                     MoTa="@(_dangSua?.TenChiNhanh + " · Chỉ đổi giá và trạng thái bán tại chi nhánh này; đơn cũ và giá chi nhánh khác giữ nguyên.")"
                     @bind-Loi="_loi" DangLuu="@_dangLuu" Dong="DongForm">

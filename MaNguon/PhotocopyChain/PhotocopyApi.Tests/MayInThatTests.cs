@@ -11,6 +11,21 @@ namespace PhotocopyApi.Tests;
 
 public class MayInThatTests
 {
+    [Theory]
+    [InlineData(1u)]
+    [InlineData(2u)]
+    [InlineData(8u)]
+    [InlineData(16u)]
+    [InlineData(128u)]
+    [InlineData(4096u)]
+    public void MayThatBaoLoiHoacOffline_KhongDuocGuiIn(uint trangThai)
+    {
+        var queue = new HangDoiWindowsDto { Ten = "HP fixture", TrangThaiDriver = trangThai,
+            KhoGiayHoTro = new() { "A4" }, InMau = true, InHaiMat = true };
+        Assert.NotNull(PhotocopyShared.MayInAo.QuyTacMayInThat.KiemTra(queue,
+            new[] { new DongLenhInDto { KhoGiay = "A4" } }));
+    }
+
     [Fact]
     public async Task GuiPdfThatBai_KhongDuocChuyenSangChoXacNhanHayHoanTat()
     {

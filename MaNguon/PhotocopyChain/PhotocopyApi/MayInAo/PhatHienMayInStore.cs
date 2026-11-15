@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using PhotocopyShared.Dtos.MayInAo;
 using PhotocopyShared.MayInAo;
 
@@ -67,7 +67,7 @@ public sealed class PhatHienMayInStore
             _connectors.TryGetValue(lk.ConnectorId, out var c);
             var queue = c?.HangDoi.FirstOrDefault(x => string.Equals(x.Ten, lk.TenHangDoi, StringComparison.OrdinalIgnoreCase));
             return new() { CheDo = lk.CheDo, TenHangDoi = lk.TenHangDoi,
-                TrucTuyen = c != null && string.IsNullOrEmpty(c.Loi) && _gio.GetUtcNow() - c.LanCuoiPhatHien < TimeSpan.FromSeconds(90),
+                TrucTuyen = queue != null && (queue.TrangThaiDriver & (1 | 2 | 8 | 16 | 128 | 4096)) == 0 && c != null && string.IsNullOrEmpty(c.Loi) && _gio.GetUtcNow() - c.LanCuoiPhatHien < TimeSpan.FromSeconds(90),
                 HangDoi = queue == null ? null : JsonSerializer.Deserialize<HangDoiWindowsDto>(JsonSerializer.Serialize(queue)) };
         }
     }

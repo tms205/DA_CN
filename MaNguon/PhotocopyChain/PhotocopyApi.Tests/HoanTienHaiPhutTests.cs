@@ -6,6 +6,14 @@ namespace PhotocopyApi.Tests;
 
 public class HoanTienHaiPhutTests
 {
+    [Fact]
+    public void KhachDaDongYXuLyNgay_KhongConQuyenHuyDuConThoiGian()
+    {
+        var paid = new DateTime(2026, 11, 15, 8, 0, 0);
+        Assert.False(ChinhSachDonApp.ChoHuy("APP", "CHO_XAC_NHAN", "DA_THANH_TOAN",
+            paid, paid.AddHours(1), paid.AddSeconds(10), daXacNhanXuLyNgay: true));
+    }
+
     [Theory]
     [InlineData(0, true)]
     [InlineData(119, true)]

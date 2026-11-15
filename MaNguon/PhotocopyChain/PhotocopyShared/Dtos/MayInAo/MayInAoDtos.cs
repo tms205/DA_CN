@@ -1,4 +1,4 @@
-namespace PhotocopyShared.Dtos.MayInAo;
+﻿namespace PhotocopyShared.Dtos.MayInAo;
 
 /// <summary>Một dòng file và quy cách mà connector cần xử lý.</summary>
 public sealed class DongLenhInDto
@@ -92,7 +92,7 @@ public sealed class TrangThaiKetNoiMayInDto
 public sealed class DieuKhienMayInRequest
 {
     [System.ComponentModel.DataAnnotations.Required]
-    [System.ComponentModel.DataAnnotations.RegularExpression("^(TAM_DUNG|TIEP_TUC|HET_GIAY|KET_GIAY|OFFLINE|KHOI_PHUC|XAC_NHAN_BAN_GIAY)$")]
+    [System.ComponentModel.DataAnnotations.RegularExpression("^(TAM_DUNG|TIEP_TUC|HET_GIAY|KET_GIAY|OFFLINE|KHOI_PHUC|XAC_NHAN_BAN_GIAY|HOAN_TAT_MO_PHONG)$")]
     public string ThaoTac { get; set; } = "";
     [System.ComponentModel.DataAnnotations.Range(1, int.MaxValue)]
     public int? MaDonHang { get; set; }
@@ -106,4 +106,5 @@ public sealed class DieuKhienMayInDto
     public bool TamDung { get; set; }
     public string? LoiMoPhong { get; set; }
     public string? MaLenhXacNhan { get; set; }
+    public string? MaLenhHoanTatMoPhong { get; set; }
 }

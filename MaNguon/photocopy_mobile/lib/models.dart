@@ -397,6 +397,7 @@ class MocTienDo {
 class DonHangChiTiet {
   String kenhDatDon = 'LEGACY';
   bool? choHuyTuMayChu;
+  bool daXacNhanXuLyNgay = false;
   double _giayChoBanDau = 0;
   final Stopwatch _dongHoXacNhan = Stopwatch()..start();
   int get giayChoTiepNhan =>
@@ -449,6 +450,7 @@ class DonHangChiTiet {
     kenhDatDon = json['kenhDatDon'] ?? 'LEGACY';
     choHuyTuMayChu = json['choHuyKhach'] as bool?;
     _giayChoBanDau = soThuc(json['giayChoTiepNhan']);
+    daXacNhanXuLyNgay = json['daXacNhanXuLyNgay'] == true;
     maDonHang = json['maDonHang'];
     maDonHangHienThi = json['maDonHangHienThi'] ?? '';
     maChiNhanh = json['maChiNhanh'];
@@ -505,6 +507,7 @@ class DonHangChiTiet {
 
   bool get choPhepHuy =>
       trangThaiDonHang == 'CHO_XAC_NHAN' &&
+      !daXacNhanXuLyNgay &&
       (kenhDatDon == 'APP' && daTra
           ? giayChoTiepNhan > 0
           : (choHuyTuMayChu ?? true));
