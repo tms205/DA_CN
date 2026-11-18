@@ -32,11 +32,20 @@
         @if (TrangThai.TrangThai == "CHO_XAC_NHAN") { <p>Đã gửi tài liệu và không còn job đang xử lý. Mở Điều khiển máy in để đối chiếu toàn bộ bản giấy; spooler chưa chứng minh giấy đã ra đủ.</p> }
     }
     <a class="nut-nho" href="/may-in">Mở điều khiển máy in</a>
+    @if (TrangThai?.CheDo == "AO" && TrangThai.TrangThai == "DANG_IN" && !TrangThai.TamDung
+        && TrangThai.MaDonHangDangIn.HasValue && HoanTatMoPhong.HasDelegate)
+    {
+        <button type="button" class="nut-nho chinh tdi-bo-qua" disabled="@DangGui" @onclick="() => HoanTatMoPhong.InvokeAsync(TrangThai)">
+            @(DangGui ? "Đang gửi yêu cầu…" : "Bỏ qua thời gian mô phỏng")
+        </button>
+    }
     <small>Không chuyển máy hoặc gửi lại đơn khi mất kết nối; cần đối chiếu lệnh cũ để tránh in trùng.</small>
 </section>
 
 @code {
     [Parameter] public TrangThaiKetNoiMayInDto TrangThai { get; set; }
+    [Parameter] public bool DangGui { get; set; }
+    [Parameter] public EventCallback<TrangThaiKetNoiMayInDto> HoanTatMoPhong { get; set; }
     private static string TenTrangThai(string s) => s switch {
         "DANG_IN" => "Máy đang xử lý lệnh in", "TAM_DUNG" => "Lệnh in đang tạm dừng",
         "CHO_XAC_NHAN" => "Chờ kiểm tra bản giấy", "HET_GIAY" => "Máy hết giấy", "KET_GIAY" => "Máy kẹt giấy",

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import 'phien.dart';
@@ -9,7 +10,13 @@ import 'kiem_tra_du_lieu.dart';
 // Điện thoại thật cắm USB: chạy "adb reverse tcp:5268 tcp:5268" trên máy tính để localhost:5268 trên điện thoại
 // trỏ về API trên máy tính (không cần IP LAN, không cần mở Firewall).
 // Muốn gọi qua Wi-Fi thì chạy: flutter run --dart-define=API_BASE_URL=http://192.168.1.10:5268
-const String diaChiApi = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://localhost:5268');
+const _diaChiTuyChinh = String.fromEnvironment('API_BASE_URL');
+// Chrome gọi cùng địa chỉ với trang. Flutter dev server chuyển /api và /hubs tới API.
+final String diaChiApi = _diaChiTuyChinh.isNotEmpty
+    ? _diaChiTuyChinh
+    : kIsWeb
+        ? Uri.base.origin
+        : 'http://localhost:5268';
 
 // Kết quả của 1 lần gọi API
 class KetQuaApi {
@@ -257,7 +264,9 @@ class Api {
 
   static KetQuaApi _loiKetNoi() {
     KetQuaApi kq = KetQuaApi();
-    kq.loi = 'Không kết nối được máy chủ. Kiểm tra PhotocopyApi đã chạy và đã chạy "adb reverse tcp:5268 tcp:5268".';
+    kq.loi = kIsWeb
+        ? 'Không kết nối được máy chủ. Hãy kiểm tra PhotocopyApi đang chạy rồi thử lại.'
+        : 'Không kết nối được máy chủ. Kiểm tra PhotocopyApi đã chạy và đã chạy "adb reverse tcp:5268 tcp:5268".';
     return kq;
   }
 }

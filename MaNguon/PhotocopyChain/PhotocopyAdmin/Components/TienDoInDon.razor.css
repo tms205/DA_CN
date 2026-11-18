@@ -5,3 +5,4 @@
 .tdi-khung progress { width: 100%; height: 14px; accent-color: var(--accent); }
 .tdi-khung a { justify-self: start; min-height: 44px; display: inline-flex; align-items: center; }
 .tdi-khung .tdi-loi { color: var(--loi, #b42318); }
+.tdi-bo-qua { justify-self:stretch; display:flex; align-items:center; justify-content:center; min-height:40px; width:100%; padding:10px 12px; box-sizing:border-box; white-space:normal; text-align:center; line-height:1.5; }

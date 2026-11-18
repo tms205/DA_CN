@@ -290,7 +290,7 @@
                 }
                 else if (don.TrangThaiDonHang == "DANG_IN")
                 {
-                    <TienDoInDon TrangThai="@_dsTrangThaiMayIn.FirstOrDefault(x => x.MaDonHangDangIn == don.MaDonHang && x.MaMayIn == don.MaMayIn)" />
+                    <TienDoInDon TrangThai="@_dsTrangThaiMayIn.FirstOrDefault(x => x.MaDonHangDangIn == don.MaDonHang && x.MaMayIn == don.MaMayIn)" DangGui="@_dangGui" HoanTatMoPhong="BoQuaThoiGianMoPhongAsync" />
                     <button type="button" class="nut-phu" disabled="@_dangGui" @onclick="() => _moChuyenMay = true">Chuyển máy khi gặp sự cố</button>
                     @if (don.PhuongThucThanhToan == "COD" && !don.DaGuiLenhIn && don.MaMayIn != null)
                     {
@@ -763,6 +763,18 @@
         var than = new CapNhatTrangThaiInRequest { TrangThaiMoi = "DANG_IN", MaMayIn = _mayDaChon };
         await GuiThaoTac(async () => await Http.PutAsJsonAsync("api/don-hang/" + maDon + "/trang-thai-in", than));
         if (_loiThaoTac == null) _moChonMay = false;
+    }
+
+    private async Task BoQuaThoiGianMoPhongAsync(TrangThaiKetNoiMayInDto trangThai)
+    {
+        if (_dangGui || _donDangChon == null || _donDangChon.TrangThaiDonHang != "DANG_IN"
+            || trangThai?.CheDo != "AO" || trangThai.TrangThai != "DANG_IN" || trangThai.TamDung
+            || trangThai.MaDonHangDangIn != _donDangChon.MaDonHang || trangThai.MaMayIn != _donDangChon.MaMayIn)
+            return;
+        int maMay = trangThai.MaMayIn;
+        int maDon = _donDangChon.MaDonHang;
+        await GuiThaoTac(() => Http.PostAsJsonAsync($"api/may-in-ao/{maMay}/dieu-khien",
+            new DieuKhienMayInRequest { ThaoTac = "HOAN_TAT_MO_PHONG", MaDonHang = maDon }));
     }
 
     private async Task GuiCodCuAsync()

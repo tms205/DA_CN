@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'api.dart';
 
@@ -8,6 +9,10 @@ class GoogleAuth {
 
   // null = người dùng hủy chọn Google, không coi là lỗi mật khẩu.
   static Future<KetQuaApi?> tiepTuc(bool ghiNho) async {
+    if (kIsWeb) {
+      return KetQuaApi()
+        ..loi = 'Bản chạy Chrome dùng tài khoản và mật khẩu. Đăng nhập bằng Google hiện hỗ trợ trên app Android.';
+    }
     final cfg = await Api.get('/api/auth/google/config');
     if (!cfg.thanhCong) return cfg;
     final data = cfg.duLieu;

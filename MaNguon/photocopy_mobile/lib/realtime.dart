@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:signalr_netcore/signalr_client.dart';
 
 import 'api.dart';
@@ -34,6 +35,8 @@ class Realtime {
           .withUrl(
             '$diaChiApi/hubs/cap-nhat',
             options: HttpConnectionOptions(
+              // Proxy phát triển Flutter chuyển tiếp HTTP, dùng polling trên Chrome.
+              transport: kIsWeb ? HttpTransportType.LongPolling : null,
               // Máy chủ đọc token này để biết ai đang nối (xếp vào nhóm nguoi-dung-<mã>)
               accessTokenFactory: () async => Phien.token ?? '',
             ),

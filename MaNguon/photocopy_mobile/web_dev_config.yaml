@@ -1,0 +1,8 @@
+server:
+  host: "localhost"
+  port: 5065
+  proxy:
+    - prefix: "/api/"
+      target: "http://127.0.0.1:5268/"
+    - prefix: "/hubs/"
+      target: "http://127.0.0.1:5268/"
