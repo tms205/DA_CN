@@ -30,6 +30,23 @@ namespace PhotocopyApi.Controllers;
 // Mỗi action làm đúng 4 bước: lấy người gọi từ token → kiểm tra → gọi SQL / thủ tục → trả kết quả.
 [ApiController]
 [Route("api/don-hang")]
+// FILE LỚN NHẤT: mọi thao tác trên ĐƠN HÀNG. Phần của Tài nằm ở các hàm:
+//   ChonKhachTaiQuay  (POST api/don-hang/khach-tai-quay)  — tìm / tạo khách tại quầy
+//   DatDonTaiQuay     (POST api/don-hang/tai-quay)        — nhân viên lập đơn cho khách tới tiệm
+//   HangDoi           (GET  api/don-hang/hang-doi)        — danh sách hàng đợi của chi nhánh
+//   DanhSachMayIn     (GET  api/don-hang/{id}/may-in)     — máy nào in được đơn này
+//   TiepNhan          (POST api/don-hang/{id}/tiep-nhan)  — nhân viên nhận đơn
+//   CapNhatTrangThaiIn(PUT  api/don-hang/{id}/trang-thai-in) — chọn máy, bắt đầu in, trừ kho
+//   GiaoTaiQuay       (POST api/don-hang/{id}/giao-tai-quay) — bàn giao cho khách, thu tiền mặt vào ca
+//   TaoInLaiTaiQuay / TaoDonBoSungTaiQuay — in lại do lỗi quầy / khách mua thêm
+//   Các hàm phụ ở cuối file: DocYeuCauMayIn, ThieuGi, LyDoKhongInDuoc, DuocLamViecVoiChiNhanh, LayCaDangMo...
+//
+// TRẠNG THÁI ĐƠN (cột DonHang.TrangThai):
+//   CHO_XAC_NHAN → (tiếp nhận) DA_XAC_NHAN → (bắt đầu in) DANG_IN → (máy báo xong) DA_IN
+//     → nhận tại quầy: (bàn giao) HOAN_THANH
+//     → giao tận nơi : DANG_GIAO → HOAN_THANH (hoặc GIAO_THAT_BAI)
+//   Hủy được trước khi in: DA_HUY.
+// "partial class" = lớp này còn chia sang các file DonHangBangChungHuy.cs, DonHangXuLyNgay.cs...
 public partial class DonHangController : ControllerBase
 {
     private readonly TaoDonHangService _taoDon = new();
@@ -46,6 +63,13 @@ public partial class DonHangController : ControllerBase
             WHERE MaDonHangGoc=@MaDonHangGoc AND LoaiPhatSinh='IN_LAI_LOI_QUAY'
               AND TrangThai NOT IN ('HOAN_THANH','DA_HUY'))
             THROW 50116, N'Đơn này đang có một yêu cầu in lại chưa hoàn tất.', 1;";
+    // Giống giao hàng (tối đa 3 lượt): mỗi đơn gốc chỉ được in lại do lỗi quầy tối đa 3 lần.
+    // Lần in lại đã hủy (DA_HUY) không tính. Chỉ gọi lúc TẠO in lại, sau KiemTraDonGocPhatSinhSql (đã khóa đơn gốc),
+    // không gọi lúc bàn giao — đơn đã in lại đủ 3 lần vẫn bàn giao bình thường.
+    public const string KiemTraSoLanInLaiSql = @"
+        IF (SELECT COUNT(*) FROM DonHang
+            WHERE MaDonHangGoc=@MaDonHangGoc AND LoaiPhatSinh='IN_LAI_LOI_QUAY' AND TrangThai<>'DA_HUY') >= 3
+            THROW 50117, N'Đơn này đã in lại 3 lần (tối đa). Cửa hàng cần liên hệ khách để xử lý.', 1;";
     private readonly string _chuoiKetNoi;
     private readonly GeoapifyService _giaoHang;
     private readonly IHubContext<CapNhatHub> _hub;
@@ -298,19 +322,23 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
     [Authorize(Roles = "BRANCH_ADMIN,STAFF")]
     public async Task<IActionResult> ChonKhachTaiQuay(KhachTaiQuayRequest req)
     {
+        // Kiểm định dạng họ tên, SĐT (luật ở PhotocopyShared, Web cũng dùng chung)
         string loi = QuyTacNhap.LayLoi(req);
         if (loi != null) return BadRequest(new { message = loi });
+        // "?? """ = nếu null thì dùng chuỗi rỗng, tránh lỗi khi gọi .Trim() trên null
         string hoTen = (req.HoTen ?? "").Trim();
         string soDienThoai = (req.SoDienThoai ?? "").Trim();
 
         using var conn = new SqlConnection(_chuoiKetNoi);
         KhachTaiQuayDto khach = null;
+        // Bước 1: có SĐT thì tìm khách cũ có SĐT đó (chỉ tìm trong vai trò khách hàng)
         if (soDienThoai.Length > 0)
             khach = await conn.QueryFirstOrDefaultAsync<KhachTaiQuayDto>(
                 @"SELECT TOP 1 MaNguoiDung AS MaKhachHang, HoTen, SoDienThoai, Email
                   FROM NguoiDung WHERE SoDienThoai = @SoDienThoai AND VaiTro = 'CUSTOMER'
                   ORDER BY MaNguoiDung", new { SoDienThoai = soDienThoai });
 
+        // Bước 2: tìm thấy thì dùng luôn khách đó (trừ khi tài khoản đang bị khóa)
         if (khach != null)
         {
             if (await conn.ExecuteScalarAsync<string>(
@@ -320,6 +348,10 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
             return Ok(khach);
         }
 
+        // Bước 3: không tìm thấy → tạo khách mới ("khách vãng lai").
+        //   - Cột Email trong CSDL bắt buộc và không trùng, nên tạo email giả dạng khach.<SĐT>@taiquay.local
+        //     (không có SĐT thì dùng một chuỗi ngẫu nhiên Guid).
+        //   - MatKhau = NULL → khách này KHÔNG đăng nhập App được, chỉ để gắn đơn.
         if (hoTen.Length == 0) hoTen = "Khách tại quầy";
         string email = "khach." + (soDienThoai.Length > 0 ? soDienThoai : Guid.NewGuid().ToString("N")) + "@taiquay.local";
         int maKhachHang = await conn.ExecuteScalarAsync<int>(
@@ -342,34 +374,50 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
     // Khách chọn VietQR trả trước hoặc COD trả khi nhận tài liệu.
     [HttpPost("tai-quay")]
     [Authorize(Roles = "BRANCH_ADMIN,STAFF")]
+    //
+    // Web gửi lên (DatDonTaiQuayRequest): mã khách, danh sách file (mỗi file: mã file, mã dịch vụ in, số bản,
+    // hướng giấy, danh sách gia công), mã khuyến mãi, in gấp, phương thức thanh toán, mã yêu cầu tạo đơn.
+    // KHÔNG gửi giá và KHÔNG gửi số trang — máy chủ tự lấy/tự tính.
     public async Task<IActionResult> DatDonTaiQuay(DatDonTaiQuayRequest req)
     {
+        // Nhân viên nào, chi nhánh nào: đọc từ token, không nhận từ Web
         int maNhanVien = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
         int maChiNhanh = int.Parse(User.FindFirst(TenClaim.MaChiNhanh).Value);
+        // ---- Bước 1: kiểm dữ liệu cơ bản
         string phuongThucThanhToan = (req.PhuongThucThanhToan ?? "").Trim().ToUpper();
         if (phuongThucThanhToan != "VIETQR" && phuongThucThanhToan != "COD")
             return BadRequest(new { message = "Phương thức thanh toán phải là VietQR hoặc COD." });
         if (req.FileIn.Count == 0)
             return BadRequest(new { message = "Vui lòng tải ít nhất 1 file để lập đơn." });
+        // .Any(x => ...) = "có file nào mà ..." ; ở đây: có file nào hướng giấy không hợp lệ không
         if (req.FileIn.Any(x => !QuyTacIn.HuongGiayHopLe(x.HuongGiay)))
             return BadRequest(new { message = "Hướng giấy phải là giấy đứng hoặc giấy ngang." });
 
         using var conn = new SqlConnection(_chuoiKetNoi);
+        // ---- Bước 2: chống tạo trùng khi nhân viên bấm "Lập đơn" 2 lần (hoặc mạng chậm Web gửi lại).
+        // Web gửi kèm MaYeuCauTao (một Guid ngẫu nhiên, mỗi lần lập đơn một mã). dauYeuCau = "dấu vân tay" SHA256
+        // của nội dung yêu cầu. Mã này đã tạo đơn rồi thì trả lại đơn cũ, không tạo đơn mới.
         string dauYeuCau=TaoDonHangService.DauYeuCau(maNhanVien,"TAI_QUAY",maChiNhanh,req);
         try {
             var daTao=await _taoDon.Tim(conn,req.MaYeuCauTao,dauYeuCau);
             if(daTao!=null)return Ok(daTao);
         }catch(YeuCauTaoDonTrungException ex){return Conflict(new {message=ex.Message});}
+        // ---- Bước 3: nhân viên phải đang có ca mở thì mới được lập đơn (tiền COD sẽ thu vào ca này)
         int? maCa = await LayCaDangMo(conn, maNhanVien, maChiNhanh);
         if (maCa == null)
             return BadRequest(new { message = "Bạn chưa mở ca làm việc. Hãy mở ca trước khi lập đơn tại quầy." });
 
+        // ---- Bước 4: khách phải tồn tại, là khách hàng và không bị khóa
         NguoiDung khach = await conn.QueryFirstOrDefaultAsync<NguoiDung>(
             "SELECT * FROM NguoiDung WHERE MaNguoiDung = @MaKhachHang AND VaiTro = 'CUSTOMER' AND TrangThai = N'HOAT_DONG'",
             new { req.MaKhachHang });
         if (khach == null)
             return BadRequest(new { message = "Khách hàng không tồn tại hoặc tài khoản đã bị khóa." });
 
+        // ---- Bước 5: dựng 2 "bảng" trong bộ nhớ để truyền nguyên bảng vào thủ tục SQL (table-valued parameter).
+        //   bangDongIn : mỗi dòng = 1 file cần in: mã file, mã dịch vụ in (vd A4 màu 1 mặt), số trang, số bản
+        //   bangGiaCong: mỗi dòng = 1 gia công của 1 file (vd file 12 đóng lò xo)
+        // Thứ tự cột phải giống kiểu bảng Kieu_DongDonHang / Kieu_DongGiaCong khai báo trong CSDL.
         var bangDongIn = new DataTable();
         bangDongIn.Columns.Add("MaFile", typeof(int));
         bangDongIn.Columns.Add("MaDichVu", typeof(int));
@@ -382,6 +430,8 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
 
         foreach (DongInRequest file in req.FileIn)
         {
+            // Đọc file trong CSDL: phải đúng là file của khách này và đã xử lý xong (SAN_SANG).
+            // SỐ TRANG lấy từ đây (đã đếm lúc tải lên), không tin số Web gửi.
             FileInDto fileTrongCsdl = await conn.QueryFirstOrDefaultAsync<FileInDto>(
                 @"SELECT MaFile AS MaFileIn, TenFile AS TenFileGoc, SoTrang, TrangThai AS TrangThaiFile
                   FROM FileIn WHERE MaFile = @MaFile AND MaKhachHang = @MaKhachHang",
@@ -397,6 +447,8 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
                 bangGiaCong.Rows.Add(file.MaFileIn, maGiaCong);
         }
 
+        // ---- Bước 6: chi nhánh còn hoạt động và có ít nhất 1 máy in đáp ứng được quy cách (A3 / màu / 2 mặt).
+        // Không máy nào in được thì báo luôn, khỏi lập đơn rồi mới phát hiện không in được.
         ChiNhanh chiNhanh = await conn.QueryFirstOrDefaultAsync<ChiNhanh>(
             "SELECT * FROM ChiNhanh WHERE MaChiNhanh = @MaChiNhanh AND TrangThai = N'HOAT_DONG'", new { MaChiNhanh = maChiNhanh });
         if (chiNhanh == null)
@@ -410,10 +462,12 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
         if (lyDoKhongIn != null)
             return BadRequest(new { message = lyDoKhongIn });
 
+        // ---- Bước 7: chuẩn bị tham số gọi thủ tục sp_TaoDonHang.
+        // Mã khuyến mãi chỉ chuẩn hóa (bỏ khoảng trắng, viết hoa); kiểm mã có hợp lệ không là việc của sp_TinhTien.
         string maKhuyenMai = string.IsNullOrWhiteSpace(req.MaCodeKhuyenMai)
             ? null : req.MaCodeKhuyenMai.Trim().ToUpper();
         var thamSo = new DynamicParameters();
-        thamSo.Add("@KenhDatDon", "TAI_QUAY");
+        thamSo.Add("@KenhDatDon", "TAI_QUAY");   // đơn lập tại quầy (khác "APP" là khách tự đặt)
         thamSo.Add("@MaKhachHang", req.MaKhachHang);
         thamSo.Add("@MaChiNhanh", maChiNhanh);
         thamSo.Add("@HinhThucNhan", "TAI_QUAY");
@@ -427,13 +481,17 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
         thamSo.Add("@DsFile", bangDongIn.AsTableValuedParameter("Kieu_DongDonHang"));
         thamSo.Add("@DsGiaCong", bangGiaCong.AsTableValuedParameter("Kieu_DongGiaCong"));
         thamSo.Add("@HuongGiayJson", JsonSerializer.Serialize(req.FileIn.Select(x => new { maFile = x.MaFileIn, huongGiay = x.HuongGiay })));
+        // @MaDonHang là tham số OUTPUT: thủ tục ghi mã đơn mới vào đây
         thamSo.Add("@MaDonHang", dbType: DbType.Int32, direction: ParameterDirection.Output);
 
         string ghiChu = phuongThucThanhToan == "VIETQR"
             ? "Đơn VietQR lập tại quầy"
             : "Đơn COD lập tại quầy";
         if (!string.IsNullOrWhiteSpace(req.GhiChu)) ghiChu += " · " + req.GhiChu.Trim();
-        if (ghiChu.Length > 255) ghiChu = ghiChu[..255];
+        if (ghiChu.Length > 255) ghiChu = ghiChu[..255];   // cắt còn 255 ký tự cho vừa cột GhiChu
+        // ---- Bước 8: tạo đơn. TaoDonHangService.Tao (DichVu\TaoDonHangService.cs) mở transaction, khóa file,
+        // gọi sp_TaoDonHang (thủ tục này gọi sp_TinhTien để tính tiền in, gia công, khuyến mãi, giờ nhận dự kiến),
+        // kiểm tổng tiền tối thiểu, lưu mã yêu cầu chống trùng, rồi COMMIT. Lỗi ở đâu thì hủy toàn bộ.
         KetQuaTaoDon tao;
         try {tao=await _taoDon.Tao(conn,thamSo,req.MaYeuCauTao,dauYeuCau,req.MaKhachHang,
             req.FileIn.Select(x=>x.MaFileIn),ghiChu,HttpContext.RequestAborted);}
@@ -442,6 +500,7 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
         catch(InvalidOperationException ex){return Conflict(new {message=ex.Message});}
         catch(SqlException ex){return BadRequest(new {message=ex.Message});}
         var don=tao.Don;int maDonHang=don.MaDonHang;
+        // ---- Bước 9: báo realtime (SignalR) cho nhân viên cùng chi nhánh → tab Hàng đợi tự hiện đơn mới.
         if(tao.TaoMoi) await BaoTaoDonAnToan(maChiNhanh,new TinCapNhat
         {
             MaDonHang = maDonHang,
@@ -524,6 +583,8 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
         if (User.FindFirst(TenClaim.MaChiNhanh) != null)
             maChiNhanh = int.Parse(User.FindFirst(TenClaim.MaChiNhanh).Value);
 
+        // Nhân viên / quản lý chỉ thấy đơn chi nhánh mình; CEO truyền null = thấy toàn chuỗi.
+        // Câu SQL HangDoi nằm ở DuLieu\TruyVanSql.cs.
         // Đơn hỏa tốc xếp lên đầu, sau đó đơn đặt trước xếp trước.
         // Đơn đã hoàn tất / đã hủy chỉ lấy trong 7 ngày gần đây cho bảng khỏi dài.
         using var conn = new SqlConnection(_chuoiKetNoi);
@@ -531,6 +592,7 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
         {
             MaChiNhanh = vaiTro == VaiTro.SuperAdmin ? null : maChiNhanh
         });
+        // Đơn đang in: tính giờ in xong dự kiến theo tiến độ máy in thật sự đang báo về
         foreach (var don in danhSach)
             don.NgayHenTra = don.TrangThaiDonHang == "DANG_IN"
                 ? _trangThaiMay.LayDuKienInXong(don.MaDonHang, don.MaMayIn) : null;
@@ -562,6 +624,8 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
             "SELECT * FROM MayIn WHERE MaChiNhanh = @MaChiNhanh ORDER BY MaMayIn",
             new { MaChiNhanh = maChiNhanhDon.Value })).ToList();
 
+        // Duyệt từng máy của chi nhánh, đánh dấu DapUngDuoc = true/false kèm lý do.
+        // Web hiện máy không in được ở dạng mờ, ghi lý do (vd "Không in được màu").
         var ketQua = new List<MayInDto>();
         foreach (MayIn may in dsMay)
         {
@@ -578,6 +642,7 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
                 DapUngDuoc = true
             };
 
+            // (1) Máy đang bảo trì / hỏng → không in được
             if (may.TrangThai != "HOAT_DONG")
             {
                 dto.DapUngDuoc = false;
@@ -585,6 +650,7 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
             }
             else
             {
+                // (2) Máy thiếu khả năng đơn cần (A3 / màu / 2 mặt) → không in được
                 string thieu = ThieuGi(may, yeuCau);
                 if (thieu != null)
                 {
@@ -593,6 +659,7 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
                 }
             }
 
+            // (3) Thiết bị connector báo không hỗ trợ quy cách (dùng khi gắn máy in thật)
             string loiThietBi = _phatHienMay?.KiemTraQuyCach(may.MaMayIn, quyCach);
             if (loiThietBi != null) { dto.DapUngDuoc = false; dto.LyDoKhongDapUng = loiThietBi; }
 
@@ -605,6 +672,8 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
     // POST api/don-hang/5/tiep-nhan — F-15: thợ in nhận đơn vào xử lý
     [HttpPost("{maDonHang}/tiep-nhan")]
     [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
+    // Đổi đơn từ CHO_XAC_NHAN sang DA_XAC_NHAN và ghi nhân viên nào nhận. Kiểm ở C# trước (ca, chi nhánh)
+    // để báo lỗi dễ hiểu, rồi thủ tục sp_TiepNhanDon (CSDL file 029) kiểm lại hết + luật 2 phút của đơn App.
     public async Task<IActionResult> TiepNhan([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maDonHang)
     {
         int maNhanVien = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
@@ -634,6 +703,7 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
             return BadRequest(new { message = ex.Message });
         }
 
+        // Báo realtime: Web các nhân viên khác thấy đơn đổi trạng thái, App khách hiện "Đã tiếp nhận"
         await BaoDonDoiTrangThai(conn, maDonHang, "Đơn đã được tiếp nhận");
         return Ok(new KetQuaDto { Message = "Đã tiếp nhận đơn hàng." });
     }
@@ -730,8 +800,18 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
     //   DANG_IN → DA_IN chỉ đi qua callback connector, không nhận xác nhận bỏ qua bước in từ web.
     [HttpPut("{maDonHang}/trang-thai-in")]
     [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN,STAFF")]
+    //
+    // Đây là nút "Chọn máy & bắt đầu in". Các bước:
+    //   1. Chỉ nhận yêu cầu chuyển sang DANG_IN và phải có máy được chọn. Web gửi "DA_IN" bị từ chối.
+    //   2. Mở transaction, khóa dòng đơn (UPDLOCK, HOLDLOCK) để 2 nhân viên bấm cùng lúc không in trùng.
+    //   3. Kiểm: đúng chi nhánh, đơn đã trả tiền / là COD tại quầy, đơn đã tiếp nhận.
+    //   4. Kiểm máy: connector đang kết nối và đang rảnh/đang in (không lỗi, không tạm dừng); file PDF còn.
+    //   5. sp_PhanCongMayIn: gán máy cho đơn (kiểm lại A3 / màu / 2 mặt).
+    //      sp_CapNhatTrangThaiIn: đổi sang DANG_IN và TRỪ VẬT TƯ TRONG KHO; thiếu giấy thì lỗi, hủy cả transaction.
+    //   6. COMMIT, báo realtime. Máy in ảo (connector) sẽ tự hỏi API lấy lệnh in này (MayInAoController.LenhTiepTheo).
     public async Task<IActionResult> CapNhatTrangThaiIn([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maDonHang, CapNhatTrangThaiInRequest req)
     {
+        // Bước 1
         if (req.TrangThaiMoi == "DA_IN")
             return BadRequest(new { message = "Không xác nhận in xong thủ công. Connector phải gửi tài liệu tới máy và báo kết quả; kiểm tra tiến độ trong Điều khiển máy in." });
         if (req.TrangThaiMoi != "DANG_IN")
@@ -741,6 +821,7 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
 
         using var conn = new SqlConnection(_chuoiKetNoi);
 
+        // Bước 2: transaction + khóa dòng đơn
         await conn.OpenAsync();
         await using var giaoDich = (SqlTransaction)await conn.BeginTransactionAsync();
         var don = await conn.QuerySingleOrDefaultAsync<DonPhucHoiFile>(
@@ -749,6 +830,7 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
               FROM DonHang dh WITH (UPDLOCK, HOLDLOCK)
               JOIN ThanhToan tt ON tt.MaDonHang=dh.MaDonHang WHERE dh.MaDonHang=@MaDonHang",
             new { MaDonHang = maDonHang }, giaoDich);
+        // Bước 3: kiểm đơn
         if (don == null)
             return NotFound(new { message = "Không tìm thấy đơn hàng." });
         if (!DuocLamViecVoiChiNhanh(don.MaChiNhanh))
@@ -765,6 +847,7 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
                 return Ok(new KetQuaDto { Message = "Đơn đã được gửi tới hàng đợi của máy; không gửi thêm lệnh hoặc trừ kho lần hai." });
         }
         else if (don.TrangThai != "DA_XAC_NHAN") return BadRequest(new { message = "Phải tiếp nhận đơn trước khi gửi in." });
+        // Bước 4: trạng thái máy lấy từ heartbeat connector gửi về mỗi giây (lưu trong RAM: TrangThaiMayInAoStore)
         var ketNoi = _trangThaiMay.LayTatCa().FirstOrDefault(x => x.MaMayIn == req.MaMayIn);
         if (ketNoi == null || ketNoi.TrangThai is not ("SAN_SANG" or "DANG_IN"))
             return Conflict(new { message = "Máy chưa kết nối hoặc đang lỗi/tạm dừng. Kiểm tra connector trước khi gửi đơn." });
@@ -784,6 +867,8 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
             return Ok(new KetQuaDto { Message = "Đã gửi yêu cầu COD cũ tới connector; không trừ kho thêm lần nữa." });
         }
 
+        // Bước 5 + 6: gán máy, đổi trạng thái + trừ kho, rồi COMMIT. Lỗi SQL (vd thiếu giấy) thì ROLLBACK:
+        // kho không bị trừ, đơn vẫn ở DA_XAC_NHAN như cũ.
         try
         {
             await conn.ExecuteAsync("sp_PhanCongMayIn",
@@ -833,6 +918,10 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
     // POST api/don-hang/5/giao-tai-quay — F-18: bàn giao; đơn COD được thu vào ca tại bước này.
     [HttpPost("{maDonHang}/giao-tai-quay")]
     [Authorize(Roles = "BRANCH_ADMIN,STAFF")]
+    //
+    // Nút "Bàn giao" khi khách tới lấy tài liệu đã in xong. Phần quan trọng (thu tiền mặt vào ca, chống cộng tiền 2 lần)
+    // nằm trong thủ tục sp_GiaoTaiQuay (CSDL file 021). Ở đây chỉ: kiểm chi nhánh → gọi thủ tục trong transaction
+    // → xóa file PDF của đơn đã xong (khỏi tốn ổ đĩa) → báo realtime.
     public async Task<IActionResult> GiaoTaiQuay([Range(1, int.MaxValue, ErrorMessage = "Mã bản ghi phải là số nguyên dương.")] int maDonHang)
     {
         int maNhanVien = int.Parse(User.FindFirst(TenClaim.MaNguoiDung).Value);
@@ -1332,6 +1421,8 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
                 throw new InvalidOperationException("File gốc không còn sẵn sàng để lập đơn phát sinh.");
             await conn.ExecuteAsync(KiemTraDonGocPhatSinhSql,
                 new { MaDonHangGoc = nguon.MaDonHang, LoaiPhatSinh = loaiPhatSinh }, giaoDich);
+            if (loaiPhatSinh == "IN_LAI_LOI_QUAY")
+                await conn.ExecuteAsync(KiemTraSoLanInLaiSql, new { MaDonHangGoc = nguon.MaDonHang }, giaoDich);
             await conn.ExecuteAsync("sp_TaoDonHang", thamSo, giaoDich, commandType: CommandType.StoredProcedure);
             int maDonMoi = thamSo.Get<int>("@MaDonHang");
             string ghiChu = loaiPhatSinh == "IN_LAI_LOI_QUAY"
@@ -1471,6 +1562,8 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
 
     // Đọc bảng giá để biết các dòng in khách chọn cần máy in thế nào.
     // Trả về null nếu có mã dịch vụ không phải dòng in ấn.
+    // Từ danh sách dịch vụ in khách chọn, suy ra đơn CẦN máy như thế nào: có cần khổ A3? cần in màu? cần in 2 mặt?
+    // Trả null nếu có mã dịch vụ không có trong bảng DichVu (dữ liệu gửi lên sai).
     private async Task<YeuCauMayIn> DocYeuCauMayIn(SqlConnection conn, List<int> dsMaDichVu)
     {
         var dsDong = (await conn.QueryAsync<DichVuDto>(
@@ -1544,7 +1637,9 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
         return tenChiNhanh + " chưa có máy in đáp ứng cùng lúc các quy cách bạn chọn.";
     }
 
-    // Người đang đăng nhập có được xử lý đơn của chi nhánh này không
+    // Người đang đăng nhập có được xử lý đơn của chi nhánh này không.
+    // Nhân viên / quản lý: chi nhánh trong token phải trùng chi nhánh của đơn (nhân viên CN1 không đụng đơn CN2).
+    // CEO: đang chọn chi nhánh nào thì theo chi nhánh đó; xem toàn chuỗi (không có claim chi nhánh) thì được hết.
     private bool DuocLamViecVoiChiNhanh(int maChiNhanhDon)
     {
         var claim = User.FindFirst(TenClaim.MaChiNhanh);
@@ -1552,6 +1647,8 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
         return User.IsInRole(VaiTro.SuperAdmin);
     }
 
+    // Trả mã ca đang mở của nhân viên tại chi nhánh này; chưa mở ca thì trả null.
+    // Dùng để chặn lập đơn quầy / tiếp nhận đơn / in lại khi nhân viên chưa vào ca.
     private static Task<int?> LayCaDangMo(SqlConnection conn, int maNhanVien, int maChiNhanh)
     {
         return conn.ExecuteScalarAsync<int?>(
@@ -1663,6 +1760,8 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
         return 0;
     }
 
+    // Gửi tin "có đơn mới" qua SignalR cho nhân viên chi nhánh. Gửi lỗi (mất kết nối...) chỉ ghi log,
+    // KHÔNG làm hỏng việc tạo đơn vì đơn đã lưu xong trong CSDL rồi.
     private async Task BaoTaoDonAnToan(int branch,TinCapNhat tin)
     {
         if(_hub==null)return;
@@ -1674,6 +1773,7 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
     }
 
     // Lưu nghiệp vụ đã hoàn tất trước bước này; lỗi thông báo không biến thành lỗi thao tác.
+    // Gửi tin "đơn đổi trạng thái" cho 2 nơi: nhân viên chi nhánh (Web tự tải lại) và khách chủ đơn (App hiện thông báo).
     private async Task BaoDonDoiTrangThai(SqlConnection conn, int maDonHang, string noiDung)
     {
         if(_hub==null)return;

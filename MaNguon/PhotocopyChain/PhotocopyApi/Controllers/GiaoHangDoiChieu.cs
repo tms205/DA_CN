@@ -84,7 +84,9 @@ public partial class GiaoHangController
             if (row == null) return NotFound(new { message = "Không tìm thấy lượt giao thất bại của bạn." });
             if (row.DoiChieuKhachHangJson != null) return Ok(new { message = "Phản hồi lượt này đã được ghi nhận; bằng chứng cũ được giữ nguyên." });
             QuyTacDoiChieu.KiemTraNoiDung(req.NoiDung);
-            files = await _bangChung.Luu(maGiaoHang, req.Anh, HttpContext.RequestAborted, NguonAnhGiaoHang.KhachHang);
+            // Ảnh bằng chứng là TÙY CHỌN: khách có thể chỉ gửi nội dung (0 ảnh) hoặc kèm 1–3 ảnh.
+            if (req.Anh != null && req.Anh.Count > 0)
+                files = await _bangChung.Luu(maGiaoHang, req.Anh, HttpContext.RequestAborted, NguonAnhGiaoHang.KhachHang);
             // File/ảnh được xử lý trước khi khóa SQL; khóa theo thứ tự Đơn → Lượt như nghiệp vụ giao hàng.
             using var conn = new SqlConnection(_chuoiKetNoi); await conn.OpenAsync();
             await using var tran = (SqlTransaction)await conn.BeginTransactionAsync(IsolationLevel.Serializable);

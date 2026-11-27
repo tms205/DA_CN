@@ -3,6 +3,7 @@ namespace PhotocopyShared.QuyCachIn;
 public static class QuyTacIn
 {
     public const int SoToKimGocToiDa = 50;
+    public const int SoLanInLaiToiDa = 3;   // in lại do lỗi quầy tối đa 3 lần / đơn, giống giao hàng 3 lượt
     public const int TongTienDonToiThieu = 1000;
     public const string LoiTongTienDonToiThieu = "Tổng tiền đơn hàng phải từ 1.000đ. Vui lòng điều chỉnh đơn trước khi lập.";
 

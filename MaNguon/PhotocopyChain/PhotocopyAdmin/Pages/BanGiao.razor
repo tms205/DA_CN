@@ -96,7 +96,10 @@
                                 <td data-nhan="In xong lúc"><span class="chu-mo">@don.NgayDat.ToString("HH:mm dd/MM")</span></td>
                                 <td class="cot-hanh-dong" data-nhan="Thao tác">
                                     <div class="bg-hanh-dong-phat-sinh">
-                                        <button class="nut-nho" disabled="@_dangGui" @onclick="() => MoInLaiAsync(don)">In lại do lỗi quầy</button>
+                                        @* In lại tối đa 3 lần / đơn (giống giao hàng 3 lượt); hết lượt thì khóa nút. *@
+                                        <button class="nut-nho" disabled="@(_dangGui || don.SoLanInLai >= QuyTacIn.SoLanInLaiToiDa)"
+                                                title="@(don.SoLanInLai >= QuyTacIn.SoLanInLaiToiDa ? "Đã in lại 3 lần (tối đa). Liên hệ khách để xử lý." : "")"
+                                                @onclick="() => MoInLaiAsync(don)">In lại do lỗi quầy (@don.SoLanInLai/@QuyTacIn.SoLanInLaiToiDa)</button>
                                         <button class="nut-nho" disabled="@_dangGui" @onclick="() => MoBoSungAsync(don)">Khách mua thêm</button>
                                     </div>
                                     @if (don.PhuongThucThanhToan == "VIETQR" && don.TrangThaiThanhToan != "DA_THANH_TOAN")

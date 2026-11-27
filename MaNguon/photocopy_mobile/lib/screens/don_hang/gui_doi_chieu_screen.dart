@@ -88,7 +88,8 @@ class _GuiDoiChieuScreenState extends State<GuiDoiChieuScreen> {
 
   Future<void> _gui() async {
     final text = _noiDung.text.trim();
-    if (_dangGui || text.length < 5 || text.length > 1000 || _anh.isEmpty) {
+    // Ảnh không bắt buộc: chỉ cần nội dung; có ảnh thì gửi kèm (tối đa 3).
+    if (_dangGui || text.length < 5 || text.length > 1000) {
       return;
     }
     setState(() {
@@ -155,7 +156,7 @@ class _GuiDoiChieuScreenState extends State<GuiDoiChieuScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Nếu thông tin giao thất bại chưa đúng, bạn có thể gửi ảnh nhật ký cuộc gọi của mình để cửa hàng đối chiếu.',
+                  'Nếu thông tin giao thất bại chưa đúng, hãy mô tả lại để cửa hàng đối chiếu. Bạn có thể gửi kèm ảnh nhật ký cuộc gọi hoặc không.',
                 ),
                 const SizedBox(height: 20),
                 TextField(
@@ -172,12 +173,12 @@ class _GuiDoiChieuScreenState extends State<GuiDoiChieuScreen> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Ảnh nhật ký cuộc gọi *',
+                  'Ảnh nhật ký cuộc gọi (không bắt buộc)',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Từ 1–3 ảnh JPG/PNG, tối đa 5 MB/ảnh. Bạn có thể che thông tin các cuộc gọi không liên quan trước khi tải lên.',
+                  'Có thể bỏ qua. Nếu gửi: tối đa 3 ảnh JPG/PNG, 5 MB/ảnh. Bạn có thể che thông tin các cuộc gọi không liên quan trước khi tải lên.',
                 ),
                 for (int i = 0; i < _anh.length; i++)
                   Padding(
@@ -246,12 +247,17 @@ class _GuiDoiChieuScreenState extends State<GuiDoiChieuScreen> {
                   onPressed:
                       _dangGui ||
                           _dangChon ||
-                          _noiDung.text.trim().length < 5 ||
-                          _anh.isEmpty
+                          _noiDung.text.trim().length < 5
                       ? null
                       : _gui,
                   style: FilledButton.styleFrom(minimumSize: const Size(0, 52)),
-                  child: Text(_dangGui ? 'Đang gửi…' : 'Gửi bằng chứng'),
+                  child: Text(
+                    _dangGui
+                        ? 'Đang gửi…'
+                        : _anh.isEmpty
+                        ? 'Gửi phản hồi (không kèm ảnh)'
+                        : 'Gửi bằng chứng (${_anh.length} ảnh)',
+                  ),
                 ),
                 const SizedBox(height: 12),
                 const Text(

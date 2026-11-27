@@ -13,15 +13,20 @@ else
     <h3>Ý kiến của khách hàng</h3>
     <p class="dc-noi-dung">@report.NoiDung</p>
     <h3>Ảnh nhật ký cuộc gọi của khách</h3>
-    <div class="dc-cong-cu" role="group" aria-label="Chọn ảnh của khách">
-        @for(int i=0;i<report.Anh.Count;i++) { int index=i;
-            <button type="button" class="nut-nho @(_chiSo==i ? "chinh":"")" aria-pressed="@(_chiSo==i?"true":"false")" @onclick="()=>TaiAnh(index)">Ảnh @(i+1)</button>
-        }
-        <button class="nut-nho" disabled="@(_anh==null)" @onclick="()=>_phongTo=!_phongTo">@(_phongTo?"Thu gọn":"Phóng to ảnh")</button>
-    </div>
-    @if(_loiAnh!=null) { <p role="alert">@_loiAnh</p><button class="nut-phu" @onclick="()=>TaiAnh(_chiSo)">Tải lại ảnh</button> }
-    else if(_anh==null) { <p role="status">Đang tải ảnh…</p> }
-    else { <div class="dc-khung-anh @(_phongTo?"dc-phong-to":"")"><img src="@_anh" alt="Nhật ký cuộc gọi của khách, ảnh @(_chiSo+1)" /></div> }
+    @* Ảnh là tùy chọn: khách có thể chỉ gửi nội dung, không kèm ảnh. *@
+    @if (report.Anh.Count == 0) { <p>Khách không gửi kèm ảnh bằng chứng.</p> }
+    else
+    {
+        <div class="dc-cong-cu" role="group" aria-label="Chọn ảnh của khách">
+            @for(int i=0;i<report.Anh.Count;i++) { int index=i;
+                <button type="button" class="nut-nho @(_chiSo==i ? "chinh":"")" aria-pressed="@(_chiSo==i?"true":"false")" @onclick="()=>TaiAnh(index)">Ảnh @(i+1)</button>
+            }
+            <button class="nut-nho" disabled="@(_anh==null)" @onclick="()=>_phongTo=!_phongTo">@(_phongTo?"Thu gọn":"Phóng to ảnh")</button>
+        </div>
+        @if(_loiAnh!=null) { <p role="alert">@_loiAnh</p><button class="nut-phu" @onclick="()=>TaiAnh(_chiSo)">Tải lại ảnh</button> }
+        else if(_anh==null) { <p role="status">Đang tải ảnh…</p> }
+        else { <div class="dc-khung-anh @(_phongTo?"dc-phong-to":"")"><img src="@_anh" alt="Nhật ký cuộc gọi của khách, ảnh @(_chiSo+1)" /></div> }
+    }
     @if(report.TrangThai=="DA_XU_LY")
     {
         <h3>Kết quả đối chiếu</h3><p class="dc-noi-dung">@report.KetLuan</p>

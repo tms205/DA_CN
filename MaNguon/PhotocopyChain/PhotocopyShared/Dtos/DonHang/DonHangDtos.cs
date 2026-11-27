@@ -241,6 +241,7 @@ public sealed class HangDoiDonDto
     public int? MaDonHangGoc { get; set; }
     public string? MaDonHangGocHienThi { get; set; }
     public string? LoaiPhatSinh { get; set; }
+    public int SoLanInLai { get; set; }   // số lần đã in lại do lỗi quầy (tối đa 3, không tính lần đã hủy)
     public int MaChiNhanh { get; set; }
     public string TenChiNhanh { get; set; } = "";
     public string TenKhachHang { get; set; } = "";

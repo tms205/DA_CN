@@ -11,10 +11,17 @@ public class DoiChieuGiaoTests
     [InlineData("")]
     [InlineData("    ")]
     [InlineData("1234")]
-    public void PhanHoi_PhaiCoNoiDungVaAnh(string text)
+    public void PhanHoi_PhaiCoNoiDung(string text)
     {
         Assert.Throws<ArgumentException>(() => QuyTacDoiChieu.Tao(1, text, new() { new() }, DateTimeOffset.UtcNow));
-        Assert.Throws<ArgumentException>(() => QuyTacDoiChieu.Tao(1, "Nội dung hợp lệ", new(), DateTimeOffset.UtcNow));
+    }
+    [Fact]
+    public void PhanHoi_AnhKhongBatBuoc_ToiDa3()
+    {
+        var khongAnh = QuyTacDoiChieu.Tao(1, "Nội dung hợp lệ", new(), DateTimeOffset.UtcNow);
+        Assert.Empty(khongAnh.Anh);
+        Assert.Empty(QuyTacDoiChieu.Tao(1, "Nội dung hợp lệ", null, DateTimeOffset.UtcNow).Anh);
+        Assert.Throws<ArgumentException>(() => QuyTacDoiChieu.Tao(1, "Nội dung hợp lệ", new() { new(), new(), new(), new() }, DateTimeOffset.UtcNow));
     }
     [Fact]
     public void XuLy_GiuNguyenBangChungVaNguoiGui_KhongChoGhiDeKetLuan()

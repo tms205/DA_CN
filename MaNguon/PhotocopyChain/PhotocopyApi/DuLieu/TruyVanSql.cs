@@ -124,6 +124,9 @@ internal static class TruyVanSql
                    CASE WHEN dh.MaDonHangGoc IS NULL THEN NULL
                         ELSE 'DH' + RIGHT('00000' + CAST(dh.MaDonHangGoc AS VARCHAR(10)), 5) END AS MaDonHangGocHienThi,
                    dh.LoaiPhatSinh,
+                   (SELECT COUNT(*) FROM DonHang il
+                    WHERE il.MaDonHangGoc = dh.MaDonHang AND il.LoaiPhatSinh = 'IN_LAI_LOI_QUAY'
+                      AND il.TrangThai <> 'DA_HUY') AS SoLanInLai,
                    dh.MaChiNhanh, cn.TenChiNhanh,
                    kh.HoTen AS TenKhachHang, kh.SoDienThoai AS SoDienThoaiKhach,
                    dh.HinhThucNhan, dh.InGap AS InHoaToc,

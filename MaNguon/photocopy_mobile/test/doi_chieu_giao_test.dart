@@ -111,7 +111,7 @@ void main() {
     await t.pumpWidget(const SizedBox());
   });
 
-  testWidgets('Màn 320px chữ lớn; bắt buộc ảnh và nội dung; lỗi giữ bản nhập', (
+  testWidgets('Màn 320px chữ lớn; bắt buộc nội dung, ảnh tùy chọn; lỗi giữ bản nhập', (
     t,
   ) async {
     t.view.physicalSize = const Size(320, 800);
@@ -160,11 +160,12 @@ void main() {
       await t.pumpAndSettle();
     }
 
-    await toi('Gửi bằng chứng');
+    // Chưa nhập nội dung thì chưa gửi được (ảnh không bắt buộc).
+    await toi('Gửi phản hồi (không kèm ảnh)');
     expect(
       t
           .widget<FilledButton>(
-            find.widgetWithText(FilledButton, 'Gửi bằng chứng'),
+            find.widgetWithText(FilledButton, 'Gửi phản hồi (không kèm ảnh)'),
           )
           .onPressed,
       isNull,
@@ -186,8 +187,8 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 100));
     });
     await t.pumpAndSettle();
-    await toi('Gửi bằng chứng');
-    await t.tap(find.text('Gửi bằng chứng'));
+    await toi('Gửi bằng chứng (1 ảnh)');
+    await t.tap(find.text('Gửi bằng chứng (1 ảnh)'));
     await t.pumpAndSettle();
     expect(calls, 1);
     expect(text, 'Tôi đã nhận cuộc gọi của shipper');
@@ -204,5 +205,35 @@ void main() {
     expect(t.widget<TextField>(find.byType(TextField)).controller!.text, text);
     expect(t.takeException(), isNull);
     await t.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('Khách gửi phản hồi đối chiếu không kèm ảnh', (t) async {
+    int calls = 0;
+    List<Map<String, String>>? files;
+    await t.pumpWidget(
+      MaterialApp(
+        home: GuiDoiChieuScreen(
+          maGiao: 78,
+          lanGiao: 1,
+          gui: (body, anh) async {
+            calls++;
+            files = anh;
+            return KetQuaApi()..loi = 'Mất mạng, hãy thử lại.';
+          },
+        ),
+      ),
+    );
+    await t.pumpAndSettle();
+    await t.enterText(find.byType(TextField), 'Tôi ở nhà cả buổi chiều');
+    t.testTextInput.hide();
+    await t.pumpAndSettle();
+    final nut = find.widgetWithText(FilledButton, 'Gửi phản hồi (không kèm ảnh)');
+    await t.ensureVisible(nut);
+    await t.pumpAndSettle();
+    expect(t.widget<FilledButton>(nut).onPressed, isNotNull);
+    await t.tap(nut);
+    await t.pumpAndSettle();
+    expect(calls, 1);
+    expect(files, isEmpty);
   });
 }
