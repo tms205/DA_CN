@@ -129,7 +129,7 @@ void main() {
           ),
         ),
       );
-      await t.tap(find.text('Yêu cầu hoàn tiền do sản phẩm'));
+      await t.tap(find.text('Gửi ý kiến về sản phẩm'));
       await t.pumpAndSettle();
       expect(
         find.widgetWithText(TextFormField, 'Chủ tài khoản ngân hàng'),
@@ -162,7 +162,7 @@ void main() {
             find.text('CEO đã chấp thuận · Chờ chuyển tiền'),
             findsOneWidget,
           );
-          expect(find.text('Yêu cầu hoàn tiền do sản phẩm'), findsNothing);
+          expect(find.text('Gửi ý kiến về sản phẩm'), findsNothing);
           expect(find.text('Yêu cầu của bạn'), findsOneWidget);
           expect(find.text('QUYẾT ĐỊNH CỦA CEO'), findsOneWidget);
           expect(find.text('KẾT QUẢ HOÀN TIỀN'), findsNothing);

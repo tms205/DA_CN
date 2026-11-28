@@ -130,8 +130,12 @@ class _BangChungHuyDonState extends State<BangChungHuyDon> {
                   ? 'Hệ thống tự hủy do hết hạn thanh toán'
                   : _data!['loai'] == 'HUY_TRUOC_TIEP_NHAN'
                   ? 'Hủy đơn trước khi nhân viên tiếp nhận'
+                  : _data!['loai'] == 'IN_LOI_3_LAN'
+                  ? 'Cửa hàng hủy đơn vì in lại 3 lần vẫn lỗi'
                   : 'Yêu cầu hủy có ảnh bằng chứng',
             ),
+            if (_data!['loai'] == 'IN_LOI_3_LAN' && _data!['lyDo'] != null)
+              Text(_data!['lyDo'].toString()),
             if (_luc(_data!['guiLuc']) case final time?)
               Text('Ghi nhận: $time'),
             if (_data!['loai'] == 'TU_DONG')

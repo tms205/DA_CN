@@ -85,13 +85,13 @@ void main() {
         ),
       ),
     );
-    await t.tap(find.text('Yêu cầu hoàn tiền do sản phẩm'));
+    await t.tap(find.text('Gửi ý kiến về sản phẩm'));
     await t.pumpAndSettle();
     await t.tap(find.text('Gửi CEO xem xét'));
     await t.pumpAndSettle();
     expect(calls, 0);
     expect(find.text('Chưa lưu được ảnh.'), findsOneWidget);
-    await t.tap(find.text('Yêu cầu hoàn tiền do sản phẩm'));
+    await t.tap(find.text('Gửi ý kiến về sản phẩm'));
     await t.pumpAndSettle();
     expect(find.text('proof.png'), findsOneWidget);
     await t.pumpWidget(const SizedBox());

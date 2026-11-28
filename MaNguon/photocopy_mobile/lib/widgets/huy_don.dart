@@ -117,7 +117,7 @@ class _NutHuyDonState extends State<NutHuyDon> {
               ? 'Bổ sung thông tin hoàn tiền'
               : 'Sửa thông tin hoàn tiền')
         : widget.khieuNaiSanPham
-        ? 'Yêu cầu hoàn tiền do sản phẩm'
+        ? 'Gửi ý kiến về sản phẩm'
         : widget.daThanhToan
         ? 'Hủy đơn & yêu cầu hoàn tiền'
         : 'Hủy đơn',
@@ -254,7 +254,7 @@ class _HoiHuyDonState extends State<_HoiHuyDon> {
   Widget build(BuildContext context) => AlertDialog(
     title: Text(
       widget.khieuNaiSanPham
-          ? 'Sản phẩm có vấn đề?'
+          ? 'Ý kiến về sản phẩm'
           : widget.capNhatHoanTien
           ? 'Thông tin nhận hoàn tiền'
           : 'Hủy đơn hàng?',

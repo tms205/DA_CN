@@ -7,8 +7,14 @@ import 'bien_lai_hoan_tien.dart';
 
 // Nằm dưới phần đánh giá; yêu cầu sản phẩm lỗi tách riêng việc hủy đơn trước tiếp nhận.
 class KhieuNaiHoanTien extends StatefulWidget {
-  const KhieuNaiHoanTien({super.key, required this.maDonHang});
+  const KhieuNaiHoanTien({
+    super.key,
+    required this.maDonHang,
+    this.anKhiKhongCoHoSo = false,
+  });
   final int maDonHang;
+  // Đơn đã hủy: chỉ hiện khi có hồ sơ (vd quầy in lỗi 3 lần lập hoàn tiền), không mời gửi ý kiến.
+  final bool anKhiKhongCoHoSo;
   @override
   State<KhieuNaiHoanTien> createState() => _KhieuNaiHoanTienState();
 }
@@ -193,15 +199,28 @@ class _KhieuNaiHoanTienState extends State<KhieuNaiHoanTien> {
     );
   }
 
+  bool get _doQuayLap => _hoSo?['nguon'] == 'IN_LOI_3_LAN';
+
   @override
-  Widget build(BuildContext context) => Card(
+  Widget build(BuildContext context) {
+    if (widget.anKhiKhongCoHoSo && (_tai || _hoSo == null)) {
+      return const SizedBox.shrink();
+    }
+    return _the(context);
+  }
+
+  Widget _the(BuildContext context) => Card(
     child: Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            _hoSo == null ? 'Sản phẩm có vấn đề?' : 'Yêu cầu hoàn tiền',
+            _hoSo == null
+                ? 'Có ý kiến về sản phẩm?'
+                : _doQuayLap
+                ? 'Hoàn tiền do cửa hàng in lỗi'
+                : 'Ý kiến về sản phẩm',
             style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
           ),
           const SizedBox(height: 8),
@@ -237,18 +256,20 @@ class _KhieuNaiHoanTienState extends State<KhieuNaiHoanTien> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Row(
+                  Row(
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.description_outlined,
                         size: 20,
                         color: Color(0xFF42546B),
                       ),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Yêu cầu của bạn',
-                          style: TextStyle(
+                          _doQuayLap
+                              ? 'Cửa hàng lập thay bạn'
+                              : 'Yêu cầu của bạn',
+                          style: const TextStyle(
                             fontWeight: FontWeight.w700,
                             color: Color(0xFF283B52),
                           ),
@@ -328,7 +349,7 @@ class _KhieuNaiHoanTienState extends State<KhieuNaiHoanTien> {
             ],
           ] else if (_choGui) ...[
             const Text(
-              'Gửi mô tả chi tiết, ảnh sản phẩm bị lỗi và thông tin ngân hàng để CEO xem xét. Yêu cầu không tự hủy đơn hoặc tự chuyển tiền.',
+              'Gửi mô tả chi tiết, ảnh sản phẩm và thông tin ngân hàng để CEO xem xét. Yêu cầu không tự hủy đơn hoặc tự chuyển tiền.',
             ),
             const SizedBox(height: 12),
             NutHuyDon(
@@ -339,7 +360,7 @@ class _KhieuNaiHoanTienState extends State<KhieuNaiHoanTien> {
             ),
           ] else
             const Text(
-              'Đơn này hiện không đủ điều kiện gửi yêu cầu hoàn tiền do sản phẩm.',
+              'Đơn này hiện không đủ điều kiện gửi ý kiến về sản phẩm.',
             ),
         ],
       ),

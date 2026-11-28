@@ -101,6 +101,11 @@
                                                 title="@(don.SoLanInLai >= QuyTacIn.SoLanInLaiToiDa ? "Đã in lại 3 lần (tối đa). Liên hệ khách để xử lý." : "")"
                                                 @onclick="() => MoInLaiAsync(don)">In lại do lỗi quầy (@don.SoLanInLai/@QuyTacIn.SoLanInLaiToiDa)</button>
                                         <button class="nut-nho" disabled="@_dangGui" @onclick="() => MoBoSungAsync(don)">Khách mua thêm</button>
+                                        @* In lại đủ 3 lần vẫn lỗi + khách đã chuyển khoản VietQR: hủy đơn, lập hồ sơ hoàn tiền chờ CEO chuyển. *@
+                                        @if (QuyTacHoanTienInLoi.HienNut(don.MaDonHangGoc, don.PhuongThucThanhToan, don.TrangThaiThanhToan, don.SoLanInLai))
+                                        {
+                                            <button class="nut-nho nguy-hiem" disabled="@_dangGui" @onclick="() => MoHoanTienInLoi(don)">Hoàn tiền (in lỗi 3 lần)</button>
+                                        }
                                     </div>
                                     @if (don.PhuongThucThanhToan == "VIETQR" && don.TrangThaiThanhToan != "DA_THANH_TOAN")
                                     {
@@ -122,6 +127,36 @@
     <HopThoaiQuanTri Mo="@(_donBanGiao != null)" TieuDe="Bàn giao tại quầy" @bind-Loi="_loi" DangLuu="@_dangGui" Dong="DongBanGiao">
         <NoiDung><p><b>@_donBanGiao?.MaDonHangHienThi · @_donBanGiao?.TenKhachHang</b></p><p>@(_donBanGiao?.PhuongThucThanhToan is "COD" or "TIEN_MAT" ? "Chỉ xác nhận khi đã thu đủ tiền COD và giao đúng tài liệu cho khách. Tiền sẽ được ghi nhận vào ca." : "Xác nhận đã giao đúng tài liệu cho khách.")</p></NoiDung>
         <Chan><button type="button" class="nut-phu" disabled="@_dangGui" @onclick="DongBanGiao">Hủy</button><button type="button" class="nut-chinh" disabled="@_dangGui" @onclick="() => BanGiaoAsync(_donBanGiao)">Xác nhận bàn giao</button></Chan>
+    </HopThoaiQuanTri>
+    <HopThoaiQuanTri Mo="@(_donHoanTien != null)" TieuDe="Hoàn tiền do in lỗi 3 lần" @bind-Loi="_loi" DangLuu="@_dangGui" Dong="DongHoanTienInLoi">
+        <NoiDung>
+            @if (_donHoanTien != null)
+            {
+                <form id="bg-form-hoan-tien" @onsubmit="LapHoanTienInLoiAsync" @onsubmit:preventDefault>
+                    <p><b>@_donHoanTien.MaDonHangHienThi · @_donHoanTien.TenKhachHang</b> · đã chuyển khoản <b class="mono">@Tien(_donHoanTien.TongTien)</b></p>
+                    <div class="o-canh-bao">
+                        <span>Đơn đã in lại @_donHoanTien.SoLanInLai/@QuyTacIn.SoLanInLaiToiDa lần vẫn lỗi. Xác nhận sẽ <b>hủy đơn</b> và gửi hồ sơ hoàn toàn bộ tiền cho CEO. Quầy không tự chuyển tiền; CEO duyệt, chuyển khoản và gửi biên lai cho khách.</span>
+                    </div>
+                    <label class="truong">
+                        <span class="nhan">Ngân hàng của khách</span>
+                        <input required class="ca-o-loc" maxlength="60" @bind="_htNganHang" placeholder="Ví dụ: Vietcombank" />
+                    </label>
+                    <label class="truong">
+                        <span class="nhan">Số tài khoản</span>
+                        <input required class="ca-o-loc mono" maxlength="30" inputmode="numeric" @bind="_htSoTaiKhoan" placeholder="Chỉ gồm chữ số" />
+                    </label>
+                    <label class="truong">
+                        <span class="nhan">Tên chủ tài khoản</span>
+                        <input required class="ca-o-loc" maxlength="100" @bind="_htChuTaiKhoan" />
+                    </label>
+                    <label class="truong">
+                        <span class="nhan">Ghi chú lỗi <span class="chu-mo">(không bắt buộc)</span></span>
+                        <input class="ca-o-loc" maxlength="300" @bind="_htGhiChu" placeholder="Ví dụ: máy vẫn lem mực trang 3-5 sau 3 lần in lại" />
+                    </label>
+                </form>
+            }
+        </NoiDung>
+        <Chan><button type="button" class="nut-phu" disabled="@_dangGui" @onclick="DongHoanTienInLoi">Hủy</button><button type="submit" form="bg-form-hoan-tien" class="nut-chinh" disabled="@_dangGui">@(_dangGui ? "Đang gửi…" : "Hủy đơn & gửi CEO hoàn tiền")</button></Chan>
     </HopThoaiQuanTri>
     <HopThoaiQuanTri Mo="@(_donPhatSinh != null)" TieuDe="@(_cheDoPhatSinh == "IN_LAI_LOI_QUAY" ? "In lại do lỗi quầy" : "Khách mua thêm")" @bind-Loi="_loi" DangLuu="@_dangGui" Dong="YeuCauDongPhatSinh" Rong="true">
     <NoiDung>
@@ -250,6 +285,8 @@
     private string _ghiChuPhatSinh = "";
     private List<DichVuDto> _dsDichVu = new();
     private List<int> _dsGiaCongBoSung = new();
+    private HangDoiDonDto _donHoanTien;
+    private string _htNganHang = "", _htSoTaiKhoan = "", _htChuTaiKhoan = "", _htGhiChu = "";
 
     private HubConnection _ketNoi;
 
@@ -349,6 +386,57 @@
         {
             _loi = "Không tải được chi tiết đơn để xử lý phát sinh.";
         }
+    }
+
+    private void MoHoanTienInLoi(HangDoiDonDto don)
+    {
+        if (_dangGui) return;
+        _loi = null;
+        _thongBao = null;
+        _donBanGiao = null;
+        _htNganHang = _htSoTaiKhoan = _htGhiChu = "";
+        _htChuTaiKhoan = don.TenKhachHang ?? "";
+        _donHoanTien = don;
+    }
+
+    private void DongHoanTienInLoi() { if (!_dangGui) { _donHoanTien = null; _loi = null; } }
+
+    // POST api/don-hang/{id}/hoan-tien-in-loi — hủy đơn + lập hồ sơ hoàn tiền chờ CEO chuyển khoản.
+    private async Task LapHoanTienInLoiAsync()
+    {
+        if (_dangGui || _donHoanTien == null) return;
+        string soTk = (_htSoTaiKhoan ?? "").Trim();
+        if ((_htNganHang ?? "").Trim().Length < 2 || (_htChuTaiKhoan ?? "").Trim().Length < 2
+            || soTk.Length < 6 || soTk.Length > 30 || !soTk.All(char.IsAsciiDigit))
+        {
+            _loi = "Nhập đủ ngân hàng, số tài khoản (6–30 chữ số) và tên chủ tài khoản của khách.";
+            return;
+        }
+        _dangGui = true;
+        _loi = null;
+        string loiVuaGap = null;
+        try
+        {
+            var res = await Http.PostAsJsonAsync($"api/don-hang/{_donHoanTien.MaDonHang}/hoan-tien-in-loi",
+                new HoanTienInLoiRequest { NganHang = _htNganHang.Trim(), SoTaiKhoan = soTk, ChuTaiKhoan = _htChuTaiKhoan.Trim(), GhiChu = _htGhiChu?.Trim() });
+            if (res.IsSuccessStatusCode)
+            {
+                var ketQua = await res.Content.ReadFromJsonAsync<ApiError>();
+                _thongBao = ketQua?.Message;
+                _donHoanTien = null;
+            }
+            else
+            {
+                loiVuaGap = (await res.Content.ReadFromJsonAsync<ApiError>())?.Message ?? "Không lập được hồ sơ hoàn tiền.";
+            }
+        }
+        catch
+        {
+            loiVuaGap = "Không kết nối được máy chủ API.";
+        }
+        _dangGui = false;
+        await TaiTatCa();
+        _loi = loiVuaGap;
     }
 
     private Task MoInLaiAsync(HangDoiDonDto don) => MoPhatSinhAsync(don, "IN_LAI_LOI_QUAY");
