@@ -21,12 +21,14 @@ public partial class QuanTriController : ControllerBase
     private readonly string _chuoiKetNoi;
     private readonly PhienDangNhapStore _phien;
     private readonly KiemTraPhienDangNhap _kiemTraPhien;
+    private readonly PhotocopyApi.InLai.BangChungInLaiStore _bangChungInLai;   // báo cáo in lại đếm số ảnh bằng chứng
 
     public QuanTriController(IConfiguration config, PhienDangNhapStore phien = null, KiemTraPhienDangNhap kiemTraPhien = null)
     {
         _phien = phien;
         _kiemTraPhien = kiemTraPhien;
         _chuoiKetNoi = config.GetConnectionString("PhotocopyChain");
+        _bangChungInLai = new(config);
     }
 
     // ================================================================ DỊCH VỤ / BẢNG GIÁ
@@ -577,7 +579,12 @@ public partial class QuanTriController : ControllerBase
         string sql = $@"SELECT {bieuThucNhom} AS Ngay, dh.MaChiNhanh, cn.TenChiNhanh,
                                dh.TrangThai, COUNT(*) AS SoDon, SUM(dh.TongTien) AS GiaTriDon,
                                SUM(CASE WHEN dh.TrangThai='HOAN_THANH' AND ISNULL(dh.LoaiPhatSinh,'')<>'IN_LAI_LOI_QUAY' AND ISNULL(tt.TrangThai,'')<>'DA_HOAN_TIEN' THEN 1 ELSE 0 END) AS SoDonDoanhThu,
-                               SUM(CASE WHEN dh.TrangThai='HOAN_THANH' AND ISNULL(dh.LoaiPhatSinh,'')<>'IN_LAI_LOI_QUAY' AND ISNULL(tt.TrangThai,'')<>'DA_HOAN_TIEN' THEN dh.TongTien ELSE 0 END) AS DoanhThu
+                               SUM(CASE WHEN dh.TrangThai='HOAN_THANH' AND ISNULL(dh.LoaiPhatSinh,'')<>'IN_LAI_LOI_QUAY' AND ISNULL(tt.TrangThai,'')<>'DA_HOAN_TIEN' THEN dh.TongTien ELSE 0 END) AS DoanhThu,
+                               -- 28/11: tách doanh thu theo cách trả tiền (cùng điều kiện như cột DoanhThu)
+                               SUM(CASE WHEN dh.TrangThai='HOAN_THANH' AND ISNULL(dh.LoaiPhatSinh,'')<>'IN_LAI_LOI_QUAY' AND ISNULL(tt.TrangThai,'')<>'DA_HOAN_TIEN' AND tt.PhuongThuc='COD' THEN dh.TongTien ELSE 0 END) AS DoanhThuCod,
+                               SUM(CASE WHEN dh.TrangThai='HOAN_THANH' AND ISNULL(dh.LoaiPhatSinh,'')<>'IN_LAI_LOI_QUAY' AND ISNULL(tt.TrangThai,'')<>'DA_HOAN_TIEN' AND tt.PhuongThuc='COD' THEN 1 ELSE 0 END) AS SoDonCod,
+                               SUM(CASE WHEN dh.TrangThai='HOAN_THANH' AND ISNULL(dh.LoaiPhatSinh,'')<>'IN_LAI_LOI_QUAY' AND ISNULL(tt.TrangThai,'')<>'DA_HOAN_TIEN' AND tt.PhuongThuc='VIETQR' THEN dh.TongTien ELSE 0 END) AS DoanhThuVietQr,
+                               SUM(CASE WHEN dh.TrangThai='HOAN_THANH' AND ISNULL(dh.LoaiPhatSinh,'')<>'IN_LAI_LOI_QUAY' AND ISNULL(tt.TrangThai,'')<>'DA_HOAN_TIEN' AND tt.PhuongThuc='VIETQR' THEN 1 ELSE 0 END) AS SoDonVietQr
                         FROM DonHang dh JOIN ChiNhanh cn ON cn.MaChiNhanh=dh.MaChiNhanh
                         LEFT JOIN ThanhToan tt ON tt.MaDonHang=dh.MaDonHang
                         WHERE COALESCE(dh.NgayHoanThanh,dh.NgayDat)>=@TuNgay

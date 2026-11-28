@@ -40,6 +40,7 @@
                     <div id="menu-bao-cao" class="tb-nhom-noi-dung @(_cacNhomDangMo.Contains("bao-cao") ? "" : "dong")">
                         <NavLink class="tb-muc" href="tong-quan" title="Tổng quan" @onclick="DongMenu">@((MarkupString)Svg.DongHoDo()) <span>Tổng quan</span></NavLink>
                         <NavLink class="tb-muc" href="bao-cao" title="Báo cáo doanh thu" @onclick="DongMenu">@((MarkupString)Svg.BieuDoCot(18)) <span>Báo cáo doanh thu</span></NavLink>
+                        <NavLink class="tb-muc" href="bao-cao-in-lai" title="Báo cáo in lại theo nhân viên" @onclick="DongMenu">@((MarkupString)Svg.BieuDoDuong(18)) <span>Báo cáo in lại</span></NavLink>
                     </div>
                 </section>
             }
@@ -278,6 +279,7 @@
             return trang switch {
                 "tong-quan" => ("Dashboard", "Tổng quan"),
                 "bao-cao" => ("Dashboard", "Báo cáo doanh thu"),
+                "bao-cao-in-lai" => ("Dashboard", "Báo cáo in lại do lỗi quầy"),
                 "" => ("Vận hành", "Hàng đợi đơn hàng"),
                 "lap-don-tai-quay" => ("Vận hành", "Lập đơn tại quầy"),
                 "ban-giao" => ("Vận hành", "Bàn giao tại quầy"),
@@ -435,7 +437,7 @@
         string duongDan = Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].Trim('/');
         if (duongDan == "ca-lam-viec" || duongDan == "don-hang-trong-ca")
             _cacNhomDangMo.Add("ca-tien");
-        else if (duongDan == "tong-quan" || duongDan == "bao-cao")
+        else if (duongDan == "tong-quan" || duongDan == "bao-cao" || duongDan == "bao-cao-in-lai")
             _cacNhomDangMo.Add("bao-cao");
         else if (duongDan == "bang-gia" || duongDan == "khuyen-mai" || duongDan == "quan-tri")
             _cacNhomDangMo.Add("cau-hinh");

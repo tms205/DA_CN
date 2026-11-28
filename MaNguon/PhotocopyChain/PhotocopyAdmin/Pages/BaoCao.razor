@@ -79,6 +79,20 @@
             </div>
         </div>
 
+        @* 28/11: tách tổng doanh thu theo cách khách trả tiền *@
+        <div class="ca-so-lieu the-rong">
+            <div class="ca-o">
+                <div class="ca-o-nhan">Doanh thu tiền mặt (COD)</div>
+                <div class="ca-o-so mono">@Tien(_ds.Sum(x => x.DoanhThuCod))</div>
+                <div class="nv-phu" style="margin-top: 4px;">@_ds.Sum(x => x.SoDonCod) đơn · @TyLeDoanhThu(_ds.Sum(x => x.DoanhThuCod)) tổng doanh thu · thu tại quầy, vào két ca</div>
+            </div>
+            <div class="ca-o">
+                <div class="ca-o-nhan">Doanh thu chuyển khoản (VietQR)</div>
+                <div class="ca-o-so mono">@Tien(_ds.Sum(x => x.DoanhThuVietQr))</div>
+                <div class="nv-phu" style="margin-top: 4px;">@_ds.Sum(x => x.SoDonVietQr) đơn · @TyLeDoanhThu(_ds.Sum(x => x.DoanhThuVietQr)) tổng doanh thu · về tài khoản qua payOS</div>
+            </div>
+        </div>
+
         <div class="the the-bang">
             <div class="bang-tieu-de">
                 <div>
@@ -102,6 +116,8 @@
                                 <th scope="col">Trạng thái đơn</th>
                                 <th scope="col">Số lượng đơn</th>
                                 <th scope="col">Giá trị đơn</th>
+                                <th scope="col">Tiền mặt (COD)</th>
+                                <th scope="col">VietQR</th>
                                 <th scope="col">Doanh thu ghi nhận</th>
                             </tr>
                         </thead>
@@ -114,6 +130,8 @@
                                     <td data-nhan="Trạng thái">@TrangThaiDonHang.TenHienThi(x.TrangThai)</td>
                                     <td class="mono" data-nhan="Số lượng đơn"><b>@x.SoDon</b> đơn</td>
                                     <td class="mono" data-nhan="Giá trị đơn">@Tien(x.GiaTriDon)</td>
+                                    <td class="mono" data-nhan="Tiền mặt (COD)">@Tien(x.DoanhThuCod)</td>
+                                    <td class="mono" data-nhan="VietQR">@Tien(x.DoanhThuVietQr)</td>
                                     <td class="mono hd-tong" data-nhan="Doanh thu ghi nhận">@Tien(x.DoanhThu)</td>
                                 </tr>
                             }
@@ -225,4 +243,11 @@
     };
 
     private string Tien(decimal soTien) => soTien.ToString("#,##0", KieuSo) + "₫";
+
+    // Phần trăm của một khoản trên tổng doanh thu đang hiện, ví dụ "62%".
+    private string TyLeDoanhThu(decimal khoan)
+    {
+        decimal tong = _ds?.Sum(x => x.DoanhThu) ?? 0;
+        return tong == 0 ? "0%" : Math.Round(khoan * 100 / tong) + "%";
+    }
 }

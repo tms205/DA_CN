@@ -1,0 +1,124 @@
+@* Ảnh bản in lỗi của một lần in lại (28/11). Dùng ở Hàng đợi đơn và Báo cáo in lại.
+   Ảnh cần đăng nhập mới tải được nên phải gọi API lấy byte rồi hiện bằng data URL, không dùng <img src="api/..."> trực tiếp. *@
+@inject HttpClient Http
+@inject IJSRuntime Js
+
+<div class="il-anh">
+    @if (_dangTai)
+    {
+        <span class="nv-phu">Đang tải ảnh bản in lỗi…</span>
+    }
+    else if (_maAnh.Count == 0)
+    {
+        <span class="nv-phu">@(_loi ?? "Lần in lại này không có ảnh bằng chứng (tạo trước khi bắt buộc chụp ảnh).")</span>
+    }
+    else
+    {
+        <span class="nv-phu">Ảnh bản in lỗi (@_maAnh.Count) · chụp lúc @_guiLuc?.ToOffset(TimeSpan.FromHours(7)).ToString("HH:mm dd/MM/yyyy")</span>
+        <div class="il-anh-luoi">
+            @for (int i = 0; i < _anh.Count; i++)
+            {
+                int so = i;   // chép ra biến riêng để lambda nhớ đúng ảnh thứ mấy
+                <img src="@_anh[so]" alt="Ảnh bản in lỗi @(so + 1)" title="Bấm để phóng to" @onclick="() => PhongTo(so)" />
+            }
+        </div>
+    }
+</div>
+
+@* Bấm ảnh → phóng to toàn màn hình. Bấm nền tối, nút ✕ hoặc phím Esc để đóng; ‹ › hoặc phím mũi tên để chuyển ảnh.
+   Dùng <dialog> + showModal() (hàm moMauDon trong index.html) để ảnh nằm ở lớp trên cùng của trang;
+   nếu dùng div position:fixed thì bị khung bảng bên ngoài giới hạn, chỉ tối được trong khung. *@
+<dialog class="il-phong-to" @ref="_hopPhongTo" aria-label="Ảnh bản in lỗi phóng to" @onclick="DongPhongTo" @onkeydown="BamPhim">
+    @if (_dangXem != null && _dangXem < _anh.Count)
+    {
+        <img src="@_anh[_dangXem.Value]" alt="Ảnh bản in lỗi phóng to" @onclick:stopPropagation="true" />
+        <button type="button" class="il-nut il-dong" title="Đóng (Esc)" @onclick="DongPhongTo" @onclick:stopPropagation="true">✕</button>
+        @if (_anh.Count > 1)
+        {
+            <button type="button" class="il-nut il-truoc" title="Ảnh trước" @onclick="() => ChuyenAnh(-1)" @onclick:stopPropagation="true">‹</button>
+            <button type="button" class="il-nut il-sau" title="Ảnh sau" @onclick="() => ChuyenAnh(1)" @onclick:stopPropagation="true">›</button>
+            <span class="il-dem">@(_dangXem.Value + 1) / @_anh.Count</span>
+        }
+    }
+</dialog>
+
+<style>
+    .il-anh { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+    .il-anh-luoi { display: flex; gap: 8px; flex-wrap: wrap; }
+    .il-anh-luoi img { width: 160px; max-height: 200px; object-fit: contain; background: #f8fbff; border-radius: 6px; border: 1px solid #d8e2ee; cursor: zoom-in; }
+    .il-phong-to { width: 100vw; height: 100vh; max-width: 100vw; max-height: 100vh; margin: 0; padding: 0; border: 0; background: transparent; cursor: zoom-out; outline: none; }
+    .il-phong-to[open] { display: flex; align-items: center; justify-content: center; }
+    .il-phong-to::backdrop { background: rgba(10, 20, 35, .88); }
+    .il-phong-to img { max-width: 92vw; max-height: 88vh; object-fit: contain; border-radius: 6px; background: #fff; cursor: default; box-shadow: 0 10px 40px rgba(0,0,0,.4); }
+    .il-nut { position: absolute; border: 0; background: rgba(255,255,255,.15); color: #fff; font-size: 28px; line-height: 1; width: 48px; height: 48px; border-radius: 50%; cursor: pointer; }
+    .il-nut:hover { background: rgba(255,255,255,.3); }
+    .il-dong { top: 18px; right: 18px; font-size: 22px; }
+    .il-truoc { left: 18px; top: 50%; transform: translateY(-50%); }
+    .il-sau { right: 18px; top: 50%; transform: translateY(-50%); }
+    .il-dem { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); color: #fff; font-size: 14px; }
+</style>
+
+@code {
+    [Parameter] public int MaDonInLai { get; set; }
+
+    private bool _dangTai = true;
+    private string _loi;
+    private DateTimeOffset? _guiLuc;
+    private List<string> _maAnh = new();
+    private List<string> _anh = new();   // data URL để hiện ảnh
+    private int _daTaiCho;
+    private int? _dangXem;                 // ảnh đang phóng to (null = không phóng to)
+    private ElementReference _hopPhongTo;
+
+    private async Task PhongTo(int so)
+    {
+        _dangXem = so;
+        await Js.InvokeVoidAsync("moMauDon", _hopPhongTo);    // showModal(): tự đưa con trỏ vào hộp, Esc tự đóng
+    }
+
+    private async Task DongPhongTo()
+    {
+        _dangXem = null;
+        await Js.InvokeVoidAsync("dongMauDon", _hopPhongTo);
+    }
+    private void ChuyenAnh(int buoc) =>
+        _dangXem = ((_dangXem ?? 0) + buoc + _anh.Count) % _anh.Count;   // vòng lại đầu/cuối
+
+    private void BamPhim(KeyboardEventArgs e)
+    {
+        // Esc: trình duyệt tự đóng <dialog>; lần bấm ảnh sau sẽ mở lại đúng ảnh được chọn.
+        if (e.Key == "ArrowLeft" && _anh.Count > 1) ChuyenAnh(-1);
+        else if (e.Key == "ArrowRight" && _anh.Count > 1) ChuyenAnh(1);
+    }
+
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_daTaiCho == MaDonInLai) return;
+        _daTaiCho = MaDonInLai;
+        _dangTai = true; _loi = null; _maAnh = new(); _anh = new();
+        try
+        {
+            using var r = await Http.GetAsync($"api/don-hang/{MaDonInLai}/bang-chung-in-lai");
+            if (r.IsSuccessStatusCode)
+            {
+                var hoSo = await r.Content.ReadFromJsonAsync<BangChungInLaiDto>();
+                _guiLuc = hoSo?.GuiLuc;
+                _maAnh = hoSo?.MaAnh ?? new();
+                foreach (string ma in _maAnh)
+                {
+                    using var ra = await Http.GetAsync($"api/don-hang/{MaDonInLai}/bang-chung-in-lai/anh/{ma}");
+                    string mime = ra.Content.Headers.ContentType?.MediaType;
+                    if (!ra.IsSuccessStatusCode || mime is not ("image/jpeg" or "image/png")) continue;
+                    byte[] data = await ra.Content.ReadAsByteArrayAsync();
+                    _anh.Add($"data:{mime};base64,{Convert.ToBase64String(data)}");
+                }
+            }
+        }
+        catch
+        {
+            _loi = "Không tải được ảnh bằng chứng.";
+        }
+        _dangTai = false;
+    }
+}

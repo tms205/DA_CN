@@ -9,22 +9,27 @@ using Xunit;
 
 namespace PhotocopyApi.Tests;
 
-// Hoàn tiền đơn VietQR khi quầy đã in lại đủ 3 lần mà vẫn lỗi.
+// Hoàn tiền đơn VietQR khi quầy đã in lại (từ 1 lần) mà vẫn lỗi — 28/11 bỏ điều kiện phải đủ 3 lần.
 public class HoanTienInLoiTests
 {
     [Theory]
     [InlineData(null, "VIETQR", "DA_THANH_TOAN", 3, true)]
-    [InlineData(null, "VIETQR", "DA_THANH_TOAN", 2, false)]   // chưa in lại đủ 3 lần
+    [InlineData(null, "VIETQR", "DA_THANH_TOAN", 1, true)]    // in lại 1 lần vẫn lỗi là hoàn được luôn
+    [InlineData(null, "VIETQR", "DA_THANH_TOAN", 2, true)]
+    [InlineData(null, "VIETQR", "DA_THANH_TOAN", 0, false)]   // chưa in lại lần nào
     [InlineData(null, "COD", "DA_THANH_TOAN", 3, false)]      // tiền mặt không hoàn qua chuyển khoản
     [InlineData(null, "VIETQR", "CHUA_THANH_TOAN", 3, false)]
     [InlineData(null, "VIETQR", "DA_HOAN_TIEN", 3, false)]
     [InlineData(12, "VIETQR", "DA_THANH_TOAN", 3, false)]     // dòng in lại 0đ, không phải đơn gốc
-    public void NutHoanTien_ChiHienChoDonGocVietQrDaInLaiDu3Lan(int? goc, string pt, string tt, int soLan, bool hien)
+    public void NutHoanTien_ChiHienChoDonGocVietQrDaInLaiItNhat1Lan(int? goc, string pt, string tt, int soLan, bool hien)
         => Assert.Equal(hien, QuyTacHoanTienInLoi.HienNut(goc, pt, tt, soLan));
 
     [Fact]
     public void DuDieuKien_KhongCoLoi()
-        => Assert.Null(QuyTacHoanTienInLoi.LoiKhongChoHoan("DA_IN", "TAI_QUAY", null, "VIETQR", "DA_THANH_TOAN", false, 3, 0));
+    {
+        Assert.Null(QuyTacHoanTienInLoi.LoiKhongChoHoan("DA_IN", "TAI_QUAY", null, "VIETQR", "DA_THANH_TOAN", false, 1, 0));
+        Assert.Null(QuyTacHoanTienInLoi.LoiKhongChoHoan("DA_IN", "TAI_QUAY", null, "VIETQR", "DA_THANH_TOAN", false, 3, 0));
+    }
 
     [Theory]
     [InlineData("HOAN_THANH", "TAI_QUAY", null, "VIETQR", "DA_THANH_TOAN", false, 3, 0, "bàn giao")]
@@ -33,7 +38,7 @@ public class HoanTienInLoiTests
     [InlineData("DA_IN", "TAI_QUAY", null, "COD", "DA_THANH_TOAN", false, 3, 0, "VietQR")]
     [InlineData("DA_IN", "TAI_QUAY", null, "VIETQR", "DA_HOAN_TIEN", false, 3, 0, "đã hoàn tiền")]
     [InlineData("DA_IN", "TAI_QUAY", null, "VIETQR", "DA_THANH_TOAN", true, 3, 0, "không lập trùng")]
-    [InlineData("DA_IN", "TAI_QUAY", null, "VIETQR", "DA_THANH_TOAN", false, 2, 0, "2/3")]
+    [InlineData("DA_IN", "TAI_QUAY", null, "VIETQR", "DA_THANH_TOAN", false, 0, 0, "chưa in lại")]
     [InlineData("DA_IN", "TAI_QUAY", null, "VIETQR", "DA_THANH_TOAN", false, 3, 1, "chưa in xong")]
     public void KhongDuDieuKien_BaoLyDo(string don, string nhan, int? goc, string pt, string tt, bool coHoSo,
         int soLan, int dangChay, string chua)
@@ -73,5 +78,8 @@ public class HoanTienInLoiTests
 
     [Fact]
     public void ThongBaoChoCeo_NamTrongNhomChoXuLy()
-        => Assert.Equal("CHO_XU_LY", QuyTacThongBaoXuLy.TrangThai("Hoàn tiền do in lỗi 3 lần"));
+    {
+        Assert.Equal("CHO_XU_LY", QuyTacThongBaoXuLy.TrangThai("Hoàn tiền do in lỗi"));
+        Assert.Equal("CHO_XU_LY", QuyTacThongBaoXuLy.TrangThai("Hoàn tiền do in lỗi 3 lần")); // thông báo cũ
+    }
 }

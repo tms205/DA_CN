@@ -1,0 +1,212 @@
+@page "/bao-cao-in-lai"
+@attribute [Authorize(Roles = "SUPER_ADMIN,BRANCH_ADMIN")]
+@inject HttpClient Http
+
+@* Báo cáo in lại do lỗi quầy theo nhân viên (28/11).
+   In lại là đơn 0đ, cửa hàng chịu giấy mực → quản lý cần thấy ai in lại nhiều bất thường. *@
+
+<PageTitle>Báo cáo in lại · PhotocopyChain</PageTitle>
+
+<TieuDeTrang TieuDe="Báo cáo in lại do lỗi quầy" MoTa="Nhân viên nào in lại nhiều, in lại bao nhiêu trang, vì lý do gì" />
+
+<div class="than-trang khoi-doc">
+    <div class="the ca-bo-loc">
+        <div class="ca-loc-luoi">
+            <div class="truong">
+                <label class="nhan" for="il-thang">Tháng</label>
+                <input id="il-thang" class="ca-o-loc" type="month" @bind="_thang" />
+            </div>
+            <div class="truong" style="align-self: flex-end;">
+                <button class="nut-chinh" disabled="@_dangTai" @onclick="TaiAsync">@(_dangTai ? "Đang tải…" : "Xem báo cáo")</button>
+            </div>
+        </div>
+        <p class="goi-y">
+            Đánh dấu <b>bất thường</b> khi nhân viên in lại từ @SoLanToiThieu lần trở lên và tỷ lệ in lại trên số đơn đã xử lý
+            từ @(NguongTyLe.ToString("P0")) hoặc gấp đôi mức trung bình (@TyLeTrungBinh.ToString("P1")).
+        </p>
+    </div>
+
+    <ThongBaoLoi @bind-NoiDung="_loi" />
+
+    <div class="the the-bang">
+        <div class="bang-tieu-de">
+            <div>
+                <h2>Theo nhân viên</h2>
+                <p class="bang-mo-ta">Không tính lần in lại đã hủy. Bấm vào một dòng để xem từng lần in lại của người đó.</p>
+            </div>
+            <span class="bang-dem">@(_baoCao?.ChiTiet.Count ?? 0) lần in lại</span>
+        </div>
+        @if (_baoCao == null)
+        {
+            <div class="bang-trong">Đang tải…</div>
+        }
+        else if (_baoCao.TheoNhanVien.Count == 0)
+        {
+            <div class="bang-trong">Tháng này chưa có dữ liệu.</div>
+        }
+        else
+        {
+            <div class="bang-cuon">
+                <table class="bang">
+                    <thead>
+                        <tr>
+                            <th>Nhân viên</th>
+                            <th>Chi nhánh</th>
+                            <th>Đơn đã xử lý</th>
+                            <th>Số lần in lại</th>
+                            <th>Đơn gốc bị in lại</th>
+                            <th>Trang in lại</th>
+                            <th>Tỷ lệ in lại</th>
+                            <th>Đánh giá</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (InLaiTheoNhanVienDto nv in _baoCao.TheoNhanVien)
+                        {
+                            <tr style="cursor:pointer; @(nv.MaNhanVien == _nvDangXem ? "background:#f3f7fd;" : "")" @onclick="() => ChonNhanVien(nv.MaNhanVien)">
+                                <td data-nhan="Nhân viên"><div class="nv-ten">@nv.HoTen</div></td>
+                                <td data-nhan="Chi nhánh">@nv.TenChiNhanh</td>
+                                <td data-nhan="Đơn đã xử lý" class="mono">@nv.SoDonDaXuLy</td>
+                                <td data-nhan="Số lần in lại" class="mono"><b>@nv.SoLanInLai</b></td>
+                                <td data-nhan="Đơn gốc bị in lại" class="mono">@nv.SoDonGocBiInLai</td>
+                                <td data-nhan="Trang in lại" class="mono">@nv.SoTrangInLai</td>
+                                <td data-nhan="Tỷ lệ in lại" class="mono">@(nv.SoDonDaXuLy > 0 ? TyLe(nv).ToString("P1") : "—")</td>
+                                <td data-nhan="Đánh giá">
+                                    @if (BatThuong(nv)) { <span class="nhan-mau nhan-do">Bất thường</span> }
+                                    else if (nv.SoLanInLai > 0) { <span class="nhan-mau nhan-cam">Theo dõi</span> }
+                                    else { <span class="nhan-mau nhan-xanh">Bình thường</span> }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    @if (_baoCao != null)
+    {
+        <div class="the the-bang">
+            <div class="bang-tieu-de">
+                <div>
+                    <h2>Từng lần in lại @(_nvDangXem != null ? "· " + _baoCao.TheoNhanVien.FirstOrDefault(x => x.MaNhanVien == _nvDangXem)?.HoTen : "")</h2>
+                    <p class="bang-mo-ta">Lý do quầy ghi + ảnh bản in lỗi. Lần in lại trước 28/11 chưa bắt chụp ảnh nên có thể không có ảnh.</p>
+                </div>
+                @if (_nvDangXem != null) { <button class="nut-nho" @onclick="() => ChonNhanVien(null)">Xem tất cả</button> }
+            </div>
+            @if (DsChiTiet.Count == 0)
+            {
+                <div class="bang-trong">Không có lần in lại nào.</div>
+            }
+            else
+            {
+                <div class="bang-cuon">
+                    <table class="bang">
+                        <thead>
+                            <tr>
+                                <th>Đơn in lại</th>
+                                <th>Đơn gốc</th>
+                                <th>Nhân viên</th>
+                                <th>Khách</th>
+                                <th>Trang</th>
+                                <th>Lý do</th>
+                                <th>Ảnh</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (LanInLaiDto lan in DsChiTiet)
+                            {
+                                <tr>
+                                    <td data-nhan="Đơn in lại"><div class="mono hd-ma">@MaDon(lan.MaDonHang)</div><div class="nv-phu">@lan.NgayDat.ToString("HH:mm dd/MM")</div></td>
+                                    <td data-nhan="Đơn gốc" class="mono">@MaDon(lan.MaDonHangGoc)</td>
+                                    <td data-nhan="Nhân viên">@lan.TenNhanVien</td>
+                                    <td data-nhan="Khách">@lan.TenKhachHang</td>
+                                    <td data-nhan="Trang" class="mono">@lan.SoTrang</td>
+                                    <td data-nhan="Lý do"><div style="max-width:280px">@lan.LyDo</div></td>
+                                    <td data-nhan="Ảnh">
+                                        @if (lan.SoAnh == 0) { <span class="nv-phu">Không có</span> }
+                                        else if (_moAnh.Contains(lan.MaDonHang)) { <AnhBangChungInLai MaDonInLai="@lan.MaDonHang" /> }
+                                        else { <button class="nut-nho" @onclick="() => _moAnh.Add(lan.MaDonHang)">Xem @lan.SoAnh ảnh</button> }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    // Ngưỡng cảnh báo — đặt đơn giản để quản lý dễ hiểu, có thể chỉnh.
+    private const int SoLanToiThieu = 3;          // in lại ít hơn 3 lần/tháng thì chưa coi là bất thường
+    private const double NguongTyLe = 0.10;       // từ 10% số đơn đã xử lý
+
+    private DateTime? _thang = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private BaoCaoInLaiDto _baoCao;
+    private bool _dangTai;
+    private string _loi;
+    private int? _nvDangXem;
+    private readonly HashSet<int> _moAnh = new();
+
+    // Phạm vi chi nhánh do API lấy từ token (quản lý: chi nhánh mình; CEO: chi nhánh đang chọn hoặc toàn chuỗi).
+    protected override async Task OnInitializedAsync() => await TaiAsync();
+
+    private async Task TaiAsync()
+    {
+        if (_dangTai) return;
+        _dangTai = true; _loi = null;
+        try
+        {
+            string thang = (_thang ?? DateTime.Today).ToString("yyyy-MM");
+            using var r = await Http.GetAsync("api/quan-tri/bao-cao-in-lai?thang=" + thang);
+            if (r.IsSuccessStatusCode)
+            {
+                _baoCao = await r.Content.ReadFromJsonAsync<BaoCaoInLaiDto>();
+                _nvDangXem = null;
+                _moAnh.Clear();
+            }
+            else
+            {
+                _loi = await DocLoiApi.TuPhanHoiAsync(r, "Không tải được báo cáo in lại.");
+                _baoCao ??= new BaoCaoInLaiDto();
+            }
+        }
+        catch
+        {
+            _loi = "Không kết nối được máy chủ API.";
+            _baoCao ??= new BaoCaoInLaiDto();
+        }
+        _dangTai = false;
+    }
+
+    private void ChonNhanVien(int? maNhanVien) => _nvDangXem = maNhanVien;
+
+    private List<LanInLaiDto> DsChiTiet =>
+        _baoCao?.ChiTiet.Where(x => _nvDangXem == null || x.MaNhanVien == _nvDangXem).ToList() ?? new();
+
+    private static double TyLe(InLaiTheoNhanVienDto nv) =>
+        nv.SoDonDaXuLy == 0 ? 0 : (double)nv.SoLanInLai / nv.SoDonDaXuLy;
+
+    // Trung bình cả bảng: tổng lần in lại / tổng đơn đã xử lý.
+    private double TyLeTrungBinh
+    {
+        get
+        {
+            if (_baoCao == null) return 0;
+            int tongDon = _baoCao.TheoNhanVien.Sum(x => x.SoDonDaXuLy);
+            return tongDon == 0 ? 0 : (double)_baoCao.TheoNhanVien.Sum(x => x.SoLanInLai) / tongDon;
+        }
+    }
+
+    private bool BatThuong(InLaiTheoNhanVienDto nv)
+    {
+        if (nv.SoLanInLai < SoLanToiThieu) return false;
+        if (nv.SoDonDaXuLy == 0) return true;   // in lại mà không tự xử lý đơn nào → đáng xem
+        double tyLe = TyLe(nv);
+        return tyLe >= NguongTyLe || (TyLeTrungBinh > 0 && tyLe >= 2 * TyLeTrungBinh);
+    }
+
+    private static string MaDon(int ma) => "DH" + ma.ToString("00000");
+}

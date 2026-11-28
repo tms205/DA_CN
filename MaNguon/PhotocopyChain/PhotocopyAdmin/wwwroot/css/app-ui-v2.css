@@ -2942,6 +2942,8 @@ a:hover {
 .thanh-loc .chip.hd-tab-da-nhan.chon { box-shadow:0 0 0 2px #91aed6; }
 .thanh-loc .chip.hd-tab-dang-in.chon { box-shadow:0 0 0 2px #bba0dc; }
 .thanh-loc .chip.hd-tab-da-in.chon { box-shadow:0 0 0 2px #80b798; }
+.thanh-loc .chip.hd-tab-in-lai { background:#fdecec;color:#a12626;border-color:#f1c2c2; }
+.thanh-loc .chip.hd-tab-in-lai.chon { box-shadow:0 0 0 2px #e08f8f; }
 .thanh-loc .chip:focus-visible { outline:3px solid var(--accent);outline-offset:3px; }
 
 .nhan-mau.nhan-cho-dam { background:#a44711;border-color:#a44711;color:#fff; }

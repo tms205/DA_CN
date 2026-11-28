@@ -131,7 +131,7 @@ class _BangChungHuyDonState extends State<BangChungHuyDon> {
                   : _data!['loai'] == 'HUY_TRUOC_TIEP_NHAN'
                   ? 'Hủy đơn trước khi nhân viên tiếp nhận'
                   : _data!['loai'] == 'IN_LOI_3_LAN'
-                  ? 'Cửa hàng hủy đơn vì in lại 3 lần vẫn lỗi'
+                  ? 'Cửa hàng hủy đơn vì in lại vẫn lỗi'
                   : 'Yêu cầu hủy có ảnh bằng chứng',
             ),
             if (_data!['loai'] == 'IN_LOI_3_LAN' && _data!['lyDo'] != null)

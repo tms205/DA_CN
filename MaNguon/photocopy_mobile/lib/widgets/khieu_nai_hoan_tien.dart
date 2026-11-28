@@ -13,7 +13,7 @@ class KhieuNaiHoanTien extends StatefulWidget {
     this.anKhiKhongCoHoSo = false,
   });
   final int maDonHang;
-  // Đơn đã hủy: chỉ hiện khi có hồ sơ (vd quầy in lỗi 3 lần lập hoàn tiền), không mời gửi ý kiến.
+  // Đơn đã hủy: chỉ hiện khi có hồ sơ (vd quầy in lỗi lập hoàn tiền), không mời gửi ý kiến.
   final bool anKhiKhongCoHoSo;
   @override
   State<KhieuNaiHoanTien> createState() => _KhieuNaiHoanTienState();

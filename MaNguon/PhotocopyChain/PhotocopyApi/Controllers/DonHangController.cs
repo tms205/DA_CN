@@ -78,6 +78,7 @@ public partial class DonHangController : ControllerBase
     private readonly PhatHienMayInStore _phatHienMay;
     private readonly PhotocopyApi.HuyDon.BangChungHuyStore _bangChungHuy;
     private readonly PhotocopyApi.HuyDon.BangChungHuyStore _khoBienLai;
+    private readonly PhotocopyApi.InLai.BangChungInLaiStore _bangChungInLai;   // ảnh bản in lỗi khi in lại (28/11)
 
     public DonHangController(IConfiguration config, IMemoryCache boNhoTam, IHubContext<CapNhatHub> hub, GeoapifyService giaoHang = null,
         TrangThaiMayInAoStore trangThaiMay = null, YeuCauInCodStore yeuCauCod = null, PhatHienMayInStore phatHienMay = null)
@@ -85,6 +86,7 @@ public partial class DonHangController : ControllerBase
         _giaoHang = giaoHang ?? new GeoapifyService(config, boNhoTam);
         _fileLifecycle = new FileInLifecycleService(config);
         _bangChungHuy = new(config);
+        _bangChungInLai = new(config);
         _khoBienLai = new(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string> {
             ["HuyDon:ThuMucBangChung"] = config["HoanTien:ThuMucBienLai"] ?? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PhotocopyChain", "RefundReceipts") }).Build());
@@ -982,6 +984,12 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
         IActionResult loiNguon = KiemTraNguonPhatSinh(nguon);
         if (loiNguon != null) return loiNguon;
 
+        // 28/11: bắt buộc có ảnh bản in lỗi (đã tải trước qua api/don-hang/{gốc}/bang-chung-in-lai).
+        // Chỉ ghi lý do bằng chữ thì nhân viên có thể in lại khống để đưa thêm 1 bộ cho người quen.
+        PhotocopyApi.InLai.HoSoInLai hoSoAnh;
+        try { hoSoAnh = _bangChungInLai.DocHoSoTam(maDonHang, maNhanVien, (req.MaBangChung ?? "").Trim()); }
+        catch (ArgumentException ex) { return BadRequest(new { message = ex.Message }); }
+
         int tuTrangGoc = nguon.TuTrang ?? 1;
         int denTrangGoc = nguon.DenTrang ?? (tuTrangGoc + nguon.SoTrang - 1);
         string loiPhamVi = KiemTraPhamViTrang(req.TuTrang, req.DenTrang, req.SoBan, tuTrangGoc, denTrangGoc);
@@ -998,6 +1006,13 @@ thamSo.Add("@DiaChiGiao", diaChiDayDu);
             DonPhatSinhResponse ketQua = await TaoDonPhatSinhAsync(
                 conn, nguon, maNhanVien, "IN_LAI_LOI_QUAY", lyDo,
                 req.TuTrang, req.DenTrang, req.SoBan, nguon.MaDichVu, dsGiaCong, true);
+            // Đơn in lại đã ghi xong → gắn ảnh vào mã đơn in lại để báo cáo/hàng đợi xem lại được.
+            try { await _bangChungInLai.GanVaoDonInLai(hoSoAnh, ketQua.MaDonHang); }
+            catch (IOException ex)
+            {
+                HttpContext?.RequestServices?.GetService<ILogger<DonHangController>>()?.LogWarning(ex,
+                    "Đơn in lại {MaDonHang} đã tạo nhưng chưa gắn được ảnh bằng chứng.", ketQua.MaDonHang);
+            }
             return Ok(ketQua);
         }
         catch (Exception ex) when (ex is SqlException || ex is InvalidOperationException)

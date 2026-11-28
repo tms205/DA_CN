@@ -104,7 +104,7 @@
                                         @* In lại đủ 3 lần vẫn lỗi + khách đã chuyển khoản VietQR: hủy đơn, lập hồ sơ hoàn tiền chờ CEO chuyển. *@
                                         @if (QuyTacHoanTienInLoi.HienNut(don.MaDonHangGoc, don.PhuongThucThanhToan, don.TrangThaiThanhToan, don.SoLanInLai))
                                         {
-                                            <button class="nut-nho nguy-hiem" disabled="@_dangGui" @onclick="() => MoHoanTienInLoi(don)">Hoàn tiền (in lỗi 3 lần)</button>
+                                            <button class="nut-nho nguy-hiem" disabled="@_dangGui" @onclick="() => MoHoanTienInLoi(don)">Hoàn tiền (in lỗi)</button>
                                         }
                                     </div>
                                     @if (don.PhuongThucThanhToan == "VIETQR" && don.TrangThaiThanhToan != "DA_THANH_TOAN")
@@ -128,14 +128,14 @@
         <NoiDung><p><b>@_donBanGiao?.MaDonHangHienThi · @_donBanGiao?.TenKhachHang</b></p><p>@(_donBanGiao?.PhuongThucThanhToan is "COD" or "TIEN_MAT" ? "Chỉ xác nhận khi đã thu đủ tiền COD và giao đúng tài liệu cho khách. Tiền sẽ được ghi nhận vào ca." : "Xác nhận đã giao đúng tài liệu cho khách.")</p></NoiDung>
         <Chan><button type="button" class="nut-phu" disabled="@_dangGui" @onclick="DongBanGiao">Hủy</button><button type="button" class="nut-chinh" disabled="@_dangGui" @onclick="() => BanGiaoAsync(_donBanGiao)">Xác nhận bàn giao</button></Chan>
     </HopThoaiQuanTri>
-    <HopThoaiQuanTri Mo="@(_donHoanTien != null)" TieuDe="Hoàn tiền do in lỗi 3 lần" @bind-Loi="_loi" DangLuu="@_dangGui" Dong="DongHoanTienInLoi">
+    <HopThoaiQuanTri Mo="@(_donHoanTien != null)" TieuDe="Hoàn tiền do in lỗi" @bind-Loi="_loi" DangLuu="@_dangGui" Dong="DongHoanTienInLoi">
         <NoiDung>
             @if (_donHoanTien != null)
             {
                 <form id="bg-form-hoan-tien" @onsubmit="LapHoanTienInLoiAsync" @onsubmit:preventDefault>
                     <p><b>@_donHoanTien.MaDonHangHienThi · @_donHoanTien.TenKhachHang</b> · đã chuyển khoản <b class="mono">@Tien(_donHoanTien.TongTien)</b></p>
                     <div class="o-canh-bao">
-                        <span>Đơn đã in lại @_donHoanTien.SoLanInLai/@QuyTacIn.SoLanInLaiToiDa lần vẫn lỗi. Xác nhận sẽ <b>hủy đơn</b> và gửi hồ sơ hoàn toàn bộ tiền cho CEO. Quầy không tự chuyển tiền; CEO duyệt, chuyển khoản và gửi biên lai cho khách.</span>
+                        <span>Đơn đã in lại @_donHoanTien.SoLanInLai lần vẫn lỗi. Hoàn tiền ngay để quầy không tốn thêm giấy mực in lại. Xác nhận sẽ <b>hủy đơn</b> và gửi hồ sơ hoàn toàn bộ tiền cho CEO. Quầy không tự chuyển tiền; CEO duyệt, chuyển khoản và gửi biên lai cho khách.</span>
                     </div>
                     <label class="truong">
                         <span class="nhan">Ngân hàng của khách</span>
@@ -243,6 +243,12 @@
                     <span class="nhan">Lỗi của quầy <span class="chu-mo">(bắt buộc)</span></span>
                     <input required class="ca-o-loc" maxlength="200" @bind="_lyDoInLai" placeholder="Ví dụ: lem mực trang 3-5, in sai màu" />
                 </label>
+                @* 28/11: bắt chụp bản in lỗi để quản lý đối chiếu, chống in lại khống cho người quen. *@
+                <div class="truong">
+                    <span class="nhan">Ảnh bản in lỗi <span class="chu-mo">(bắt buộc, 1–3 ảnh)</span></span>
+                    <InputFile @key="_lanChonAnhInLai" multiple accept=".jpg,.jpeg,.png" disabled="@_dangGui" OnChange="ChonAnhInLai" />
+                    <p class="goi-y">Chụp rõ chỗ lỗi trên bản in (lem mực, sai màu, thiếu trang…). JPG/PNG, tối đa 5 MB mỗi ảnh. Đã chọn @_anhInLai.Count ảnh.</p>
+                </div>
             }
 
             <div class="bg-tom-tat-phat-sinh">
@@ -282,6 +288,8 @@
     private int _soBanPhatSinh = 1;
     private int _maDichVuBoSung;
     private string _lyDoInLai = "";
+    private IReadOnlyList<IBrowserFile> _anhInLai = Array.Empty<IBrowserFile>();   // ảnh bản in lỗi
+    private int _lanChonAnhInLai;   // đổi @key để ô chọn file trống lại khi mở popup mới
     private string _ghiChuPhatSinh = "";
     private List<DichVuDto> _dsDichVu = new();
     private List<int> _dsGiaCongBoSung = new();
@@ -371,6 +379,8 @@
             _donPhatSinh = await res.Content.ReadFromJsonAsync<DonHangChiTietDto>();
             _cheDoPhatSinh = cheDo;
             _lyDoInLai = "";
+            _anhInLai = Array.Empty<IBrowserFile>();
+            _lanChonAnhInLai++;
             _ghiChuPhatSinh = "";
             _dsGiaCongBoSung.Clear();
             DongInChiTietDto dongDau = _donPhatSinh.DongIn.FirstOrDefault();
@@ -502,6 +512,24 @@
             HttpResponseMessage res;
             if (_cheDoPhatSinh == "IN_LAI_LOI_QUAY")
             {
+                // Bước 1: tải ảnh bản in lỗi lên trước, nhận mã bằng chứng.
+                if (_anhInLai.Count == 0)
+                {
+                    _loi = "Vui lòng chụp ảnh bản in lỗi (1–3 ảnh) trước khi tạo việc in lại.";
+                    return;
+                }
+                using var form = new MultipartFormDataContent();
+                foreach (IBrowserFile file in _anhInLai)
+                    form.Add(new StreamContent(file.OpenReadStream(5 * 1024 * 1024)), "Anh", file.Name);
+                var taiAnh = await Http.PostAsync($"api/don-hang/{_donPhatSinh.MaDonHang}/bang-chung-in-lai", form);
+                if (!taiAnh.IsSuccessStatusCode)
+                {
+                    _loi = await DocLoiApi.TuPhanHoiAsync(taiAnh, "Không tải được ảnh bản in lỗi.");
+                    return;
+                }
+                var bangChung = await taiAnh.Content.ReadFromJsonAsync<TaiBangChungInLaiResponse>();
+
+                // Bước 2: tạo việc in lại kèm mã bằng chứng.
                 res = await Http.PostAsJsonAsync(
                     $"api/don-hang/{_donPhatSinh.MaDonHang}/in-lai-tai-quay",
                     new TaoInLaiTaiQuayRequest
@@ -510,7 +538,8 @@
                         TuTrang = _tuTrangPhatSinh,
                         DenTrang = _denTrangPhatSinh,
                         SoBan = _soBanPhatSinh,
-                        LyDo = _lyDoInLai
+                        LyDo = _lyDoInLai,
+                        MaBangChung = bangChung?.MaBangChung ?? ""
                     });
             }
             else
@@ -545,7 +574,27 @@
         {
             _loi = "Không tạo được yêu cầu phát sinh.";
         }
-        _dangGui = false;
+        finally
+        {
+            _dangGui = false;   // finally: các nhánh return sớm (thiếu ảnh / tải ảnh lỗi) cũng mở lại nút
+        }
+    }
+
+    private void ChonAnhInLai(InputFileChangeEventArgs e)
+    {
+        _loi = null;
+        try
+        {
+            _anhInLai = e.GetMultipleFiles(3);
+            if (_anhInLai.Any(x => x.Size <= 0 || x.Size > 5 * 1024 * 1024
+                    || !new[] { ".jpg", ".jpeg", ".png" }.Contains(System.IO.Path.GetExtension(x.Name).ToLowerInvariant())))
+                throw new ArgumentException("Chọn 1–3 ảnh JPG/PNG, tối đa 5 MB mỗi ảnh.");
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+        {
+            _anhInLai = Array.Empty<IBrowserFile>();
+            _loi = ex is InvalidOperationException ? "Chỉ chọn tối đa 3 ảnh." : ex.Message;
+        }
     }
 
     private void DongPhatSinh()
@@ -605,6 +654,7 @@
         && _denTrangPhatSinh >= _tuTrangPhatSinh
         && _soBanPhatSinh >= 1
         && _soBanPhatSinh <= SoBanLonNhat
+        && (_cheDoPhatSinh != "IN_LAI_LOI_QUAY" || _anhInLai.Count > 0)
         && (_cheDoPhatSinh != "BO_SUNG" || KimGocBoSungHopLe || !_dsDichVu.Any(x =>
             _dsGiaCongBoSung.Contains(x.MaDichVu) && QuyTacIn.LaKimGoc(x.TenDichVu)))
         && (_cheDoPhatSinh == "IN_LAI_LOI_QUAY"

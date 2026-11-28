@@ -8,7 +8,8 @@ using PhotocopyShared.Dtos.DonHang;
 
 namespace PhotocopyApi.Controllers;
 
-// Quầy in lại đủ 3 lần (tối đa) mà tài liệu vẫn lỗi: nhân viên hủy đơn và lập hồ sơ hoàn tiền cho khách đã trả VietQR.
+// Quầy đã in lại (từ lần 1, không cần chờ đủ 3 lần) mà tài liệu vẫn lỗi: nhân viên hủy đơn và lập hồ sơ hoàn tiền
+// cho khách đã trả VietQR, để khỏi tốn thêm giấy mực in lại lần 2, lần 3.
 // Hồ sơ dùng chung bảng khiếu nại hoàn tiền (YeuCauHoanTienJson) nên CEO duyệt + chuyển tiền + gửi biên lai
 // ở đúng màn hình "Khiếu nại hoàn tiền" như các yêu cầu khác; nhân viên không tự chuyển tiền.
 public partial class DonHangController
@@ -73,7 +74,7 @@ public partial class DonHangController
         {
             MaDonHang = maDonHang, MaKhachHang = don.MaKhachHang, TenKhachHang = don.HoTen, TenChiNhanh = don.TenChiNhanh,
             TrangThai = "CHO_DUYET", Nguon = QuyTacHoanTienInLoi.Nguon, SoTien = don.SoTien, GuiLuc = luc,
-            MoTa = "Quầy đã in lại 3 lần nhưng tài liệu vẫn lỗi; cửa hàng hủy đơn và hoàn lại tiền đã chuyển khoản VietQR."
+            MoTa = $"Quầy đã in lại {don.SoLanInLai} lần nhưng tài liệu vẫn lỗi; cửa hàng hủy đơn và hoàn lại tiền đã chuyển khoản VietQR."
                    + (ghiChu.Length > 0 ? " Ghi chú của quầy: " + ghiChu : ""),
             NganHang = nganHang, SoTaiKhoan = soTaiKhoan, ChuTaiKhoan = chuTaiKhoan
         };
@@ -82,7 +83,7 @@ public partial class DonHangController
         {
             Loai = QuyTacHoanTienInLoi.Nguon, MaHoSo = Guid.NewGuid().ToString("N"), MaDonHang = maDonHang,
             MaNguoiGui = maNhanVien, GuiLuc = luc, TrangThaiThanhToan = don.ThanhToan,
-            LyDo = "In lại 3 lần vẫn lỗi. Đơn đã hủy, chờ CEO hoàn tiền chuyển khoản cho khách."
+            LyDo = $"In lại {don.SoLanInLai} lần vẫn lỗi. Đơn đã hủy, chờ CEO hoàn tiền chuyển khoản cho khách."
         };
 
         // Lần in lại cuối (0đ) vẫn đang chờ bàn giao thì hủy theo đơn gốc, để không còn nằm ở trang Bàn giao.
@@ -101,10 +102,10 @@ public partial class DonHangController
 
         string soTienHienThi = don.SoTien.ToString("#,0", new System.Globalization.CultureInfo("vi-VN")) + "₫";
         await conn.ExecuteAsync(@"INSERT ThongBao(MaNguoiDung,MaDonHang,TieuDe,NoiDung)
-            SELECT MaNguoiDung, @id, N'Hoàn tiền do in lỗi 3 lần', @noiDung
+            SELECT MaNguoiDung, @id, N'Hoàn tiền do in lỗi', @noiDung
             FROM NguoiDung WHERE TrangThai = N'HOAT_DONG' AND (VaiTro = 'SUPER_ADMIN' OR (VaiTro = 'BRANCH_ADMIN' AND MaChiNhanh = @cn))",
             new { id = maDonHang, cn = don.MaChiNhanh,
-                  noiDung = $"Quầy in lại 3 lần vẫn lỗi nên đã hủy đơn. CEO cần duyệt và chuyển hoàn {soTienHienThi} cho khách." }, tx);
+                  noiDung = $"Quầy in lại {don.SoLanInLai} lần vẫn lỗi nên đã hủy đơn. CEO cần duyệt và chuyển hoàn {soTienHienThi} cho khách." }, tx);
         await conn.ExecuteAsync(@"INSERT ThongBao(MaNguoiDung,MaDonHang,TieuDe,NoiDung)
             VALUES(@kh, @id, N'Đã tiếp nhận yêu cầu hoàn tiền', @noiDung)",
             new { kh = don.MaKhachHang, id = maDonHang,
@@ -112,7 +113,7 @@ public partial class DonHangController
         await tx.CommitAsync();
 
         await BaoHoanTienDoiAsync(maDonHang, don.MaChiNhanh);
-        await BaoDonDoiTrangThai(conn, maDonHang, "Đơn in lỗi 3 lần đã hủy, chờ CEO hoàn tiền");
+        await BaoDonDoiTrangThai(conn, maDonHang, "Đơn in lỗi đã hủy, chờ CEO hoàn tiền");
         foreach (int maInLai in dsInLai)
             await BaoDonDoiTrangThai(conn, maInLai, "Hủy lần in lại vì đơn gốc đã chuyển sang hoàn tiền");
         await XoaFileCuaDonDaKetThuc(conn, maDonHang);

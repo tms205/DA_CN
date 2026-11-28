@@ -107,6 +107,7 @@
                 @if (don.LoaiPhatSinh == "IN_LAI_LOI_QUAY")
                 {
                     <div class="o-canh-bao bg-mien-phi"><span>Việc in lại miễn phí của @don.MaDonHangGocHienThi · cửa hàng chịu chi phí · @don.LyDoPhatSinh</span></div>
+                    <AnhBangChungInLai MaDonInLai="@don.MaDonHang" />
                 }
                 else if (don.LoaiPhatSinh == "BO_SUNG")
                 {
@@ -428,10 +429,15 @@
     // Các nhóm lọc trên đầu bảng
     private string LopMauTab(string s) => s != "TAT_CA" && DemTheoLoc(s) == 0 ? "hd-tab-trong" : s switch {
         "CHO_XAC_NHAN" => "hd-tab-cho", "DA_XAC_NHAN" => "hd-tab-da-nhan",
-        "DANG_IN" => "hd-tab-dang-in", "DA_IN" => "hd-tab-da-in", _ => "" };
+        "DANG_IN" => "hd-tab-dang-in", "DA_IN" => "hd-tab-da-in", LocInLai => "hd-tab-in-lai", _ => "" };
     [SupplyParameterFromQuery(Name="xemDon")] public int? DonTuThongBao { get; set; }
     private int? _daMoTuThongBao;
-    private static readonly string[] DsLoc = { "TAT_CA", "CHO_XAC_NHAN", "DA_XAC_NHAN", "DANG_IN", "DA_IN" };
+    // IN_LAI (28/11): không phải trạng thái đơn, là nhóm "đơn in lỗi": việc in lại 0đ + đơn gốc đã từng phải in lại.
+    private const string LocInLai = "IN_LAI";
+    private static readonly string[] DsLoc = { "TAT_CA", "CHO_XAC_NHAN", "DA_XAC_NHAN", "DANG_IN", "DA_IN", LocInLai };
+    private static bool LaDonInLoi(HangDoiDonDto don) => don.LoaiPhatSinh == "IN_LAI_LOI_QUAY" || don.SoLanInLai > 0;
+    private static bool KhopLoc(HangDoiDonDto don, string loc) =>
+        loc == "TAT_CA" || (loc == LocInLai ? LaDonInLoi(don) : don.TrangThaiDonHang == loc);
 
     private List<HangDoiDonDto> _ds;              // bảng bên trái (null = đang tải)
     private DonHangChiTietDto _donDangChon;       // panel bên phải
@@ -921,6 +927,7 @@
     private string TenLoc(string trangThai)
     {
         if (trangThai == "TAT_CA") return "Tất cả";
+        if (trangThai == LocInLai) return "In lỗi / in lại";
         return TrangThaiDonHang.TenHienThi(trangThai);
     }
 
@@ -939,7 +946,7 @@
         int dem = 0;
         foreach (var don in _ds)
         {
-            if (trangThai == "TAT_CA" || don.TrangThaiDonHang == trangThai) dem++;
+            if (KhopLoc(don, trangThai)) dem++;
         }
         return dem;
     }
@@ -953,7 +960,7 @@
         string tuKhoa = _tuKhoa.Trim().ToLower();
         foreach (var don in _ds)
         {
-            if (_loc != "TAT_CA" && don.TrangThaiDonHang != _loc) continue;
+            if (!KhopLoc(don, _loc)) continue;
 
             string sdt = don.SoDienThoaiKhach ?? "";
             if (tuKhoa == ""

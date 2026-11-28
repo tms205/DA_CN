@@ -68,6 +68,10 @@ public sealed partial class TaoInLaiTaiQuayRequest
     [Required(ErrorMessage = "Vui lòng nhập lý do in lại.")]
     [MaxLength(255, ErrorMessage = "Lý do tối đa 255 ký tự.")]
     public string LyDo { get; set; } = "";
+    // Mã hồ sơ ảnh bản in lỗi (1–3 ảnh) đã tải lên trước qua POST api/don-hang/{gốc}/bang-chung-in-lai.
+    // API bắt buộc có khi tạo in lại, để chống bấm in lại khống đưa thêm bản cho người quen.
+    [MaxLength(32)]
+    public string MaBangChung { get; set; } = "";
 }
 
 public sealed partial class TaoDonBoSungTaiQuayRequest
@@ -407,6 +411,11 @@ public sealed class BaoCaoDoanhThuDto
     public string TrangThai { get; set; } = "HOAN_THANH";
     public decimal GiaTriDon { get; set; }
     public int SoDonDoanhThu {get;set;}
+    // Doanh thu ghi nhận tách theo cách trả tiền: COD = tiền mặt thu tại quầy, VIETQR = chuyển khoản payOS.
+    public decimal DoanhThuCod { get; set; }
+    public int SoDonCod { get; set; }
+    public decimal DoanhThuVietQr { get; set; }
+    public int SoDonVietQr { get; set; }
 }
 
 public sealed class DoiSoatMayInDto

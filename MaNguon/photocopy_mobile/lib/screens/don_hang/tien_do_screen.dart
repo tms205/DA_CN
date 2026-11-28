@@ -249,7 +249,7 @@ class _TienDoScreenState extends State<TienDoScreen> {
                 key: ValueKey(_don),
               ),
             ],
-            // Đơn hủy vì quầy in lỗi 3 lần: hiện hồ sơ hoàn tiền cửa hàng đã lập.
+            // Đơn hủy vì quầy in lại vẫn lỗi: hiện hồ sơ hoàn tiền cửa hàng đã lập.
             if (_don!.trangThaiDonHang == 'DA_HUY') ...[
               const SizedBox(height: 14),
               KhieuNaiHoanTien(
