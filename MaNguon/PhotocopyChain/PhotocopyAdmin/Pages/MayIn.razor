@@ -76,6 +76,7 @@
                         <a class="nut-phu" href="/">Xem hàng đợi đơn</a>
                     </div>
                     <dl class="mi-thong-so"><div><dt>@(that ? "Khổ giấy từ driver" : "Khổ giấy tối đa")</dt><dd>@(that ? (may.KetNoi?.HangDoi?.KhoGiayHoTro is { Count: > 0 } kho ? string.Join(", ", kho) : "Chưa xác nhận từ driver") : may.KhoGiay)</dd></div><div><dt>Tốc độ danh mục</dt><dd>@may.TocDo trang/phút</dd></div><div><dt>Màu / hai mặt</dt><dd>@(that ? $"Màu: {NangLuc(may.KetNoi?.HangDoi?.InMau)} · Hai mặt: {NangLuc(may.KetNoi?.HangDoi?.InHaiMat)}" : $"{(may.InMau ? "Có màu" : "Đen trắng")} · {(may.In2Mat ? "Hai mặt" : "Một mặt")}")</dd></div><div><dt>Counter đã hoàn tất</dt><dd>@may.SoTrangDaIn trang</dd></div></dl>
+                    <HopMucMayIn MaMayIn="@may.MaMayIn" KhoaThaoTac="@KhacPhamVi" />
                     @if (that)
                     {
                         <div class="mi-ghi-chu"><strong>Queue Windows: @(may.KetNoi?.TenHangDoi ?? tt.TenHangDoi ?? "Chưa cấu hình")</strong><p>USB và mạng dùng driver đã cài trên máy connector. Tạm dừng không thu hồi những trang đã vào máy; kiểm tra tại thiết bị nếu driver không nhận diện được job.</p></div>

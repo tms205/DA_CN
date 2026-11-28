@@ -9,7 +9,7 @@
 <TieuDeTrang TieuDe="Kho vật tư" MoTa="Theo dõi tồn kho thực tế, cảnh báo định mức tối thiểu và quản lý phiếu nhập hàng" />
 
 <div class="than-trang khoi-doc">
-    @if (!_moForm && !_moVatTu && !_moCanhBao)
+    @if (!_moForm && !_moVatTu && !_moCanhBao && !_moKiemKe)
     {
         <ThongBaoLoi @bind-NoiDung="_loi" />
     }
@@ -30,6 +30,7 @@
         @if (LaQuanLyChiNhanh() && _tonKho?.Count > 0)
         {
             <button type="button" class="nut-phu" disabled="@_dangLuu" @onclick="MoTaoPhieu">Lập phiếu nhập</button>
+            <button type="button" class="nut-phu" disabled="@_dangLuu" @onclick="MoKiemKe">Kiểm kê kho</button>
         }
     </div>
     @if (LaCEO())
@@ -278,7 +279,101 @@
             </div>
         }
     </div>
+
+    @* ===== KIỂM KÊ KHO (28/11): đếm lại toàn bộ số đang có trên kệ, khác với nhận hàng ===== *@
+    <div class="the the-bang">
+        <div class="bang-tieu-de">
+            <div>
+                <h2>Lịch sử kiểm kê kho</h2>
+                <p class="bang-mo-ta">Đếm lại số thực có trên kệ. Lệch thì CEO duyệt rồi mới cộng chênh lệch vào tồn hiện tại.</p>
+            </div>
+            <span class="bang-dem">Hao hụt tháng này: <b class="mono">@Tien(HaoHutThangNay)</b></span>
+        </div>
+        @if (_kiemKe == null)
+        {
+            <div class="bang-trong">Đang tải lịch sử kiểm kê…</div>
+        }
+        else if (_kiemKe.Count == 0)
+        {
+            <div class="bang-trong">Chưa có lần kiểm kê nào.</div>
+        }
+        else
+        {
+            <div class="bang-cuon">
+                <table role="table" class="bang bang-thao-tac-trai">
+                    <thead>
+                        <tr>
+                            <th scope="col">Mã phiếu</th>
+                            <th scope="col">Chi nhánh</th>
+                            <th scope="col">Vật tư</th>
+                            <th scope="col">Theo sổ → Thực đếm</th>
+                            <th scope="col">Chênh lệch</th>
+                            <th scope="col">Lý do</th>
+                            <th scope="col">Người lập / duyệt</th>
+                            <th scope="col">Trạng thái</th>
+                            <th scope="col" class="cot-hanh-dong">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (PhieuKiemKeDto k in _kiemKe)
+                        {
+                            <tr>
+                                <td class="mono" data-nhan="Mã phiếu"><b>@("KK" + k.MaPhieuKiemKe.ToString("0000"))</b><div class="nv-phu">@k.NgayLap.ToString("dd/MM HH:mm")</div></td>
+                                <td data-nhan="Chi nhánh">@k.TenChiNhanh</td>
+                                <td data-nhan="Vật tư"><b>@k.TenVatTu</b><div class="nv-phu">@k.DonViTinh</div></td>
+                                <td class="mono" data-nhan="Theo sổ → Thực đếm">@k.TonTheoSo → <b>@k.SoLuongThucDem</b></td>
+                                <td class="mono" data-nhan="Chênh lệch">
+                                    <b style="color: @(k.ChenhLech < 0 ? "var(--loi-chu)" : "var(--chu)")">@k.ChenhLech.ToString("+#;-#;0")</b>
+                                    @if (k.ChenhLech < 0) { <div class="nv-phu">≈ @Tien(QuyTacKiemKe.TienHaoHut(k.ChenhLech, k.DonGia))</div> }
+                                </td>
+                                <td data-nhan="Lý do"><div style="max-width:240px">@(k.LyDo ?? "—")</div></td>
+                                <td data-nhan="Người lập / duyệt"><div class="nv-ten">@k.TenNguoiLap</div><div class="nv-phu">@(k.TenNguoiDuyet ?? "Chưa duyệt")</div></td>
+                                <td data-nhan="Trạng thái"><span class="nhan-mau @(k.ChenhLech == 0 ? "nhan-xanh" : MauKiemKe(k.TrangThai))">@(k.ChenhLech == 0 ? "Khớp sổ" : TenTrangThaiKiemKe(k.TrangThai))</span></td>
+                                <td class="cot-hanh-dong" data-nhan="Thao tác">
+                                    @if (LaCEO() && k.TrangThai == "CHO_DUYET")
+                                    {
+                                        <div class="phieu-thao-tac">
+                                            <button type="button" class="nut-nho chinh" disabled="@_dangLuu" @onclick="() => DuyetKiemKeAsync(k, true)">Duyệt</button>
+                                            <button type="button" class="nut-nho phieu-nut-huy" disabled="@_dangLuu" @onclick="() => DuyetKiemKeAsync(k, false)">Từ chối</button>
+                                        </div>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
 </div>
+
+<HopThoaiQuanTri Mo="@_moKiemKe" TieuDe="Kiểm kê kho" MoTa="Đếm số đang có trên kệ rồi nhập vào. Form không hiện tồn trên máy để người đếm không nhập theo sổ." @bind-Loi="_loi" DangLuu="@_dangLuu" Dong="DongKiemKe">
+    <NoiDung>
+        <form id="kho-form-kiem-ke" @onsubmit="TaoKiemKeAsync" @onsubmit:preventDefault>
+            <div class="ca-loc-luoi" style="align-items: start;">
+                <div class="truong">
+                    <label class="nhan" for="kk-vat-tu">Vật tư kiểm kê</label>
+                    <select id="kk-vat-tu" class="ca-o-loc" @bind="_formKiemKe.MaVatTu">
+                        @foreach (TonKhoDto x in (_tonKho ?? new()).Where(x => x.MaChiNhanh == ChiNhanhDangChon).OrderBy(x => x.TenVatTu))
+                        {
+                            <option value="@x.MaVatTu">@x.TenVatTu (@x.DonViTinh)</option>
+                        }
+                    </select>
+                </div>
+                <div class="truong">
+                    <label class="nhan" for="kk-so-dem">Số đếm thực tế</label>
+                    <input id="kk-so-dem" required class="ca-o-loc mono" type="number" min="0" step="1" max="2147483647" @bind="_formKiemKe.SoLuongThucDem" />
+                    <small class="nv-phu">Đếm theo đơn vị tính của vật tư (tờ, hộp…), không đếm theo ram/thùng.</small>
+                </div>
+            </div>
+            <div class="truong">
+                <label class="nhan" for="kk-ly-do">Lý do nếu lệch <span class="chu-mo">(bắt buộc khi số đếm khác tồn trên máy)</span></label>
+                <input id="kk-ly-do" class="ca-o-loc" maxlength="255" @bind="_formKiemKe.LyDo" placeholder="Ví dụ: 1 ram bị ẩm hỏng, kẹt giấy chưa khai" />
+            </div>
+        </form>
+    </NoiDung>
+    <Chan><button type="button" class="nut-phu" disabled="@_dangLuu" @onclick="DongKiemKe">Hủy</button><button type="submit" form="kho-form-kiem-ke" class="nut-chinh" disabled="@_dangLuu">@(_dangLuu ? "Đang lưu…" : "Lưu kết quả kiểm kê")</button></Chan>
+</HopThoaiQuanTri>
 
 <HopThoaiQuanTri Mo="@(_phieuHuy != null)" TieuDe="Hủy phiếu nhập" MoTa="Kiểm tra thông tin và ghi lý do trước khi xác nhận." @bind-Loi="_loi" DangLuu="@_dangLuu" Dong="DongHuyPhieu">
     <NoiDung>
@@ -439,6 +534,9 @@
             _tonKho = new();
             _phieu = new();
         }
+        // Tải riêng: lịch sử kiểm kê lỗi (vd CSDL chưa chạy script 034) thì bảng tồn kho và phiếu nhập vẫn hiện.
+        try { _kiemKe = await Http.GetFromJsonAsync<List<PhieuKiemKeDto>>("api/quan-tri/kiem-ke") ?? new(); }
+        catch { _kiemKe = new(); }
     }
 
     private bool LaQuanLyChiNhanh() =>
@@ -483,6 +581,69 @@
         catch (HttpRequestException) { _loi = "Mất kết nối API. Làm mới kho để kiểm tra kết quả."; }
         finally { _dangLuu = false; }
     }
+
+    // ---------------------------------------------------------------- Kiểm kê kho (28/11)
+    private List<PhieuKiemKeDto> _kiemKe;
+    private bool _moKiemKe;
+    private TaoPhieuKiemKeRequest _formKiemKe = new();
+    private int? ChiNhanhDangChon => PhamVi.MaChiNhanh ?? Phien.NguoiDung?.MaChiNhanh;
+
+    private void MoKiemKe()
+    {
+        if (_dangLuu || !LaQuanLyChiNhanh()) return;
+        _formKiemKe = new() { MaVatTu = _tonKho?.FirstOrDefault(x => x.MaChiNhanh == ChiNhanhDangChon)?.MaVatTu ?? 0 };
+        _moForm = _moVatTu = _moCanhBao = false;
+        _loi = _thongBao = null;
+        _moKiemKe = true;
+    }
+
+    private void DongKiemKe() { if (!_dangLuu) { _moKiemKe = false; _loi = null; } }
+
+    // POST api/quan-tri/kiem-ke — máy chủ tự lấy tồn theo sổ lúc lưu, tính chênh lệch và bắt lý do nếu lệch.
+    private async Task TaoKiemKeAsync()
+    {
+        if (_dangLuu || !LaQuanLyChiNhanh()) return;
+        if (_formKiemKe.MaVatTu <= 0 || _formKiemKe.SoLuongThucDem < 0) { _loi = "Chọn vật tư và nhập số đếm không âm."; return; }
+        _dangLuu = true; _thongBao = null; _loi = null;
+        try
+        {
+            using var r = await Http.PostAsJsonAsync("api/quan-tri/kiem-ke", _formKiemKe);
+            if (!r.IsSuccessStatusCode) { _loi = await DocLoiApi.TuPhanHoiAsync(r, "Không lưu được phiếu kiểm kê."); return; }
+            _thongBao = (await r.Content.ReadFromJsonAsync<KetQuaDto>()).Message;
+            _moKiemKe = false;
+            await TaiAsync();
+        }
+        catch (HttpRequestException) { _loi = "Mất kết nối API. Tải lại lịch sử kiểm kê trước khi gửi lại."; }
+        finally { _dangLuu = false; }
+    }
+
+    // POST api/quan-tri/kiem-ke/{id}/duyet — chỉ CEO.
+    private async Task DuyetKiemKeAsync(PhieuKiemKeDto k, bool dongY)
+    {
+        if (_dangLuu || !LaCEO()) return;
+        string hoi = dongY
+            ? $"Duyệt phiếu KK{k.MaPhieuKiemKe:0000}? Tồn {k.TenVatTu} sẽ được điều chỉnh {k.ChenhLech:+#;-#;0} {k.DonViTinh}."
+            : $"Từ chối phiếu KK{k.MaPhieuKiemKe:0000}? Tồn kho giữ nguyên.";
+        if (!await _xacNhan.HoiAsync(hoi, dongY ? "Duyệt kiểm kê" : "Từ chối kiểm kê", dongY ? "Duyệt" : "Từ chối", !dongY)) return;
+        _dangLuu = true; _loi = _thongBao = null;
+        try
+        {
+            using var r = await Http.PostAsJsonAsync($"api/quan-tri/kiem-ke/{k.MaPhieuKiemKe}/duyet", new DuyetPhieuKiemKeRequest { DongY = dongY });
+            if (!r.IsSuccessStatusCode) { _loi = await DocLoiApi.TuPhanHoiAsync(r, "Không duyệt được phiếu kiểm kê."); return; }
+            _thongBao = (await r.Content.ReadFromJsonAsync<KetQuaDto>()).Message;
+            await TaiAsync();
+        }
+        catch (HttpRequestException) { _loi = "Mất kết nối API. Tải lại để kiểm tra kết quả."; }
+        finally { _dangLuu = false; }
+    }
+
+    // Tổng tiền hao hụt của các phiếu đã duyệt trong tháng hiện tại.
+    private decimal HaoHutThangNay => _kiemKe?
+        .Where(k => k.TrangThai == "DA_DUYET" && k.NgayLap.Year == DateTime.Today.Year && k.NgayLap.Month == DateTime.Today.Month)
+        .Sum(k => QuyTacKiemKe.TienHaoHut(k.ChenhLech, k.DonGia)) ?? 0;
+
+    private static string TenTrangThaiKiemKe(string s) => s switch { "CHO_DUYET" => "Chờ CEO duyệt", "DA_DUYET" => "Đã điều chỉnh", "TU_CHOI" => "Từ chối", _ => s };
+    private static string MauKiemKe(string s) => s switch { "CHO_DUYET" => "nhan-cam", "DA_DUYET" => "nhan-xanh", _ => "nhan-do" };
 
     private string Mau(string s) => s == "DA_NHAP"
         ? "nhan-xanh"

@@ -1,0 +1,156 @@
+@* Hộp mực của máy in đang chọn (28/11, CSDL 035). Đặt trong Bảng điều khiển máy in.
+   - Thanh % = số trang hộp hiện tại đã in / năng suất hãng công bố. ≥ 90% thì báo sắp hết mực.
+   - Nút "Thay mực": nhân viên bấm sau khi lắp hộp mới → trừ 1 hộp trong kho, đặt lại bộ đếm.
+   - Quản lý/CEO khai loại hộp mực trong kho và năng suất (trang/hộp) của máy.
+   - Lịch sử: hộp cũ hết dưới 50% năng suất thì đánh dấu "Nghi vấn". *@
+@inject HttpClient Http
+@inject PhienDangNhap Phien
+
+<section class="hm-khung" aria-label="Hộp mực">
+    <div class="hm-dau">
+        <h3>Hộp mực</h3>
+        @if (_hop != null)
+        {
+            <span class="nhan-mau @(_hop.SapHet ? "nhan-do" : "nhan-xanh")">@(_hop.SapHet ? "Sắp hết mực" : "Còn mực")</span>
+        }
+    </div>
+    <ThongBaoLoi @bind-NoiDung="_loi" />
+    @if (_thongBao != null) { <div class="o-thanh-cong" role="status">@_thongBao</div> }
+
+    @if (_hop == null)
+    {
+        <p class="nv-phu">@(_loi == null ? "Đang tải thông tin hộp mực…" : "")</p>
+    }
+    else
+    {
+        <p>
+            Loại mực: <b>@(_hop.TenVatTuMuc ?? "Chưa khai")</b> · trong kho còn <b>@_hop.TonMucTrongKho</b> hộp
+        </p>
+        <progress class="@(_hop.SapHet ? "hm-sap-het" : "")" max="100" value="@Math.Min(100, _hop.PhanTramDaDung)" aria-label="Mức đã dùng của hộp mực"></progress>
+        <p class="nv-phu">
+            Hộp hiện tại đã in <b class="mono">@_hop.SoTrangHopHienTai</b> / @_hop.NangSuatHopMuc trang (@_hop.PhanTramDaDung%).
+            Năng suất là số trang hãng công bố cho 1 hộp; thực tế phụ thuộc độ phủ mực của tài liệu.
+        </p>
+
+        <div class="xac-nhan-o">
+            <button type="button" class="nut-chinh" disabled="@(_dangGui || KhoaThaoTac || _hop.MaVatTuMuc == null)" @onclick="ThayMucAsync">Đã thay hộp mực mới</button>
+            @if (DuocCauHinh)
+            {
+                <button type="button" class="nut-phu" disabled="@(_dangGui || KhoaThaoTac)" @onclick="() => _moCauHinh = !_moCauHinh">Cấu hình hộp mực</button>
+            }
+        </div>
+
+        @if (_moCauHinh && DuocCauHinh)
+        {
+            <form class="hm-cau-hinh" @onsubmit="LuuCauHinhAsync" @onsubmit:preventDefault>
+                <label class="truong">
+                    <span class="nhan">Loại hộp mực trong kho</span>
+                    <select class="ca-o-loc" @bind="_cauHinh.MaVatTuMuc">
+                        <option value="0">-- Chọn vật tư --</option>
+                        @foreach (var vt in _hop.DsVatTu) { <option value="@vt.MaVatTu">@vt.TenVatTu (@vt.DonViTinh)</option> }
+                    </select>
+                </label>
+                <label class="truong">
+                    <span class="nhan">Năng suất (trang / hộp)</span>
+                    <input class="ca-o-loc mono" type="number" min="@QuyTacHopMuc.NangSuatToiThieu" max="@QuyTacHopMuc.NangSuatToiDa" step="1" @bind="_cauHinh.NangSuatHopMuc" />
+                    <small class="nv-phu">Ví dụ hộp HP 12A khoảng 2.000 trang.</small>
+                </label>
+                <button type="submit" class="nut-chinh" disabled="@_dangGui">Lưu cấu hình</button>
+            </form>
+        }
+
+        @if (_hop.LichSu.Count > 0)
+        {
+            <details class="hm-lich-su">
+                <summary>Lịch sử thay mực (@_hop.LichSu.Count lần gần nhất)</summary>
+                <ul>
+                    @foreach (var ls in _hop.LichSu)
+                    {
+                        <li>
+                            @ls.ThoiGian.ToString("dd/MM/yyyy HH:mm") · @ls.TenNguoiThay · hộp cũ in @ls.SoTrangHopCu / @ls.NangSuatHopMuc trang
+                            @if (ls.NghiVan) { <span class="nhan-mau nhan-do">Nghi vấn: hết sớm</span> }
+                        </li>
+                    }
+                </ul>
+            </details>
+        }
+    }
+</section>
+
+<style>
+    .hm-khung { margin-top: 14px; padding: 12px 14px; border: 1px solid #d8e2ee; border-radius: 9px; background: #f8fbff; display: flex; flex-direction: column; gap: 8px; }
+    .hm-dau { display: flex; justify-content: space-between; align-items: center; }
+    .hm-dau h3 { margin: 0; font-size: 15px; }
+    .hm-khung progress { width: 100%; height: 12px; accent-color: #1f7a4d; }
+    .hm-khung progress.hm-sap-het { accent-color: #c0392b; }
+    .hm-cau-hinh { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+    .hm-lich-su ul { margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+</style>
+
+@code {
+    [Parameter] public int MaMayIn { get; set; }
+    [Parameter] public bool KhoaThaoTac { get; set; }    // CEO đang chọn chi nhánh khác với máy
+
+    private HopMucMayInDto _hop;
+    private CauHinhHopMucRequest _cauHinh = new();
+    private bool _dangGui, _moCauHinh;
+    private string _loi, _thongBao;
+    private int _daTaiCho;
+
+    private bool DuocCauHinh => Phien.NguoiDung?.TenVaiTro is "SUPER_ADMIN" or "BRANCH_ADMIN";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_daTaiCho == MaMayIn) return;
+        _daTaiCho = MaMayIn;
+        _thongBao = null; _moCauHinh = false;
+        await TaiAsync();
+    }
+
+    private async Task TaiAsync()
+    {
+        _loi = null;
+        if (MaMayIn <= 0) { _hop = null; return; }
+        try
+        {
+            using var r = await Http.GetAsync($"api/quan-tri/may-in/{MaMayIn}/hop-muc");
+            if (!r.IsSuccessStatusCode) { _hop = null; _loi = await DocLoiApi.TuPhanHoiAsync(r, "Không tải được thông tin hộp mực."); return; }
+            _hop = await r.Content.ReadFromJsonAsync<HopMucMayInDto>();
+            _cauHinh = new() { MaVatTuMuc = _hop?.MaVatTuMuc ?? 0, NangSuatHopMuc = _hop?.NangSuatHopMuc ?? 2000 };
+        }
+        catch { _hop = null; _loi = "Không kết nối được API để tải hộp mực."; }
+    }
+
+    // POST api/quan-tri/may-in/{id}/thay-muc — trừ 1 hộp trong kho, ghi lịch sử, đặt lại bộ đếm.
+    private async Task ThayMucAsync()
+    {
+        if (_dangGui || _hop == null) return;
+        _dangGui = true; _loi = _thongBao = null;
+        try
+        {
+            using var r = await Http.PostAsync($"api/quan-tri/may-in/{MaMayIn}/thay-muc", null);
+            if (!r.IsSuccessStatusCode) { _loi = await DocLoiApi.TuPhanHoiAsync(r, "Không ghi nhận được việc thay mực."); return; }
+            _thongBao = (await r.Content.ReadFromJsonAsync<KetQuaDto>())?.Message;
+            await TaiAsync();
+        }
+        catch (HttpRequestException) { _loi = "Mất kết nối API. Tải lại để kiểm tra trước khi bấm lại."; }
+        finally { _dangGui = false; }
+    }
+
+    private async Task LuuCauHinhAsync()
+    {
+        if (_dangGui || !DuocCauHinh) return;
+        if (_cauHinh.MaVatTuMuc <= 0) { _loi = "Vui lòng chọn loại hộp mực trong kho."; return; }
+        _dangGui = true; _loi = _thongBao = null;
+        try
+        {
+            using var r = await Http.PutAsJsonAsync($"api/quan-tri/may-in/{MaMayIn}/hop-muc", _cauHinh);
+            if (!r.IsSuccessStatusCode) { _loi = await DocLoiApi.TuPhanHoiAsync(r, "Không lưu được cấu hình hộp mực."); return; }
+            _thongBao = (await r.Content.ReadFromJsonAsync<KetQuaDto>())?.Message;
+            _moCauHinh = false;
+            await TaiAsync();
+        }
+        catch (HttpRequestException) { _loi = "Mất kết nối API."; }
+        finally { _dangGui = false; }
+    }
+}
